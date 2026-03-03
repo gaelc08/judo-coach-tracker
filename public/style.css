@@ -1,0 +1,345 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
+  min-height: 100vh;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto 20px auto;
+  background: white;
+  border-radius: 12px;
+  padding: 30px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+}
+
+h1 {
+  text-align: center;
+  color: #333;
+  margin-bottom: 30px;
+  font-size: 2em;
+}
+
+h2 {
+  color: #333;
+}
+
+.controls {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+  min-width: 200px;
+}
+
+label {
+  font-weight: 600;
+  color: #555;
+  font-size: 0.9em;
+}
+
+input, select {
+  padding: 10px;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  font-size: 1em;
+  transition: border-color 0.3s;
+}
+
+input:focus, select:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.btn-primary, .btn-secondary, .btn-danger {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 1em;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-weight: 600;
+}
+
+.btn-primary {
+  background: #667eea;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #5568d3;
+  transform: translateY(-2px);
+}
+
+.btn-secondary {
+  background: #e0e0e0;
+  color: #333;
+}
+
+.btn-secondary:hover {
+  background: #d0d0d0;
+}
+
+.btn-danger {
+  background: #e74c3c;
+  color: white;
+}
+
+.btn-danger:hover {
+  background: #c0392b;
+}
+
+#addCoachBtn, #editCoachBtn {
+  margin-top: 10px;
+}
+
+.calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 10px;
+  margin-bottom: 30px;
+}
+
+.calendar-header {
+  background: #667eea;
+  color: white;
+  font-weight: bold;
+  text-align: center;
+  padding: 12px 8px;
+  border-radius: 8px;
+  font-size: 0.9em;
+  letter-spacing: 0.5px;
+}
+
+.calendar-day {
+  aspect-ratio: 1;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  background: white;
+}
+
+.calendar-day:hover:not(.disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+/* Weekends - Light gray */
+.calendar-day.weekend {
+  background: #e8e8e8;
+  border-color: #999;
+}
+
+/* Public holidays - Red/Pink */
+.calendar-day.holiday {
+  background: #ffcdd2;
+  border-color: #e57373;
+}
+
+/* School holidays - Light orange */
+.calendar-day.school-holiday {
+  background: #ffe0b2;
+  border-color: #ffb74d;
+}
+
+/* Public holiday on weekend - Darker red */
+.calendar-day.weekend.holiday {
+  background: #ef9a9a;
+  border-color: #e57373;
+}
+
+/* School holiday on weekend - Darker orange */
+.calendar-day.weekend.school-holiday {
+  background: #ffcc80;
+  border-color: #ffa726;
+}
+
+.calendar-day.disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Training days - Green */
+.calendar-day.has-data {
+  background: #c8e6c9;
+  border-color: #66bb6a;
+  font-weight: 600;
+}
+
+/* Competition days - Blue */
+.calendar-day.has-competition {
+  background: #bbdefb;
+  border-color: #42a5f5;
+  font-weight: 600;
+}
+
+.day-number {
+  font-weight: bold;
+  font-size: 1.1em;
+  color: #333;
+}
+
+.day-info {
+  font-size: 0.7em;
+  color: #666;
+  margin-top: 5px;
+  line-height: 1.2;
+}
+
+.day-hours {
+  font-size: 0.8em;
+  color: #1b5e20;
+  font-weight: 600;
+}
+
+.modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  z-index: 1000;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal.active {
+  display: flex;
+}
+
+.modal-content {
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  min-width: 400px;
+  max-width: 90%;
+  box-shadow: 0 5px 30px rgba(0,0,0,0.3);
+}
+
+.modal-content h2 {
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.modal-content input[type="text"],
+.modal-content input[type="number"],
+.modal-content input[type="email"],
+.modal-content input[type="password"] {
+  width: 100%;
+  margin-bottom: 15px;
+  padding: 10px;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  font-size: 1em;
+}
+
+.modal-content input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
+.modal-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.modal-buttons button {
+  flex: 1;
+}
+
+#travelGroup {
+  margin-top: 10px;
+}
+
+.summary {
+  background: #f8f9fa;
+  padding: 25px;
+  border-radius: 8px;
+  margin-top: 30px;
+}
+
+.summary h2 {
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px;
+  background: white;
+  border-radius: 6px;
+  border-left: 4px solid #667eea;
+}
+
+.summary-item.total {
+  grid-column: 1 / -1;
+  background: #667eea;
+  color: white;
+  font-size: 1.2em;
+  border-left: none;
+}
+
+.summary-item .label {
+  font-weight: 600;
+}
+
+.summary-item .value {
+  font-weight: bold;
+  color: #667eea;
+}
+
+.summary-item.total .value {
+  color: white;
+}
+
+#exportBtn {
+  width: 100%;
+  margin-top: 10px;
+}
+
+@media (max-width: 768px) {
+  .calendar {
+    gap: 5px;
+  }
+  
+  .calendar-day {
+    padding: 4px;
+    font-size: 0.8em;
+  }
+  
+  .modal-content {
+    min-width: 90%;
+    padding: 20px;
+  }
+}
