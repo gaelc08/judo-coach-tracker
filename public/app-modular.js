@@ -700,8 +700,9 @@ function exportMileageHTML() {
     return;
   }
 
-  // Your Judo Club logo URL
-  const logoUrl = "https://drive.google.com/uc?export=view&id=16WrRp8f5KP0CPPWbdfC9ZaA-J9dBnXsW";
+  // Judo Club logo 
+const logoUrl = "https://judo-coach-tracker.web.app/logo-jcc.png";
+
 
   const html = `
 <!DOCTYPE html>
