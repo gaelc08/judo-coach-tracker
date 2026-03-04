@@ -671,49 +671,6 @@ function exportToCSV() {
   a.click();
 }
 
-function exportMileageCSV() {
-  if (!currentCoach || !currentMonth) { alert("Please select a coach and month"); return; }
-  const [year, month] = currentMonth.split("-");
-  const today = new Date().toLocaleDateString("fr-FR").split("/").join("");
-
-  const rows = [];
-  rows.push(["Judo Club de Cattenom-Rodemack", "RA1026", "Dojo communautaire", "57570 Cattenom", "judoclubcattenom@gmail.com", "06 62 62 53 13"]);
-  rows.push(["Note de frais kilométrique"]);
-  rows.push(["Date :", today, "Nom et prénom :", currentCoach.name, "Adresse :", currentCoach.address || ""]);
-  rows.push(["Modèle et marque du véhicule :", currentCoach.vehicle || "", "Poste occupé :", "Entraîneur", "Puissance fiscale du véhicule :", (currentCoach.fiscalPower || "") + "CV"]);
-  rows.push([]);
-  rows.push(["Date", "Motif du trajet", "Lieu de départ", "Lieu d'arrivée", "Distance km", "Indemnité kilométrique", "Page", "Parking / Justificatif", "Montant indemnisé"]);
-
-  let total = 0;
-  Object.keys(timeData)
-    .filter(key => key.startsWith(`${currentCoach.id}-${year}-${month}`))
-    .sort()
-    .forEach(key => {
-      const date = key.split("-").slice(1).join("-");
-      const data = timeData[key];
-      if (!data.km || data.km <= 0) return;
-      const amount = data.km * currentCoach.kmRate;
-      total += amount;
-      rows.push([date, data.description || "Déplacement judo", data.departurePlace || "", data.arrivalPlace || "", String(data.km), currentCoach.kmRate.toFixed(2).replace(".", ","), "", "", amount.toFixed(2).replace(".", ",")]);
-    });
-
-  if (total === 0) { alert("No mileage recorded for this month."); return; }
-
-  rows.push([]);
-  rows.push(["TOTAL TTC", total.toFixed(2).replace(".", ",") + " €"]);
-  rows.push([]);
-  rows.push(["Le montant de l'indemnité par kilomètre est fixé selon le nombre de kilomètres parcouru et la puissance fiscale de votre véhicule. Pour le connaître référez-vous au barème des frais kilométriques établi par l'administration fiscale et l'Ursaf."]);
-  rows.push([]);
-  rows.push(["Signature du salarié", "", "", "Signature de l'employeur"]);
-
-  const csv = rows.map(r => r.map(v => `"${v}"`).join(";")).join("\n");
-  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `note_frais_km_${currentCoach.name}_${currentMonth}.csv`;
-  a.click();
-}
 
 function exportMileageHTML() {
   if (!currentCoach || !currentMonth) {
@@ -744,7 +701,7 @@ function exportMileageHTML() {
   }
 
   // Your Judo Club logo URL
-  const logoUrl = "https://judoclubcattenom.files.wordpress.com/2020/09/logo-judo-cattenom.png";
+  const logoUrl = "https://drive.google.com/uc?export=view&id=16WrRp8f5KP0CPPWbdfC9ZaA-J9dBnXsW";
 
   const html = `
 <!DOCTYPE html>
@@ -1036,4 +993,3 @@ async function importCoachData(data) {
 
 // Optionally expose some functions globally if needed
 window.exportToCSV = exportToCSV;
-window.exportMileageCSV = exportMileageCSV;
