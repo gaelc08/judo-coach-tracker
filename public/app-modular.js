@@ -286,7 +286,7 @@ function setupEventListeners() {
     reader.readAsText(file);
   };
 
-  document.getElementById("mileageBtn").onclick = exportMileageCSV;
+  document.getElementById("mileageBtn").onclick = exportMileageHTML;
 }
 
 // ===== Coach management =====
@@ -715,6 +715,271 @@ function exportMileageCSV() {
   a.click();
 }
 
+function exportMileageHTML() {
+  if (!currentCoach || !currentMonth) {
+    alert("Please select a coach and month");
+    return;
+  }
+  const [year, month] = currentMonth.split("-");
+  const today = new Date().toLocaleDateString("fr-FR");
+
+  const rows = [];
+  let total = 0;
+
+  Object.keys(timeData)
+    .filter(key => key.startsWith(`${currentCoach.id}-${year}-${month}`))
+    .sort()
+    .forEach(key => {
+      const date = key.split("-").slice(1).join("-");
+      const data = timeData[key];
+      if (!data.km || data.km <= 0) return;
+      const amount = data.km * currentCoach.kmRate;
+      total += amount;
+      rows.push({ date, ...data, amount });
+    });
+
+  if (total === 0) {
+    alert("No mileage recorded for this month.");
+    return;
+  }
+
+  // Your Judo Club logo URL
+  const logoUrl = "https://judoclubcattenom.files.wordpress.com/2020/09/logo-judo-cattenom.png";
+
+  const html = `
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Note de frais kilométrique - ${currentCoach.name} - ${month}/${year}</title>
+<style>
+  @media print {
+    @page { margin: 1.5cm; }
+    body { margin: 0; }
+    .no-print { display: none; }
+  }
+  
+  body { 
+    font-family: Arial, sans-serif; 
+    margin: 20px;
+    color: #333;
+  }
+  
+  .header { 
+    display: flex; 
+    align-items: center;
+    border-bottom: 3px solid #004080;
+    padding-bottom: 15px;
+    margin-bottom: 20px;
+  }
+  
+  .header-logo { 
+    margin-right: 20px; 
+  }
+  
+  .header-logo img { 
+    height: 80px; 
+  }
+  
+  .header-text { 
+    color: #004080; 
+  }
+  
+  .header-text h1 { 
+    margin: 0 0 5px 0;
+    font-size: 1.5rem;
+    color: #004080;
+  }
+  
+  .header-text p { 
+    margin: 2px 0;
+    font-size: 0.9rem;
+  }
+  
+  h2 { 
+    color: #0066cc;
+    margin-top: 20px;
+  }
+  
+  .info-section {
+    background: #f4f8ff;
+    padding: 15px;
+    border-radius: 5px;
+    margin: 15px 0;
+  }
+  
+  .info-section p {
+    margin: 5px 0;
+  }
+  
+  table { 
+    border-collapse: collapse; 
+    width: 100%; 
+    margin-top: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  
+  th, td { 
+    border: 1px solid #ddd; 
+    padding: 10px; 
+    font-size: 0.9rem;
+    text-align: left;
+  }
+  
+  th { 
+    background: #004080; 
+    color: #fff;
+    font-weight: bold;
+  }
+  
+  tr:nth-child(even) { 
+    background: #f9f9f9; 
+  }
+  
+  tr:hover:not(.total-row) {
+    background: #f4f8ff;
+  }
+  
+  .total-row td { 
+    font-weight: bold; 
+    background: #e0ecff;
+    font-size: 1rem;
+  }
+  
+  .note {
+    margin-top: 30px;
+    padding: 15px;
+    background: #fffbf0;
+    border-left: 4px solid #ffa500;
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
+  
+  .signature { 
+    margin-top: 60px; 
+    display: flex; 
+    justify-content: space-between;
+    page-break-inside: avoid;
+  }
+  
+  .signature > div {
+    width: 45%;
+    border-top: 1px solid #333;
+    padding-top: 10px;
+    text-align: center;
+  }
+  
+  .print-button {
+    margin: 20px 0;
+    padding: 10px 20px;
+    background: #004080;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1rem;
+  }
+  
+  .print-button:hover {
+    background: #0066cc;
+  }
+</style>
+</head>
+<body>
+  <button class="print-button no-print" onclick="window.print()">🖨️ Imprimer / Enregistrer en PDF</button>
+
+  <div class="header">
+    <div class="header-logo">
+      <img src="${logoUrl}" alt="Judo Club Cattenom-Rodemack" />
+    </div>
+    <div class="header-text">
+      <h1>Judo Club de Cattenom-Rodemack</h1>
+      <p>Association RA1026</p>
+      <p>Dojo communautaire – 57570 Cattenom</p>
+      <p>📧 judoclubcattenom@gmail.com – 📞 06 62 62 53 13</p>
+    </div>
+  </div>
+
+  <h2>Note de frais kilométrique</h2>
+  
+  <div class="info-section">
+    <p><strong>Période :</strong> ${month}/${year}</p>
+    <p><strong>Date d'édition :</strong> ${today}</p>
+    <p><strong>Nom et prénom :</strong> ${currentCoach.name}</p>
+    <p><strong>Adresse :</strong> ${currentCoach.address || "Non renseignée"}</p>
+    <p><strong>Poste :</strong> Entraîneur</p>
+    <p><strong>Véhicule :</strong> ${currentCoach.vehicle || "Non renseigné"}</p>
+    <p><strong>Puissance fiscale :</strong> ${currentCoach.fiscalPower || "Non renseignée"} CV</p>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Motif du trajet</th>
+        <th>Lieu de départ</th>
+        <th>Lieu d'arrivée</th>
+        <th>Distance (km)</th>
+        <th>Indemnité/km (€)</th>
+        <th>Montant (€)</th>
+      </tr>
+    </thead>
+    <tbody>
+${rows.map(r => `
+      <tr>
+        <td>${r.date}</td>
+        <td>${r.description || "Déplacement judo"}</td>
+        <td>${r.departurePlace || "-"}</td>
+        <td>${r.arrivalPlace || "-"}</td>
+        <td style="text-align:right">${r.km}</td>
+        <td style="text-align:right">${currentCoach.kmRate.toFixed(2).replace(".", ",")}</td>
+        <td style="text-align:right">${r.amount.toFixed(2).replace(".", ",")} €</td>
+      </tr>`).join("")}
+      <tr class="total-row">
+        <td colspan="6" style="text-align:right">TOTAL TTC</td>
+        <td style="text-align:right">${total.toFixed(2).replace(".", ",")} €</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <strong>ℹ️ Barème des frais kilométriques :</strong><br>
+    Le montant de l'indemnité par kilomètre est fixé selon le nombre de kilomètres parcourus
+    et la puissance fiscale du véhicule. Pour le connaître, référez-vous au barème des frais 
+    kilométriques établi par l'administration fiscale et l'Urssaf.
+  </div>
+
+  <div class="signature">
+    <div>
+      <strong>Signature du salarié</strong><br><br><br>
+      ${currentCoach.name}
+    </div>
+    <div>
+      <strong>Signature de l'employeur</strong><br><br><br>
+      Président du Judo Club
+    </div>
+  </div>
+</body>
+</html>
+`;
+
+  // Create and download the HTML file
+  const blob = new Blob([html], { type: "text/html;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `note_frais_km_${currentCoach.name}_${currentMonth}.html`;
+  a.click();
+  
+  // Also open in new window for immediate printing to PDF
+  const newWindow = window.open();
+  newWindow.document.write(html);
+  newWindow.document.close();
+}
+
+// Expose the function
+window.exportMileageHTML = exportMileageHTML;
 
 // ===== Import JSON =====
 async function importCoachData(data) {
