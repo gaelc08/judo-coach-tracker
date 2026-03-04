@@ -1,131 +1,145 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Judo Coach Tracker</title>
-    <link rel="stylesheet" href="style.css">
-  </head>
-  <body>
-    <!-- Auth area -->
-    <div id="authContainer" class="auth-container">
-      <h1>Judo Coach Tracker</h1>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Judo Coach Tracker</title>
+  >
+</head>
+<body>
+  <!-- Auth area -->
+  <div id="authContainer" class="auth-container">
+    <h1>Judo Coach Tracker</h1>
 
-      <div class="auth-row">
-        <input id="authEmail" type="email" placeholder="Email">
-        <input id="authPassword" type="password" placeholder="Password">
-      </div>
-
-      <div class="auth-buttons">
-        <button id="registerBtn">Register</button>
-        <button id="loginBtn">Login</button>
-        <button id="logoutBtn" style="display:none">Logout</button>
-      </div>
-
-      <div id="authStatus">Not logged in.</div>
+    <div class="auth-row">
+      <input id="authEmail" type="email" placeholder="Email">
+      <input id="authPassword" type="password" placeholder="Password">
     </div>
 
-    <!-- Main app (hidden until logged in) -->
-    <div id="appContainer" style="display:none">
-      <!-- Coach selection and month -->
-      <div class="toolbar">
-        <label>
-          Coach:
-          <select id="coachSelect">
-            <option value="">-- Select Coach --</option>
-          </select>
-        </label>
-
-        <label>
-          Month:
-          <input id="monthSelect" type="month" value="2026-02">
-        </label>
-
-        <button id="addCoachBtn">Add coach</button>
-        <button id="editCoachBtn">Edit coach</button>
-      </div>
-
-      <!-- Calendar -->
-      <div id="calendar" class="calendar"></div>
-
-      <!-- Summary -->
-      <div class="summary">
-        <div>Total hours: <span id="totalHours">0</span></div>
-        <div>Hourly rate: <span id="hourlyRate">€0.00</span></div>
-        <div>Training payment: <span id="trainingPayment">€0.00</span></div>
-        <div>Competition days: <span id="compDays">0</span></div>
-        <div>Competition payment: <span id="compPayment">€0.00</span></div>
-        <div>Total km: <span id="totalKm">0</span></div>
-        <div>Km payment: <span id="kmPayment">€0.00</span></div>
-        <div>Total payment: <span id="totalPayment">€0.00</span></div>
-      </div>
-
-      <!-- Export / import -->
-      <div class="actions">
-        <button id="exportBtn">Export month (CSV)</button>
-        <button id="mileageBtn">Export mileage (CSV)</button>
-
-        <input id="importFile" type="file" accept=".json">
-        <button id="importBtn">Import JSON</button>
-      </div>
+    <div class="auth-buttons">
+      <button id="registerBtn">Register</button>
+      <button id="loginBtn">Login</button>
+      <button id="logoutBtn" style="display:none">Logout</button>
     </div>
 
-    <!-- Coach modal -->
-    <div id="coachModal" class="modal">
-      <div class="modal-content">
-        <h2>Coach</h2>
-        <label>Name
-          <input id="coachName" type="text">
-        </label>
-        <label>Hourly rate (€)
-          <input id="coachRate" type="number" step="0.1">
-        </label>
-        <label>Daily allowance (€)
-          <input id="dailyAllowance" type="number" step="0.1">
-        </label>
-        <label>Km rate (€ / km)
-          <input id="kmRate" type="number" step="0.01" value="0.35">
-        </label>
+    <div id="authStatus">Not logged in.</div>
+  </div>
 
-        <div class="modal-actions">
-          <button id="saveCoach">Save</button>
-          <button id="cancelCoach">Cancel</button>
-        </div>
-      </div>
+  <!-- Main app (hidden until logged in) -->
+  <div id="appContainer" style="display:none">
+    <!-- Coach selection and month -->
+    <div class="toolbar">
+      abel>
+        Coach:
+        <select id="coachSelect">
+          <option value="">-- Select Coach --</option>
+        </select>
+      </label>
+
+      abel>
+        Month:
+        <input id="monthSelect" type="month" value="2026-02">
+      </label>
+
+      <button id="addCoachBtn">Add coach</button>
+      <button id="editCoachBtn">Edit coach</button>
     </div>
 
-    <!-- Day modal -->
-    <div id="dayModal" class="modal">
-      <div class="modal-content">
-        <h2 id="dayTitle">Edit day</h2>
+    <!-- Calendar -->
+    <div id="calendar" class="calendar"></div>
 
-        <label>Training hours
-          <input id="trainingHours" type="number" step="0.5" min="0">
-        </label>
-
-        <label>
-          <input id="competitionDay" type="checkbox">
-          Competition day
-        </label>
-
-        <div id="travelGroup" style="display:none">
-          <label>Kilometers
-            <input id="kilometers" type="number" step="1" min="0">
-          </label>
-          <label>Competition / travel description
-            <textarea id="competitionDescription"></textarea>
-          </label>
-        </div>
-
-        <div class="modal-actions">
-          <button id="saveDay">Save</button>
-          <button id="deleteDay">Delete</button>
-          <button id="cancelDay">Cancel</button>
-        </div>
-      </div>
+    <!-- Summary -->
+    <div class="summary">
+      <div>Total hours: <span id="totalHours">0</span></div>
+      <div>Hourly rate: <span id="hourlyRate">€0.00</span></div>
+      <div>Training payment: <span id="trainingPayment">€0.00</span></div>
+      <div>Competition days: <span id="compDays">0</span></div>
+      <div>Competition payment: <span id="compPayment">€0.00</span></div>
+      <div>Total km: <span id="totalKm">0</span></div>
+      <div>Km payment: <span id="kmPayment">€0.00</span></div>
+      <div>Total payment: <span id="totalPayment">€0.00</span></div>
     </div>
 
-    <!-- Load modular Firebase app logic as an ES module -->
-    <script type="module" src="app-modular.js"></script>
-  </body>
+    <!-- Export / Import -->
+    <div class="export-row">
+      <button id="exportBtn">Export salary (CSV)</button>
+      <button id="mileageBtn">Export mileage note (CSV)</button>
+      <input id="importFile" type="file" accept=".json">
+      <button id="importBtn">Import JSON</button>
+    </div>
+  </div>
+
+  <!-- Coach modal -->
+  <div id="coachModal" class="modal">
+    <div class="modal-content">
+      <h2>Coach</h2>
+      abel>Name
+        <input id="coachName" type="text">
+      </label>
+      abel>Address
+        <input id="coachAddress" type="text" placeholder="ex: 30 avenue Jean Moulin 57100 Thionville">
+      </label>
+      abel>Vehicle (make &amp; model)
+        <input id="coachVehicle" type="text" placeholder="ex: Hyundai Kona">
+      </label>
+      abel>Fiscal power (CV)
+        <input id="coachFiscalPower" type="number" placeholder="ex: 5">
+      </label>
+      abel>Hourly rate (€)
+        <input id="coachRate" type="number" step="0.1">
+      </label>
+      abel>Daily allowance (€)
+        <input id="dailyAllowance" type="number" step="0.1">
+      </label>
+      abel>Km rate (€ / km)
+        <input id="kmRate" type="number" step="0.01" value="0.35">
+      </label>
+
+      <div class="modal-actions">
+        <button id="saveCoach">Save</button>
+        <button id="cancelCoach">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Day modal -->
+  <div id="dayModal" class="modal">
+    <div class="modal-content">
+      <h2 id="dayTitle">Edit day</h2>
+
+      abel>Training hours
+        <input id="trainingHours" type="number" step="0.5" min="0">
+      </label>
+
+      abel>
+        <input id="competitionDay" type="checkbox"> Competition day
+      </label>
+
+      abel>Kilometers
+        <input id="kilometers" type="number" step="1" min="0">
+      </label>
+
+      <div id="travelGroup" style="display:none">
+        abel>Lieu de départ
+          <input id="departurePlace" type="text" placeholder="ex: Thionville">
+        </label>
+        abel>Lieu d'arrivée
+          <input id="arrivalPlace" type="text" placeholder="ex: Saint-Avold">
+        </label>
+        abel>Competition / travel description
+          <textarea id="competitionDescription"></textarea>
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button id="saveDay">Save</button>
+        <button id="deleteDay">Delete</button>
+        <button id="cancelDay">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app-modular.js"></script>
+</body>
 </html>
+  

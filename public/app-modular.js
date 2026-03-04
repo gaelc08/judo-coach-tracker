@@ -182,6 +182,8 @@ async function loadAllDataFromFirestore() {
         competition: !!data.competition,
         km: data.km || 0,
         description: data.description || "",
+        departurePlace: data.departurePlace || "",
+        arrivalPlace: data.arrivalPlace || "",
         id: d.id
       };
     });
@@ -206,9 +208,11 @@ function setupEventListeners() {
     editingCoachId = currentCoach.id;
 
     document.getElementById("coachName").value = currentCoach.name;
+    document.getElementById("coachAddress").value = currentCoach.address || "";
+    document.getElementById("coachVehicle").value = currentCoach.vehicle || "";
+    document.getElementById("coachFiscalPower").value = currentCoach.fiscalPower || "";
     document.getElementById("coachRate").value = currentCoach.hourlyRate;
-    document.getElementById("dailyAllowance").value =
-      currentCoach.dailyAllowance;
+    document.getElementById("dailyAllowance").value = currentCoach.dailyAllowance;
     document.getElementById("kmRate").value = currentCoach.kmRate;
 
     document.getElementById("coachModal").classList.add("active");
@@ -288,10 +292,14 @@ function setupEventListeners() {
 // ===== Coach management =====
 function clearCoachForm() {
   document.getElementById("coachName").value = "";
+  document.getElementById("coachAddress").value = "";
+  document.getElementById("coachVehicle").value = "";
+  document.getElementById("coachFiscalPower").value = "";
   document.getElementById("coachRate").value = "";
   document.getElementById("dailyAllowance").value = "";
   document.getElementById("kmRate").value = "0.35";
 }
+
 
 function loadCoaches() {
   const select = document.getElementById("coachSelect");
@@ -319,16 +327,19 @@ async function saveCoach() {
   if (!currentUser) return;
 
   const name = document.getElementById("coachName").value.trim();
+  const address = document.getElementById("coachAddress").value.trim();
+  const vehicle = document.getElementById("coachVehicle").value.trim();
+  const fiscalPower = document.getElementById("coachFiscalPower").value.trim();
   const rate = parseFloat(document.getElementById("coachRate").value);
-  const allowance = parseFloat(
-    document.getElementById("dailyAllowance").value
-  );
+  const allowance = parseFloat(document.getElementById("dailyAllowance").value);
   const kmRate = parseFloat(document.getElementById("kmRate").value);
 
   if (!name || isNaN(rate) || isNaN(allowance) || isNaN(kmRate)) {
-    alert("Please fill all fields with valid numbers");
+    alert("Please fill all required fields with valid numbers");
     return;
   }
+
+  const coachData = { name, address, vehicle, fiscalPower, hourlyRate: rate, dailyAllowance: allowance, kmRate };
 
   try {
     if (editMode && editingCoachId) {
@@ -339,20 +350,12 @@ async function saveCoach() {
         "coaches",
         editingCoachId
       );
-      await updateDoc(coachRef, {
-        name,
-        hourlyRate: rate,
-        dailyAllowance: allowance,
-        kmRate: kmRate
-      });
+      await updateDoc(coachRef, coachData);
+
     } else {
       const colRef = coachesCol();
-      const docRef = await addDoc(colRef, {
-        name,
-        hourlyRate: rate,
-        dailyAllowance: allowance,
-        kmRate: kmRate
-      });
+      const docRef = await addDoc(colRef, coachData);
+
       editingCoachId = docRef.id;
     }
 
@@ -485,6 +488,9 @@ function openDayModal(dateStr) {
   document.getElementById("kilometers").value = dayData.km || 0;
   document.getElementById("competitionDescription").value =
     dayData.description || "";
+  document.getElementById("departurePlace").value = dayData.departurePlace || "";
+  document.getElementById("arrivalPlace").value = dayData.arrivalPlace || "";
+
   document.getElementById("travelGroup").style.display = dayData.competition
     ? "block"
     : "none";
@@ -501,6 +507,8 @@ async function saveDay() {
   const km = parseFloat(document.getElementById("kilometers").value) || 0;
   const description =
     document.getElementById("competitionDescription").value.trim();
+  const departurePlace = document.getElementById("departurePlace").value.trim();
+  const arrivalPlace = document.getElementById("arrivalPlace").value.trim();
 
   const key = `${currentCoach.id}-${selectedDay}`;
   const existing = timeData[key];
@@ -522,7 +530,9 @@ async function saveDay() {
           hours,
           competition,
           km,
-          description
+          description,
+          departurePlace,
+          arrivalPlace
         }
       );
       timeData[key] = {
@@ -540,7 +550,9 @@ async function saveDay() {
         hours,
         competition,
         km,
-        description
+        description,
+        departurePlace,
+        arrivalPlace
       });
       timeData[key] = {
         hours,
@@ -660,65 +672,49 @@ function exportToCSV() {
 }
 
 function exportMileageCSV() {
-  if (!currentCoach || !currentMonth) {
-    alert("Please select a coach and month");
-    return;
-  }
-
+  if (!currentCoach || !currentMonth) { alert("Please select a coach and month"); return; }
   const [year, month] = currentMonth.split("-");
+  const today = new Date().toLocaleDateString("fr-FR").split("/").join("");
+
   const rows = [];
+  rows.push(["Judo Club de Cattenom-Rodemack", "RA1026", "Dojo communautaire", "57570 Cattenom", "judoclubcattenom@gmail.com", "06 62 62 53 13"]);
+  rows.push(["Note de frais kilométrique"]);
+  rows.push(["Date :", today, "Nom et prénom :", currentCoach.name, "Adresse :", currentCoach.address || ""]);
+  rows.push(["Modèle et marque du véhicule :", currentCoach.vehicle || "", "Poste occupé :", "Entraîneur", "Puissance fiscale du véhicule :", (currentCoach.fiscalPower || "") + "CV"]);
+  rows.push([]);
+  rows.push(["Date", "Motif du trajet", "Lieu de départ", "Lieu d'arrivée", "Distance km", "Indemnité kilométrique", "Page", "Parking / Justificatif", "Montant indemnisé"]);
 
-  rows.push([
-    "Date",
-    "Trajet",
-    "Motif",
-    "Km parcourus",
-    "Indemnité par km (€)",
-    "Montant total (€)",
-    "Coach"
-  ]);
-
+  let total = 0;
   Object.keys(timeData)
-    .filter((key) => key.startsWith(`${currentCoach.id}-${year}-${month}`))
+    .filter(key => key.startsWith(`${currentCoach.id}-${year}-${month}`))
     .sort()
-    .forEach((key) => {
+    .forEach(key => {
       const date = key.split("-").slice(1).join("-");
       const data = timeData[key];
-
       if (!data.km || data.km <= 0) return;
-
-      const km = data.km;
-      const rate = currentCoach.kmRate;
-      const amount = km * rate;
-
-      rows.push([
-        date,
-        "",
-        data.description || "Déplacement judo",
-        km.toString(),
-        rate.toFixed(2).replace(".", ","),
-        amount.toFixed(2).replace(".", ","),
-        currentCoach.name
-      ]);
+      const amount = data.km * currentCoach.kmRate;
+      total += amount;
+      rows.push([date, data.description || "Déplacement judo", data.departurePlace || "", data.arrivalPlace || "", String(data.km), currentCoach.kmRate.toFixed(2).replace(".", ","), "", "", amount.toFixed(2).replace(".", ",")]);
     });
 
-  if (rows.length === 1) {
-    alert("No mileage recorded for this month.");
-    return;
-  }
+  if (total === 0) { alert("No mileage recorded for this month."); return; }
 
-  let csv = "";
-  rows.forEach((r) => {
-    csv += r.map((v) => `"${v}"`).join(";") + "\n";
-  });
+  rows.push([]);
+  rows.push(["TOTAL TTC", total.toFixed(2).replace(".", ",") + " €"]);
+  rows.push([]);
+  rows.push(["Le montant de l'indemnité par kilomètre est fixé selon le nombre de kilomètres parcouru et la puissance fiscale de votre véhicule. Pour le connaître référez-vous au barème des frais kilométriques établi par l'administration fiscale et l'Ursaf."]);
+  rows.push([]);
+  rows.push(["Signature du salarié", "", "", "Signature de l'employeur"]);
 
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const csv = rows.map(r => r.map(v => `"${v}"`).join(";")).join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `mileage_${currentCoach.name}_${currentMonth}.csv`;
+  a.download = `note_frais_km_${currentCoach.name}_${currentMonth}.csv`;
   a.click();
 }
+
 
 // ===== Import JSON =====
 async function importCoachData(data) {
