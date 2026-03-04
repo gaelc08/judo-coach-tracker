@@ -701,7 +701,7 @@ function exportMileageHTML() {
   }
 
   // Judo Club logo 
-const logoUrl = "https://judo-coach-tracker.web.app/logo-jcc.png";
+  const logoUrl = "https://judo-coach-tracker.web.app/logo-jcc.png";
 
 
   const html = `
