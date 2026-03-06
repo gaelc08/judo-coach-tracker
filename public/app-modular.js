@@ -174,7 +174,9 @@ function setupAuthListeners() {
 // ===== Data loading =====
 async function loadAllDataFromFirestore() {
   if (!currentUser) return;
+
   console.log("DEBUG: loadAllDataFromFirestore for", currentUser.email);
+
   // Coaches
   coaches = [];
   const coachRef = coachesCol();
@@ -188,12 +190,12 @@ async function loadAllDataFromFirestore() {
   }
   loadCoaches();
 
-  // Time data (les règles filtreront par ownerUid côté serveur)
+  // Time data
   timeData = {};
   const timeRef = timeDataCol();
   if (timeRef) {
     console.log("DEBUG: loading clubTimeData...");
-    const timeSnap = await getDocs(timeRef);  // <== là où ça plante
+    const timeSnap = await getDocs(timeRef);
     console.log("DEBUG: clubTimeData loaded", timeSnap.size);
     timeSnap.forEach((d) => {
       const data = d.data();
@@ -213,9 +215,8 @@ async function loadAllDataFromFirestore() {
     });
   }
 
-  // Filtre local par coach sélectionné (en plus des règles)
   if (currentCoach) {
-    Object.keys(timeData).forEach(key => {
+    Object.keys(timeData).forEach((key) => {
       if (timeData[key].coachId !== currentCoach.id) {
         delete timeData[key];
       }
