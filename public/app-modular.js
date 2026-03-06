@@ -174,12 +174,14 @@ function setupAuthListeners() {
 // ===== Data loading =====
 async function loadAllDataFromFirestore() {
   if (!currentUser) return;
-
+  console.log("DEBUG: loadAllDataFromFirestore for", currentUser.email);
   // Coaches
   coaches = [];
   const coachRef = coachesCol();
   if (coachRef) {
+    console.log("DEBUG: loading clubCoaches...");
     const coachSnap = await getDocs(coachRef);
+    console.log("DEBUG: clubCoaches loaded", coachSnap.size);
     coachSnap.forEach((d) => {
       coaches.push({ id: d.id, ...d.data() });
     });
@@ -190,7 +192,9 @@ async function loadAllDataFromFirestore() {
   timeData = {};
   const timeRef = timeDataCol();
   if (timeRef) {
-    const timeSnap = await getDocs(timeRef);
+    console.log("DEBUG: loading clubTimeData...");
+    const timeSnap = await getDocs(timeRef);  // <== là où ça plante
+    console.log("DEBUG: clubTimeData loaded", timeSnap.size);
     timeSnap.forEach((d) => {
       const data = d.data();
       const key = `${data.coachId}-${data.date}`;
