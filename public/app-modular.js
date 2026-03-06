@@ -17,7 +17,9 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
-  writeBatch
+  writeBatch,
+  query,
+  where
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 // ----- Firebase config -----
@@ -175,15 +177,11 @@ function setupAuthListeners() {
 async function loadAllDataFromFirestore() {
   if (!currentUser) return;
 
-  console.log("DEBUG: loadAllDataFromFirestore for", currentUser.email);
-
   // Coaches
   coaches = [];
   const coachRef = coachesCol();
   if (coachRef) {
-    console.log("DEBUG: loading clubCoaches...");
     const coachSnap = await getDocs(coachRef);
-    console.log("DEBUG: clubCoaches loaded", coachSnap.size);
     coachSnap.forEach((d) => {
       coaches.push({ id: d.id, ...d.data() });
     });
@@ -193,28 +191,38 @@ async function loadAllDataFromFirestore() {
   // Time data
   timeData = {};
   const timeRef = timeDataCol();
-  if (timeRef) {
-    console.log("DEBUG: loading clubTimeData...");
-    const timeSnap = await getDocs(timeRef);
-    console.log("DEBUG: clubTimeData loaded", timeSnap.size);
-    timeSnap.forEach((d) => {
-      const data = d.data();
-      const key = `${data.coachId}-${data.date}`;
-      timeData[key] = {
-        hours: data.hours || 0,
-        competition: !!data.competition,
-        km: data.km || 0,
-        description: data.description || "",
-        departurePlace: data.departurePlace || "",
-        arrivalPlace: data.arrivalPlace || "",
-        coachId: data.coachId || null,
-        ownerUid: data.ownerUid || null,
-        ownerEmail: data.ownerEmail || null,
-        id: d.id
-      };
-    });
+  if (!timeRef) return;
+
+  let timeSnap;
+
+  if (isCurrentUserAdmin()) {
+    // ADMIN : lit toute la collection (règles allow read: if isAdmin())
+    timeSnap = await getDocs(timeRef);
+  } else {
+    // COACH : ne lit que ses propres docs (ownerUid == currentUser.uid),
+    // conforme aux règles Firestore basées sur ownerUid
+    const q = query(timeRef, where("ownerUid", "==", currentUser.uid));
+    timeSnap = await getDocs(q);
   }
 
+  timeSnap.forEach((d) => {
+    const data = d.data();
+    const key = `${data.coachId}-${data.date}`;
+    timeData[key] = {
+      hours: data.hours || 0,
+      competition: !!data.competition,
+      km: data.km || 0,
+      description: data.description || "",
+      departurePlace: data.departurePlace || "",
+      arrivalPlace: data.arrivalPlace || "",
+      coachId: data.coachId || null,
+      ownerUid: data.ownerUid || null,
+      ownerEmail: data.ownerEmail || null,
+      id: d.id
+    };
+  });
+
+  // Filtre local par coach sélectionné (utile surtout pour l'admin)
   if (currentCoach) {
     Object.keys(timeData).forEach((key) => {
       if (timeData[key].coachId !== currentCoach.id) {
@@ -223,6 +231,7 @@ async function loadAllDataFromFirestore() {
     });
   }
 }
+
 
 // ===== Event listeners =====
 function setupEventListeners() {
