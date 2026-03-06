@@ -191,19 +191,16 @@ async function loadAllDataFromFirestore() {
   // Time data
   timeData = {};
   const timeRef = timeDataCol();
-  if (!timeRef) return;
+if (!timeRef) return;
 
-  let timeSnap;
+let timeSnap;
 
-  if (isCurrentUserAdmin()) {
-    // ADMIN : lit toute la collection (règles allow read: if isAdmin())
-    timeSnap = await getDocs(timeRef);
-  } else {
-    // COACH : ne lit que ses propres docs (ownerUid == currentUser.uid),
-    // conforme aux règles Firestore basées sur ownerUid
-    const q = query(timeRef, where("ownerUid", "==", currentUser.uid));
-    timeSnap = await getDocs(q);
-  }
+if (isCurrentUserAdmin()) {
+  timeSnap = await getDocs(timeRef);            // ADMIN : tout
+} else {
+  const q = query(timeRef, where("ownerUid", "==", currentUser.uid));
+  timeSnap = await getDocs(q);                  // COACH : seulement ses docs
+}
 
   timeSnap.forEach((d) => {
     const data = d.data();
