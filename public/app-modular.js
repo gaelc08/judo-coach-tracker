@@ -45,6 +45,12 @@ let editMode = false;
 let editingCoachId = null;
 let currentUser = null;
 
+// ===== Admin helper =====
+function isCurrentUserAdmin() {
+  const adminEmails = ["gael.cantarero@gmail.com"]; // à adapter si besoin
+  return currentUser && adminEmails.includes(currentUser.email);
+}
+
 // ===== Firestore helpers (modular) =====
 function userDocRef() {
   if (!currentUser) return null;
@@ -143,11 +149,23 @@ function setupAuthListeners() {
       logoutBtn.style.display = "inline-block";
       appContainer.style.display = "block";
 
+      // Contrôle admin vs coach
+      const addCoachBtn  = document.getElementById("addCoachBtn");
+      const editCoachBtn = document.getElementById("editCoachBtn");
+      if (isCurrentUserAdmin()) {
+        addCoachBtn.style.display  = "inline-block";
+        editCoachBtn.style.display = "inline-block";
+      } else {
+        addCoachBtn.style.display  = "none";
+        editCoachBtn.style.display = "none";
+      }
+
       await loadAllDataFromFirestore();
       setupEventListeners();
       updateCalendar();
       updateSummary();
     } else {
+
       currentUser = null;
       statusSpan.textContent = "Not logged in.";
       logoutBtn.style.display = "none";
@@ -324,8 +342,11 @@ function loadCoaches() {
 }
 
 async function saveCoach() {
-  if (!currentUser) return;
-
+   if (!currentUser) return;
+    if (!isCurrentUserAdmin()) {
+      alert("Only admin can edit coach profiles.");
+      return;
+    }
   const name = document.getElementById("coachName").value.trim();
   const address = document.getElementById("coachAddress").value.trim();
   const vehicle = document.getElementById("coachVehicle").value.trim();
