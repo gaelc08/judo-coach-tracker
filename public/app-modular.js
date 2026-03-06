@@ -58,13 +58,11 @@ function userDocRef() {
 }
 
 function coachesCol() {
-  if (!currentUser) return null;
-  return collection(db, "users", currentUser.uid, "coaches");
+  return collection(db, "clubCoaches");  // collection commune
 }
 
 function timeDataCol() {
-  if (!currentUser) return null;
-  return collection(db, "users", currentUser.uid, "timeData");
+  return collection(db, "clubTimeData"); // collection commune
 }
 
 // ===== Static data =====
@@ -165,7 +163,6 @@ function setupAuthListeners() {
       updateCalendar();
       updateSummary();
     } else {
-
       currentUser = null;
       statusSpan.textContent = "Not logged in.";
       logoutBtn.style.display = "none";
@@ -178,6 +175,7 @@ function setupAuthListeners() {
 async function loadAllDataFromFirestore() {
   if (!currentUser) return;
 
+  // Coaches
   coaches = [];
   const coachRef = coachesCol();
   if (coachRef) {
@@ -188,6 +186,7 @@ async function loadAllDataFromFirestore() {
   }
   loadCoaches();
 
+  // Time data (les règles filtreront par ownerUid côté serveur)
   timeData = {};
   const timeRef = timeDataCol();
   if (timeRef) {
@@ -202,8 +201,20 @@ async function loadAllDataFromFirestore() {
         description: data.description || "",
         departurePlace: data.departurePlace || "",
         arrivalPlace: data.arrivalPlace || "",
+        coachId: data.coachId || null,
+        ownerUid: data.ownerUid || null,
+        ownerEmail: data.ownerEmail || null,
         id: d.id
       };
+    });
+  }
+
+  // Filtre local par coach sélectionné (en plus des règles)
+  if (currentCoach) {
+    Object.keys(timeData).forEach(key => {
+      if (timeData[key].coachId !== currentCoach.id) {
+        delete timeData[key];
+      }
     });
   }
 }
@@ -318,7 +329,6 @@ function clearCoachForm() {
   document.getElementById("kmRate").value = "0.35";
 }
 
-
 function loadCoaches() {
   const select = document.getElementById("coachSelect");
   select.innerHTML = '<option value="">-- Select Coach --</option>';
@@ -342,11 +352,12 @@ function loadCoaches() {
 }
 
 async function saveCoach() {
-   if (!currentUser) return;
-    if (!isCurrentUserAdmin()) {
-      alert("Only admin can edit coach profiles.");
-      return;
-    }
+  if (!currentUser) return;
+  if (!isCurrentUserAdmin()) {
+    alert("Only admin can edit coach profiles.");
+    return;
+  }
+
   const name = document.getElementById("coachName").value.trim();
   const address = document.getElementById("coachAddress").value.trim();
   const vehicle = document.getElementById("coachVehicle").value.trim();
@@ -360,23 +371,23 @@ async function saveCoach() {
     return;
   }
 
-  const coachData = { name, address, vehicle, fiscalPower, hourlyRate: rate, dailyAllowance: allowance, kmRate };
+  const coachData = {
+    name,
+    address,
+    vehicle,
+    fiscalPower,
+    hourlyRate: rate,
+    dailyAllowance: allowance,
+    kmRate
+  };
 
   try {
     if (editMode && editingCoachId) {
-      const coachRef = doc(
-        db,
-        "users",
-        currentUser.uid,
-        "coaches",
-        editingCoachId
-      );
+      const coachRef = doc(db, "clubCoaches", editingCoachId);
       await updateDoc(coachRef, coachData);
-
     } else {
       const colRef = coachesCol();
       const docRef = await addDoc(colRef, coachData);
-
       editingCoachId = docRef.id;
     }
 
@@ -500,7 +511,16 @@ function openDayModal(dateStr) {
   selectedDay = dateStr;
   const key = `${currentCoach.id}-${dateStr}`;
   const dayData =
-    timeData[key] || { hours: 0, competition: false, km: 0, description: "" };
+    timeData[key] || {
+      hours: 0,
+      competition: false,
+      km: 0,
+      description: "",
+      departurePlace: "",
+      arrivalPlace: "",
+      ownerUid: currentUser ? currentUser.uid : null,
+      ownerEmail: currentUser ? currentUser.email : null
+    };
 
   document.getElementById("dayTitle").textContent = `Edit ${dateStr}`;
   document.getElementById("trainingHours").value = dayData.hours || 0;
@@ -509,7 +529,8 @@ function openDayModal(dateStr) {
   document.getElementById("kilometers").value = dayData.km || 0;
   document.getElementById("competitionDescription").value =
     dayData.description || "";
-  document.getElementById("departurePlace").value = dayData.departurePlace || "";
+  document.getElementById("departurePlace").value =
+    dayData.departurePlace || "";
   document.getElementById("arrivalPlace").value = dayData.arrivalPlace || "";
 
   document.getElementById("travelGroup").style.display = dayData.competition
@@ -528,7 +549,9 @@ async function saveDay() {
   const km = parseFloat(document.getElementById("kilometers").value) || 0;
   const description =
     document.getElementById("competitionDescription").value.trim();
-  const departurePlace = document.getElementById("departurePlace").value.trim();
+  const departurePlace = document
+    .getElementById("departurePlace")
+    .value.trim();
   const arrivalPlace = document.getElementById("arrivalPlace").value.trim();
 
   const key = `${currentCoach.id}-${selectedDay}`;
@@ -536,31 +559,33 @@ async function saveDay() {
 
   if (hours === 0 && !competition && km === 0 && !description) {
     if (existing && existing.id) {
-      await deleteDoc(
-        doc(db, "users", currentUser.uid, "timeData", existing.id)
-      );
+      await deleteDoc(doc(db, "clubTimeData", existing.id));
     }
     delete timeData[key];
   } else {
     if (existing && existing.id) {
-      await updateDoc(
-        doc(db, "users", currentUser.uid, "timeData", existing.id),
-        {
-          coachId: currentCoach.id,
-          date: selectedDay,
-          hours,
-          competition,
-          km,
-          description,
-          departurePlace,
-          arrivalPlace
-        }
-      );
+      await updateDoc(doc(db, "clubTimeData", existing.id), {
+        coachId: currentCoach.id,
+        date: selectedDay,
+        hours,
+        competition,
+        km,
+        description,
+        departurePlace,
+        arrivalPlace,
+        ownerUid: currentUser.uid,
+        ownerEmail: currentUser.email
+      });
       timeData[key] = {
         hours,
         competition,
         km,
         description,
+        departurePlace,
+        arrivalPlace,
+        coachId: currentCoach.id,
+        ownerUid: currentUser.uid,
+        ownerEmail: currentUser.email,
         id: existing.id
       };
     } else {
@@ -573,13 +598,20 @@ async function saveDay() {
         km,
         description,
         departurePlace,
-        arrivalPlace
+        arrivalPlace,
+        ownerUid: currentUser.uid,
+        ownerEmail: currentUser.email
       });
       timeData[key] = {
         hours,
         competition,
         km,
         description,
+        departurePlace,
+        arrivalPlace,
+        coachId: currentCoach.id,
+        ownerUid: currentUser.uid,
+        ownerEmail: currentUser.email,
         id: docRef.id
       };
     }
@@ -595,9 +627,7 @@ async function deleteDay() {
   const key = `${currentCoach.id}-${selectedDay}`;
   const existing = timeData[key];
   if (existing && existing.id) {
-    await deleteDoc(
-      doc(db, "users", currentUser.uid, "timeData", existing.id)
-    );
+    await deleteDoc(doc(db, "clubTimeData", existing.id));
   }
   delete timeData[key];
 
@@ -692,7 +722,6 @@ function exportToCSV() {
   a.click();
 }
 
-
 function exportMileageHTML() {
   if (!currentCoach || !currentMonth) {
     alert("Please select a coach and month");
@@ -705,9 +734,9 @@ function exportMileageHTML() {
   let total = 0;
 
   Object.keys(timeData)
-    .filter(key => key.startsWith(`${currentCoach.id}-${year}-${month}`))
+    .filter((key) => key.startsWith(`${currentCoach.id}-${year}-${month}`))
     .sort()
-    .forEach(key => {
+    .forEach((key) => {
       const date = key.split("-").slice(1).join("-");
       const data = timeData[key];
       if (!data.km || data.km <= 0) return;
@@ -721,9 +750,7 @@ function exportMileageHTML() {
     return;
   }
 
-  // Judo Club logo 
   const logoUrl = "https://judo-coach-tracker.web.app/logo-jcc.png";
-
 
   const html = `
 <!DOCTYPE html>
@@ -905,19 +932,29 @@ function exportMileageHTML() {
       </tr>
     </thead>
     <tbody>
-${rows.map(r => `
+${rows
+  .map(
+    (r) => `
       <tr>
         <td>${r.date}</td>
         <td>${r.description || "Déplacement judo"}</td>
         <td>${r.departurePlace || "-"}</td>
         <td>${r.arrivalPlace || "-"}</td>
         <td style="text-align:right">${r.km}</td>
-        <td style="text-align:right">${currentCoach.kmRate.toFixed(2).replace(".", ",")}</td>
-        <td style="text-align:right">${r.amount.toFixed(2).replace(".", ",")} €</td>
-      </tr>`).join("")}
+        <td style="text-align:right">${currentCoach.kmRate
+          .toFixed(2)
+          .replace(".", ",")}</td>
+        <td style="text-align:right">${r.amount
+          .toFixed(2)
+          .replace(".", ",")} €</td>
+      </tr>`
+  )
+  .join("")}
       <tr class="total-row">
         <td colspan="6" style="text-align:right">TOTAL TTC</td>
-        <td style="text-align:right">${total.toFixed(2).replace(".", ",")} €</td>
+        <td style="text-align:right">${total
+          .toFixed(2)
+          .replace(".", ",")} €</td>
       </tr>
     </tbody>
   </table>
@@ -943,15 +980,13 @@ ${rows.map(r => `
 </html>
 `;
 
-  // Create and download the HTML file
   const blob = new Blob([html], { type: "text/html;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   a.download = `note_frais_km_${currentCoach.name}_${currentMonth}.html`;
   a.click();
-  
-  // Also open in new window for immediate printing to PDF
+
   const newWindow = window.open();
   newWindow.document.write(html);
   newWindow.document.close();
@@ -986,7 +1021,11 @@ async function importCoachData(data) {
         hours: Number(hours) || 0,
         competition: false,
         km: 0,
-        description: ""
+        description: "",
+        departurePlace: "",
+        arrivalPlace: "",
+        ownerUid: currentUser.uid,
+        ownerEmail: currentUser.email
       });
     });
   }
@@ -1001,7 +1040,11 @@ async function importCoachData(data) {
         hours: 0,
         competition: true,
         km: 0,
-        description: desc
+        description: desc,
+        departurePlace: "",
+        arrivalPlace: "",
+        ownerUid: currentUser.uid,
+        ownerEmail: currentUser.email
       });
     });
   }
