@@ -60,12 +60,15 @@ async function debugSession() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  console.log('DEBUG DOMContentLoaded');
   setupAuthListeners();
   debugSession();
 });
 
 // ===== Auth =====
 function setupAuthListeners() {
+  console.log('DEBUG setupAuthListeners called');
+
   const emailInput = document.getElementById("authEmail");
   const passwordInput = document.getElementById("authPassword");
   const registerBtn = document.getElementById("registerBtn");
@@ -75,7 +78,23 @@ function setupAuthListeners() {
   const statusSpan = document.getElementById("authStatus");
   const appContainer = document.getElementById("appContainer");
 
+  console.log('DEBUG auth elements:', {
+    emailInput,
+    passwordInput,
+    registerBtn,
+    loginBtn,
+    resetPasswordBtn,
+    logoutBtn,
+    statusSpan,
+    appContainer
+  });
+
+  if (!loginBtn || !logoutBtn) {
+    console.error('DEBUG loginBtn or logoutBtn not found in DOM');
+  }
+
   registerBtn.addEventListener("click", async () => {
+    console.log('DEBUG register click');
     const email = emailInput.value.trim();
     const pass = passwordInput.value.trim();
     if (!email || !pass) {
@@ -84,14 +103,17 @@ function setupAuthListeners() {
     }
     try {
       const { data, error } = await supabase.auth.signUp({ email, password: pass });
+      console.log('DEBUG signUp result:', { data, error });
       if (error) throw error;
       statusSpan.textContent = "Account created & logged in.";
     } catch (e) {
+      console.error('DEBUG register error:', e);
       alert(e.message);
     }
   });
 
   loginBtn.addEventListener("click", async () => {
+    console.log('DEBUG login click');
     const email = emailInput.value.trim();
     const pass = passwordInput.value.trim();
     if (!email || !pass) {
@@ -100,16 +122,76 @@ function setupAuthListeners() {
     }
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
+      console.log('DEBUG signInWithPassword result:', { data, error });
       if (error) throw error;
     } catch (e) {
+      console.error('DEBUG login error:', e);
       alert(e.message);
     }
   });
 
   logoutBtn.addEventListener("click", async () => {
+    console.log('DEBUG logout click');
     const { error } = await supabase.auth.signOut();
-    if (error) alert(error.message);
+    if (error) {
+      console.error('DEBUG logout error:', error);
+      alert(error.message);
+    }
   });
+
+  // Auth state change
+  supabase.auth.onAuthStateChange(async (event, session) => {
+    console.log('DEBUG onAuthStateChange:', event, session);
+    const user = session?.user;
+    const select = document.getElementById("coachSelect");
+    select.innerHTML = '';
+    coaches = [];
+    timeData = {};
+    currentCoach = null;
+
+    if (user) {
+      currentUser = user;
+      statusSpan.textContent = `Logged in as ${user.email}`;
+      document.getElementById("authRow").style.display = "none";
+      document.getElementById("registerBtn").style.display = "none";
+      document.getElementById("loginBtn").style.display = "none";
+      document.getElementById("resetPasswordBtn").style.display = "none";
+      logoutBtn.style.display = "inline-block";
+      document.getElementById("appContainer").style.display = "block";
+
+      const role = adminEmails.some(email => email.toLowerCase() === user.email.toLowerCase()) ? 'admin' : 'coach';
+      if (role === 'admin') {
+        document.getElementById("addCoachBtn").style.display = "inline-block";
+        document.getElementById("editCoachBtn").style.display = "inline-block";
+      } else {
+        document.getElementById("addCoachBtn").style.display = "none";
+        document.getElementById("editCoachBtn").style.display = "none";
+      }
+
+      try {
+        await loadAllDataFromSupabase();
+      } catch (e) {
+        console.error("Failed to load data:", e);
+      }
+      setupEventListeners();
+      try {
+        updateCalendar();
+        updateSummary();
+      } catch (e) {
+        console.error("Failed to update UI:", e);
+      }
+    } else {
+      currentUser = null;
+      statusSpan.textContent = "Not logged in.";
+      document.getElementById("authRow").style.display = "block";
+      document.getElementById("registerBtn").style.display = "inline-block";
+      document.getElementById("loginBtn").style.display = "inline-block";
+      document.getElementById("resetPasswordBtn").style.display = "inline-block";
+      logoutBtn.style.display = "none";
+      document.getElementById("appContainer").style.display = "none";
+    }
+  });
+  
 
   resetPasswordBtn.addEventListener("click", async () => {
     const email = emailInput.value.trim();
@@ -127,6 +209,7 @@ function setupAuthListeners() {
   });
 
   supabase.auth.onAuthStateChange(async (event, session) => {
+    console.log('DEBUG onAuthStateChange:', event, session);
     const user = session?.user;
     const select = document.getElementById("coachSelect");
     select.innerHTML = '<option value="">-- Select Coach --</option>';
