@@ -13,6 +13,7 @@ import {
   getFirestore,
   doc,
   collection,
+  getDoc,
   getDocs,
   addDoc,
   updateDoc,
@@ -137,42 +138,56 @@ function setupAuthListeners() {
   });
 
   onAuthStateChanged(auth, async (user) => {
-    const select = document.getElementById("coachSelect");
-    select.innerHTML = '<option value="">-- Select Coach --</option>';
-    coaches = [];
-    timeData = {};
-    currentCoach = null;
-
     if (user) {
       currentUser = user;
-      statusSpan.textContent = `Logged in as ${user.email}`;
-      logoutBtn.style.display = "inline-block";
-      appContainer.style.display = "block";
+      authStatus.textContent = `Connecté : ${user.email}`;
+      document.getElementById("authContainer").style.display = "block";
+      document.getElementById("appContainer").style.display = "none";
+    }
+      // --- NOUVEAU : VERIFICATION DU ROLE ---
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      const role = userDoc.exists() ? userDoc.data().role : 'coach';
 
-      // Contrôle admin vs coach
-      const addCoachBtn  = document.getElementById("addCoachBtn");
-      const editCoachBtn = document.getElementById("editCoachBtn");
-      if (isCurrentUserAdmin()) {
-        addCoachBtn.style.display  = "inline-block";
-        editCoachBtn.style.display = "inline-block";
+      if (role === 'admin') {
+        // L'admin voit les boutons et tous les coaches
+        document.getElementById("addCoachBtn").style.display = "inline-block";
+        document.getElementById("editCoachBtn").style.display = "inline-block";
+        await loadAllCoaches(); 
       } else {
-        addCoachBtn.style.display  = "none";
-        editCoachBtn.style.display = "none";
+        // Le coach ne voit rien et seulement son profil
+        document.getElementById("addCoachBtn").style.display = "none";
+        document.getElementById("editCoachBtn").style.display = "none";
+        await loadMyCoachProfile(user.uid); 
       }
-
-      await loadAllDataFromFirestore();
-      setupEventListeners();
-      updateCalendar();
-      updateSummary();
     } else {
       currentUser = null;
-      statusSpan.textContent = "Not logged in.";
-      logoutBtn.style.display = "none";
-      appContainer.style.display = "none";
+      document.getElementById("authContainer").style.display = "block";
+      document.getElementById("appContainer").style.display = "none";
     }
   });
-}
 
+// Nouvelle fonction pour les coaches
+async function loadSingleCoachForUser(uid) {
+  const q = query(collection(db, "clubCoaches"), where("ownerUid", "==", uid));
+  const snap = await getDocs(q);
+  
+  coachSelect.innerHTML = ""; // Vide le select
+  if (!snap.empty) {
+    snap.forEach(docSnap => {
+      const c = docSnap.data();
+      const opt = document.createElement("option");
+      opt.value = docSnap.id;
+      opt.textContent = c.name;
+      coachSelect.appendChild(opt);
+    });
+    // Sélection automatique du seul coach disponible
+    coachSelect.selectedIndex = 0;
+    coachSelect.dispatchEvent(new Event('change'));
+  } else {
+    coachSelect.innerHTML = '<option value="">Profil non trouvé</option>';
+  }
+}
+  
 // ===== Data loading =====
 async function loadAllDataFromFirestore() {
   if (!currentUser) return;
@@ -1006,6 +1021,31 @@ ${rows
 // Expose the function
 window.exportMileageHTML = exportMileageHTML;
 
+// Pour l'Admin : charge TOUT
+async function loadAllCoaches() {
+  const snap = await getDocs(collection(db, "clubCoaches"));
+  allCoaches = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  updateCoachSelect();
+}
+
+// Pour le Coach : charge seulement SON profil via ownerUid
+async function loadMyCoachProfile(uid) {
+  const q = query(collection(db, "clubCoaches"), where("ownerUid", "==", uid));
+  const snap = await getDocs(q);
+  allCoaches = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  updateCoachSelect();
+}
+
+// Fonction commune pour remplir le menu déroulant
+function updateCoachSelect() {
+  coachSelect.innerHTML = allCoaches.map(c => 
+    `<option value="${c.id}">${c.name}</option>`
+  ).join("");
+  if (allCoaches.length > 0) {
+    currentCoach = allCoaches[0];
+    initCalendar(); // Ou le nom de ta fonction qui affiche le calendrier
+  }
+}
 // ===== Import JSON =====
 async function importCoachData(data) {
   if (!currentCoach || !currentUser) {
