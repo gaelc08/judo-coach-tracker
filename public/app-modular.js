@@ -437,28 +437,38 @@ async function saveCoach() {
   };
 
   try {
-    if (editMode && editingCoachId) {
-      const { error } = await supabase
-        .from('coaches')
-        .update(coachData)
-        .eq('id', editingCoachId);
-      if (error) throw error;
-    } else {
-      const { error } = await supabase
-        .from('coaches')
-        .insert(coachData);
-      if (error) throw error;
+  if (editMode && editingCoachId) {
+    const { error } = await supabase
+      .from('coaches')
+      .update(coachData)
+      .eq('id', editingCoachId);
+    if (error) {
+      console.error('Supabase UPDATE error:', error);
+      alert('Supabase UPDATE error: ' + (error.message || JSON.stringify(error)));
+      return;
     }
-
-    await loadAllDataFromSupabase();
-    document.getElementById("coachModal").classList.remove("active");
-    clearCoachForm();
-    editMode = false;
-    editingCoachId = null;
-    updateSummary();
-  } catch (e) {
-    alert("Error saving coach: " + e.message);
+  } else {
+    const { error } = await supabase
+      .from('coaches')
+      .insert(coachData);
+    if (error) {
+      console.error('Supabase INSERT error:', error);
+      alert('Supabase INSERT error: ' + (error.message || JSON.stringify(error)));
+      return;
+    }
   }
+
+  await loadAllDataFromSupabase();
+  document.getElementById("coachModal").classList.remove("active");
+  clearCoachForm();
+  editMode = false;
+  editingCoachId = null;
+  updateSummary();
+} catch (e) {
+  console.error("Unexpected error saving coach:", e);
+  alert("Unexpected error saving coach: " + e.message);
+}
+
 }
 
 
