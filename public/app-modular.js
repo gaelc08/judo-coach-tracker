@@ -8,16 +8,6 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Connect to emulator if localhost
-if (window.location.hostname === 'localhost') {
-  connectStorageEmulator(storage, 'localhost', 9199);
-}
-
-// Connect to emulator if localhost
-// if (window.location.hostname === 'localhost') {
-//   connectFirestoreEmulator(db, 'localhost', 8080);
-// }
-
 // ===== In‑memory state =====
 let coaches = [];
 let timeData = {};
