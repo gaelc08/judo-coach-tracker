@@ -267,8 +267,9 @@ function setupAuthListeners() {
 
 // ===== Data loading =====
 async function loadAllDataFromSupabase() {
+  console.log('DEBUG loadAllDataFromSupabase start, isAdmin=', isCurrentUserAdmin());
   if (!currentUser) return;
-
+  
   // Coaches
   coaches = [];
   if (isCurrentUserAdmin()) {
@@ -547,6 +548,8 @@ async function saveCoach() {
         .update(coachData)
         .eq('id', editingCoachId);
       console.log('DEBUG Supabase UPDATE result error:', error);
+      console.log('DEBUG after INSERT before reload');
+
       if (error) {
         console.error('Supabase UPDATE error:', error);
         alert('Supabase UPDATE error: ' + (error.message || JSON.stringify(error)));
