@@ -479,14 +479,20 @@ function loadCoaches() {
 }
 
 async function saveCoach() {
+  console.log('DEBUG saveCoach start');
+  if (!currentUser) {
+    console.log('DEBUG saveCoach: no currentUser');
+    alert("No logged user");
+    return;
+  }
   console.log('DEBUG saveCoach currentUser:', currentUser);
-  console.log('DEBUG isCurrentUserAdmin():', isCurrentUserAdmin());
 
-  if (!currentUser) return;
   if (!isCurrentUserAdmin()) {
+    console.log('DEBUG saveCoach: not admin');
     alert("Only admin can edit coach profiles.");
     return;
   }
+  console.log('DEBUG isCurrentUserAdmin():', isCurrentUserAdmin());
 
   const name = document.getElementById("coachName").value.trim();
   const firstName = document.getElementById("coachFirstName").value.trim();
@@ -499,10 +505,23 @@ async function saveCoach() {
   const kmRate = parseFloat(document.getElementById("kmRate").value);
 
   const ownerUidInput = document.getElementById("coachOwnerUid");
-  const ownerUid = ownerUidInput.value.trim();
+  const ownerUid = ownerUidInput ? ownerUidInput.value.trim() : "";
+
+  console.log('DEBUG saveCoach form values:', {
+    name,
+    firstName,
+    email,
+    address,
+    vehicle,
+    fiscalPower,
+    rate,
+    allowance,
+    kmRate,
+    ownerUid
+  });
 
   if (!name || isNaN(rate) || isNaN(allowance) || isNaN(kmRate) || !ownerUid) {
-    alert("Please fill all required fields with valid numbers and owner UID");
+    alert("Please fill all required fields with valid numbers AND owner UID");
     return;
   }
 
@@ -519,40 +538,47 @@ async function saveCoach() {
     owner_uid: ownerUid
   };
 
+  console.log('DEBUG coachData to send:', coachData, 'editMode:', editMode, 'editingCoachId:', editingCoachId);
+
   try {
-  if (editMode && editingCoachId) {
-    const { error } = await supabase
-      .from('coaches')
-      .update(coachData)
-      .eq('id', editingCoachId);
-    if (error) {
-      console.error('Supabase UPDATE error:', error);
-      alert('Supabase UPDATE error: ' + (error.message || JSON.stringify(error)));
-      return;
+    if (editMode && editingCoachId) {
+      const { error } = await supabase
+        .from('coaches')
+        .update(coachData)
+        .eq('id', editingCoachId);
+      console.log('DEBUG Supabase UPDATE result error:', error);
+      if (error) {
+        console.error('Supabase UPDATE error:', error);
+        alert('Supabase UPDATE error: ' + (error.message || JSON.stringify(error)));
+        return;
+      }
+    } else {
+      const { error } = await supabase
+        .from('coaches')
+        .insert(coachData);
+      console.log('DEBUG Supabase INSERT result error:', error);
+      if (error) {
+        console.error('Supabase INSERT error:', error);
+        alert('Supabase INSERT error: ' + (error.message || JSON.stringify(error)));
+        return;
+      }
     }
-  } else {
-    const { error } = await supabase
-      .from('coaches')
-      .insert(coachData);
-    if (error) {
-      console.error('Supabase INSERT error:', error);
-      alert('Supabase INSERT error: ' + (error.message || JSON.stringify(error)));
-      return;
-    }
+
+    console.log('DEBUG saveCoach: calling loadAllDataFromSupabase');
+    await loadAllDataFromSupabase();
+
+    document.getElementById("coachModal").classList.remove("active");
+    clearCoachForm();
+    editMode = false;
+    editingCoachId = null;
+    updateSummary();
+    console.log('DEBUG saveCoach end OK');
+  } catch (e) {
+    console.error("Unexpected error saving coach:", e);
+    alert("Unexpected error saving coach: " + e.message);
   }
-
-  await loadAllDataFromSupabase();
-  document.getElementById("coachModal").classList.remove("active");
-  clearCoachForm();
-  editMode = false;
-  editingCoachId = null;
-  updateSummary();
-} catch (e) {
-  console.error("Unexpected error saving coach:", e);
-  alert("Unexpected error saving coach: " + e.message);
 }
 
-}
 
 
 async function deleteCoach() {
