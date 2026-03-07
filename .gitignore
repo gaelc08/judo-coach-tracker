@@ -1,0 +1,13 @@
+# Fichiers sensibles Firebase
+firestore-migration/serviceAccountKey*.json
+
+# Node modules de la migration
+firestore-migration/node_modules/
+firestore-migration/.env
+firestore-migration/npm-debug.log*
+firestore-migration/yarn.lock
+firestore-migration/package-lock.json
+
+# Logs divers
+firestore-migration/*.log
+
