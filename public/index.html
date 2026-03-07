@@ -12,14 +12,15 @@
   <div id="authContainer" class="auth-container">
     <h1>Judo Coach Tracker</h1>
 
-    <div class="auth-row">
+    <div id="authRow" class="auth-row">
       <input id="authEmail" type="email" placeholder="Email">
       <input id="authPassword" type="password" placeholder="Password">
     </div>
 
-    <div class="auth-buttons">
+    <div id="authButtons" class="auth-buttons">
       <button id="registerBtn">Register</button>
       <button id="loginBtn">Login</button>
+      <button id="resetPasswordBtn">Reset Password</button>
       <button id="logoutBtn" style="display:none">Logout</button>
     </div>
 
@@ -30,19 +31,19 @@
   <div id="appContainer" style="display:none">
     <div class="toolbar">
       <label>
-        Coach:
+        Entraîneur:
         <select id="coachSelect">
-          <option value="">-- Select Coach --</option>
+          <option value="">-- Sélectionner Entraîneur --</option>
         </select>
       </label>
 
       <label>
-        Month:
+        Mois:
         <input id="monthSelect" type="month" value="2026-02">
       </label>
 
-      <button id="addCoachBtn" class="admin-only" style="display:none">Add coach</button>
-      <button id="editCoachBtn" class="admin-only" style="display:none">Edit coach</button>
+      <button id="addCoachBtn" class="admin-only" style="display:none">Ajouter entraîneur</button>
+      <button id="editCoachBtn" class="admin-only" style="display:none">Modifier entraîneur</button>
     </div>
 
     <!-- Calendar -->
@@ -50,54 +51,61 @@
 
     <!-- Summary -->
     <div class="summary">
-      <div>Total hours: <span id="totalHours">0</span></div>
-      <div>Hourly rate: <span id="hourlyRate">€0.00</span></div>
-      <div>Training payment: <span id="trainingPayment">€0.00</span></div>
-      <div>Competition days: <span id="compDays">0</span></div>
-      <div>Competition payment: <span id="compPayment">€0.00</span></div>
+      <div>Total des heures: <span id="totalHours">0</span></div>
+      <div>Taux horaire: <span id="hourlyRate">€0.00</span></div>
+      <div>Paiement entraînement: <span id="trainingPayment">€0.00</span></div>
+      <div>Jours de compétition: <span id="compDays">0</span></div>
+      <div>Paiement compétition: <span id="compPayment">€0.00</span></div>
       <div>Total km: <span id="totalKm">0</span></div>
-      <div>Km payment: <span id="kmPayment">€0.00</span></div>
-      <div>Total payment: <span id="totalPayment">€0.00</span></div>
+      <div>Paiement km: <span id="kmPayment">€0.00</span></div>
+      <div>Paiement total: <span id="totalPayment">€0.00</span></div>
     </div>
 
     <div class="actions">
-      <button id="exportBtn">Export salary (CSV)</button>
-      <button id="mileageBtn">Export mileage note (HTML + PDF)</button>
+      <button id="exportBtn">Exporter salaire (CSV)</button>
+      <button id="mileageBtn">Exporter note de frais km (HTML + PDF)</button>
 
       <input id="importFile" type="file" accept=".json">
-      <button id="importBtn">Import JSON</button>
+      <button id="importBtn">Importer JSON</button>
     </div>
   </div>
 
   <!-- Coach modal -->
   <div id="coachModal" class="modal">
     <div class="modal-content">
-      <h2>Coach</h2>
-      <label>Name
+      <h2>Entraîneur</h2>
+      <label>Nom
         <input id="coachName" type="text">
       </label>
-      <label>Address
+      <label>Prénom
+        <input id="coachFirstName" type="text">
+      </label>
+      <label>Email
+        <input id="coachEmail" type="email">
+      </label>
+      <label>Adresse
         <input id="coachAddress" type="text">
       </label>
-      <label>Vehicle (make &amp; model)
+      <label>Véhicule (marque & modèle)
         <input id="coachVehicle" type="text">
       </label>
-      <label>Fiscal power (CV)
+      <label>Puissance fiscale (CV)
         <input id="coachFiscalPower" type="number">
       </label>
-      <label>Hourly rate (€)
+      <label>Taux horaire (€)
         <input id="coachRate" type="number" step="0.1">
       </label>
-      <label>Daily allowance (€)
+      <label>Indemnité journalière (€)
         <input id="dailyAllowance" type="number" step="0.1">
       </label>
-      <label>Km rate (€ / km)
+      <label>Taux km (€ / km)
         <input id="kmRate" type="number" step="0.01" value="0.35">
       </label>
 
       <div class="modal-actions">
-        <button id="saveCoach">Save</button>
-        <button id="cancelCoach">Cancel</button>
+        <button id="saveCoach">Sauvegarder</button>
+        <button id="deleteCoach" style="display:none">Supprimer</button>
+        <button id="cancelCoach">Annuler</button>
       </div>
     </div>
   </div>
@@ -105,19 +113,19 @@
   <!-- Day modal -->
   <div id="dayModal" class="modal">
     <div class="modal-content">
-      <h2 id="dayTitle">Edit day</h2>
+      <h2 id="dayTitle">Modifier jour</h2>
 
-      <label>Training hours
+      <label>Heures d'entraînement
         <input id="trainingHours" type="number" step="0.5" min="0">
       </label>
 
       <label>
         <input id="competitionDay" type="checkbox">
-        Competition day
+        Jour de compétition
       </label>
 
       <div id="travelGroup" style="display:none">
-        <label>Kilometers
+        <label>Kilomètres
           <input id="kilometers" type="number" step="1" min="0">
         </label>
         <label>Lieu de départ
@@ -126,15 +134,21 @@
         <label>Lieu d'arrivée
           <input id="arrivalPlace" type="text">
         </label>
-        <label>Competition / travel description
-          <textarea id="competitionDescription"></textarea>
+        <label>Description de la compétition / trajet
+          <input id="competitionDescription" type="text">
+        </label>
+        <label>Péage (€)
+          <input id="peage" type="number" step="0.01" min="0">
+        </label>
+        <label>Justificatif de péage
+          <input id="peageJustification" type="file" accept=".pdf,.jpg,.png">
         </label>
       </div>
 
       <div class="modal-actions">
-        <button id="saveDay">Save</button>
-        <button id="deleteDay">Delete</button>
-        <button id="cancelDay">Cancel</button>
+        <button id="saveDay">Sauvegarder</button>
+        <button id="deleteDay">Supprimer</button>
+        <button id="cancelDay">Annuler</button>
       </div>
     </div>
   </div>

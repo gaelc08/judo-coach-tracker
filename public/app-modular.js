@@ -1,42 +1,22 @@
 // app-modular.js
-// Uses Firebase v10 modular CDN SDK
+// Uses Supabase JS SDK
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-import {
-  getAuth,
-  onAuthStateChanged,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut
-} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
-import {
-  getFirestore,
-  doc,
-  collection,
-  getDoc,
-  getDocs,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  writeBatch,
-  query,
-  where
-} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-// ----- Firebase config -----
-const firebaseConfig = {
-  apiKey: "AIzaSyCiPU37HMlJ9B4I-6FeLSYMWnbfEUKgHTI",
-  authDomain: "judo-coach-tracker.firebaseapp.com",
-  projectId: "judo-coach-tracker",
-  storageBucket: "judo-coach-tracker.firebasestorage.app",
-  messagingSenderId: "144982546167",
-  appId: "1:144982546167:web:7982b6e63bd02b7ffae5f2",
-  measurementId: "G-CK6YFEGEW6"
-};
+// ----- Supabase config -----
+const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
+const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+// Connect to emulator if localhost
+if (window.location.hostname === 'localhost') {
+  connectStorageEmulator(storage, 'localhost', 9199);
+}
+
+// Connect to emulator if localhost
+// if (window.location.hostname === 'localhost') {
+//   connectFirestoreEmulator(db, 'localhost', 8080);
+// }
 
 // ===== In‑memory state =====
 let coaches = [];
@@ -48,24 +28,12 @@ let editMode = false;
 let editingCoachId = null;
 let currentUser = null;
 
+// ===== Admin emails =====
+const adminEmails = ["gael.cantarero@gmail.com"];
+
 // ===== Admin helper =====
 function isCurrentUserAdmin() {
-  const adminEmails = ["gael.cantarero@gmail.com"]; // à adapter si besoin
-  return currentUser && adminEmails.includes(currentUser.email);
-}
-
-// ===== Firestore helpers (modular) =====
-function userDocRef() {
-  if (!currentUser) return null;
-  return doc(db, "users", currentUser.uid);
-}
-
-function coachesCol() {
-  return collection(db, "clubCoaches");  // collection commune
-}
-
-function timeDataCol() {
-  return collection(db, "clubTimeData"); // collection commune
+  return currentUser && adminEmails.some(email => email.toLowerCase() === currentUser.email.toLowerCase());
 }
 
 // ===== Static data =====
@@ -92,7 +60,19 @@ const schoolHolidays = [
 ];
 
 // ===== Init =====
-document.addEventListener("DOMContentLoaded", setupAuthListeners);
+async function debugSession() {
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    console.log('DEBUG Supabase session:', data, error);
+  } catch (e) {
+    console.error('DEBUG getSession failed:', e);
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  setupAuthListeners();
+  debugSession();
+});
 
 // ===== Auth =====
 function setupAuthListeners() {
@@ -100,6 +80,7 @@ function setupAuthListeners() {
   const passwordInput = document.getElementById("authPassword");
   const registerBtn = document.getElementById("registerBtn");
   const loginBtn = document.getElementById("loginBtn");
+  const resetPasswordBtn = document.getElementById("resetPasswordBtn");
   const logoutBtn = document.getElementById("logoutBtn");
   const statusSpan = document.getElementById("authStatus");
   const appContainer = document.getElementById("appContainer");
@@ -112,7 +93,8 @@ function setupAuthListeners() {
       return;
     }
     try {
-      await createUserWithEmailAndPassword(auth, email, pass);
+      const { data, error } = await supabase.auth.signUp({ email, password: pass });
+      if (error) throw error;
       statusSpan.textContent = "Account created & logged in.";
     } catch (e) {
       alert(e.message);
@@ -127,109 +109,142 @@ function setupAuthListeners() {
       return;
     }
     try {
-      await signInWithEmailAndPassword(auth, email, pass);
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
+      if (error) throw error;
     } catch (e) {
       alert(e.message);
     }
   });
 
   logoutBtn.addEventListener("click", async () => {
-    await signOut(auth);
+    const { error } = await supabase.auth.signOut();
+    if (error) alert(error.message);
   });
 
-  onAuthStateChanged(auth, async (user) => {
+  resetPasswordBtn.addEventListener("click", async () => {
+    const email = emailInput.value.trim();
+    if (!email) {
+      alert("Enter your email address first.");
+      return;
+    }
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      if (error) throw error;
+      alert("Password reset email sent. Check your inbox.");
+    } catch (e) {
+      alert(e.message);
+    }
+  });
+
+  supabase.auth.onAuthStateChange(async (event, session) => {
+    const user = session?.user;
+    const select = document.getElementById("coachSelect");
+    select.innerHTML = '<option value="">-- Select Coach --</option>';
+    coaches = [];
+    timeData = {};
+    currentCoach = null;
+
     if (user) {
       currentUser = user;
-      authStatus.textContent = `Connecté : ${user.email}`;
-      document.getElementById("authContainer").style.display = "block";
-      document.getElementById("appContainer").style.display = "none";
-    }
-      // --- NOUVEAU : VERIFICATION DU ROLE ---
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      const role = userDoc.exists() ? userDoc.data().role : 'coach';
+      statusSpan.textContent = `Logged in as ${user.email}`;
+      document.getElementById("authRow").style.display = "none";
+      document.getElementById("registerBtn").style.display = "none";
+      document.getElementById("loginBtn").style.display = "none";
+      document.getElementById("resetPasswordBtn").style.display = "none";
+      logoutBtn.style.display = "inline-block";
+      document.getElementById("appContainer").style.display = "block";
+
+      // --- VERIFICATION DU ROLE ---
+      const role = adminEmails.some(email => email.toLowerCase() === user.email.toLowerCase()) ? 'admin' : 'coach';
 
       if (role === 'admin') {
         // L'admin voit les boutons et tous les coaches
         document.getElementById("addCoachBtn").style.display = "inline-block";
         document.getElementById("editCoachBtn").style.display = "inline-block";
-        await loadAllCoaches(); 
       } else {
         // Le coach ne voit rien et seulement son profil
         document.getElementById("addCoachBtn").style.display = "none";
         document.getElementById("editCoachBtn").style.display = "none";
-        await loadMyCoachProfile(user.uid); 
+      }
+
+      try {
+        await loadAllDataFromSupabase();
+      } catch (e) {
+        console.error("Failed to load data:", e);
+      }
+      setupEventListeners();
+      try {
+        updateCalendar();
+        updateSummary();
+      } catch (e) {
+        console.error("Failed to update UI:", e);
       }
     } else {
       currentUser = null;
-      document.getElementById("authContainer").style.display = "block";
+      statusSpan.textContent = "Not logged in.";
+      document.getElementById("authRow").style.display = "block";
+      document.getElementById("registerBtn").style.display = "inline-block";
+      document.getElementById("loginBtn").style.display = "inline-block";
+      document.getElementById("resetPasswordBtn").style.display = "inline-block";
+      logoutBtn.style.display = "none";
       document.getElementById("appContainer").style.display = "none";
     }
   });
-
-// Nouvelle fonction pour les coaches
-async function loadSingleCoachForUser(uid) {
-  const q = query(collection(db, "clubCoaches"), where("ownerUid", "==", uid));
-  const snap = await getDocs(q);
-  
-  coachSelect.innerHTML = ""; // Vide le select
-  if (!snap.empty) {
-    snap.forEach(docSnap => {
-      const c = docSnap.data();
-      const opt = document.createElement("option");
-      opt.value = docSnap.id;
-      opt.textContent = c.name;
-      coachSelect.appendChild(opt);
-    });
-    // Sélection automatique du seul coach disponible
-    coachSelect.selectedIndex = 0;
-    coachSelect.dispatchEvent(new Event('change'));
-  } else {
-    coachSelect.innerHTML = '<option value="">Profil non trouvé</option>';
-  }
 }
-  
+
 // ===== Data loading =====
-async function loadAllDataFromFirestore() {
+async function loadAllDataFromSupabase() {
   if (!currentUser) return;
 
   // Coaches
   coaches = [];
-  const coachRef = coachesCol();
-  if (coachRef) {
-    const coachSnap = await getDocs(coachRef);
-    coachSnap.forEach((d) => {
-      coaches.push({ id: d.id, ...d.data() });
-    });
+  if (isCurrentUserAdmin()) {
+    const { data, error } = await supabase.from('coaches').select('*');
+    if (error) throw error;
+    coaches = data.map(d => ({ id: d.id, ...d }));
+  } else {
+    // For coach, find by email
+    const { data, error } = await supabase.from('coaches').select('*').eq('email', currentUser.email);
+    if (error) throw error;
+    coaches = data.map(d => ({ id: d.id, ...d }));
   }
   loadCoaches();
 
   // Time data
   timeData = {};
-  const timeRef = timeDataCol();
-if (!timeRef) return;
+  let timeSnap;
 
-let timeSnap;
-
-if (isCurrentUserAdmin()) {
-  timeSnap = await getDocs(timeRef);            // ADMIN : tout
-} else {
-  const q = query(timeRef, where("ownerUid", "==", currentUser.uid));
-  timeSnap = await getDocs(q);                  // COACH : seulement ses docs
-}
+  if (isCurrentUserAdmin()) {
+    const { data, error } = await supabase.from('time_data').select('*');
+    if (error) throw error;
+    timeSnap = data;
+  } else {
+    // For coach, load timeData for their coach
+    if (coaches.length > 0) {
+      const coachId = coaches[0].id;
+      const { data, error } = await supabase.from('time_data').select('*').eq('coach_id', coachId);
+      if (error) throw error;
+      timeSnap = data;
+    } else {
+      timeSnap = [];
+    }
+  }
 
   timeSnap.forEach((d) => {
-    const data = d.data();
-    const key = `${data.coachId}-${data.date}`;
+    const data = d;
+    const key = `${data.coach_id}-${data.date}`;
     timeData[key] = {
       hours: data.hours || 0,
       competition: !!data.competition,
       km: data.km || 0,
       description: data.description || "",
-      departurePlace: data.departurePlace || "",
-      arrivalPlace: data.arrivalPlace || "",
-      coachId: data.coachId || null,
-      ownerUid: data.ownerUid || null,
-      ownerEmail: data.ownerEmail || null,
+      departurePlace: data.departure_place || "",
+      arrivalPlace: data.arrival_place || "",
+      peage: data.peage || 0,
+      justificationUrl: data.justification_url || "",
+      coachId: data.coach_id || null,
+      ownerUid: data.owner_uid || null,
+      ownerEmail: data.owner_email || null,
       id: d.id
     };
   });
@@ -263,14 +278,17 @@ function setupEventListeners() {
     editingCoachId = currentCoach.id;
 
     document.getElementById("coachName").value = currentCoach.name;
+    document.getElementById("coachFirstName").value = currentCoach.first_name || "";
+    document.getElementById("coachEmail").value = currentCoach.email || "";
     document.getElementById("coachAddress").value = currentCoach.address || "";
     document.getElementById("coachVehicle").value = currentCoach.vehicle || "";
-    document.getElementById("coachFiscalPower").value = currentCoach.fiscalPower || "";
-    document.getElementById("coachRate").value = currentCoach.hourlyRate;
-    document.getElementById("dailyAllowance").value = currentCoach.dailyAllowance;
-    document.getElementById("kmRate").value = currentCoach.kmRate;
+    document.getElementById("coachFiscalPower").value = currentCoach.fiscal_power || "";
+    document.getElementById("coachRate").value = currentCoach.hourly_rate;
+    document.getElementById("dailyAllowance").value = currentCoach.daily_allowance;
+    document.getElementById("kmRate").value = currentCoach.km_rate;
 
     document.getElementById("coachModal").classList.add("active");
+    document.getElementById("deleteCoach").style.display = "inline-block";
   };
 
   document.getElementById("saveCoach").onclick = saveCoach;
@@ -279,7 +297,10 @@ function setupEventListeners() {
     clearCoachForm();
     editMode = false;
     editingCoachId = null;
+    document.getElementById("deleteCoach").style.display = "none";
   };
+
+  document.getElementById("deleteCoach").onclick = deleteCoach;
 
   document.getElementById("coachModal").onclick = (e) => {
     if (e.target.id === "coachModal") {
@@ -347,6 +368,8 @@ function setupEventListeners() {
 // ===== Coach management =====
 function clearCoachForm() {
   document.getElementById("coachName").value = "";
+  document.getElementById("coachFirstName").value = "";
+  document.getElementById("coachEmail").value = "";
   document.getElementById("coachAddress").value = "";
   document.getElementById("coachVehicle").value = "";
   document.getElementById("coachFiscalPower").value = "";
@@ -362,9 +385,14 @@ function loadCoaches() {
   coaches.forEach((coach) => {
     const option = document.createElement("option");
     option.value = coach.id;
-    option.textContent = `${coach.name} (€${coach.hourlyRate}/h)`;
+    option.textContent = `${(coach.first_name ? coach.first_name + ' ' : '') + coach.name}`;
     select.appendChild(option);
   });
+
+  if (!currentCoach && coaches.length === 1) {
+    currentCoach = coaches[0];
+    select.value = currentCoach.id;
+  }
 
   if (currentCoach) {
     const found = coaches.find((c) => c.id === currentCoach.id);
@@ -385,6 +413,8 @@ async function saveCoach() {
   }
 
   const name = document.getElementById("coachName").value.trim();
+  const firstName = document.getElementById("coachFirstName").value.trim();
+  const email = document.getElementById("coachEmail").value.trim();
   const address = document.getElementById("coachAddress").value.trim();
   const vehicle = document.getElementById("coachVehicle").value.trim();
   const fiscalPower = document.getElementById("coachFiscalPower").value.trim();
@@ -399,25 +429,28 @@ async function saveCoach() {
 
   const coachData = {
     name,
+    first_name: firstName,
+    email,
     address,
     vehicle,
-    fiscalPower,
-    hourlyRate: rate,
-    dailyAllowance: allowance,
-    kmRate
+    fiscal_power: fiscalPower,
+    hourly_rate: rate,
+    daily_allowance: allowance,
+    km_rate: kmRate,
+    owner_uid: currentUser.id
   };
 
   try {
     if (editMode && editingCoachId) {
-      const coachRef = doc(db, "clubCoaches", editingCoachId);
-      await updateDoc(coachRef, coachData);
+      const { error } = await supabase.from('coaches').update(coachData).eq('id', editingCoachId);
+      if (error) throw error;
     } else {
-      const colRef = coachesCol();
-      const docRef = await addDoc(colRef, coachData);
-      editingCoachId = docRef.id;
+      const { data, error } = await supabase.from('coaches').insert(coachData).select();
+      if (error) throw error;
+      editingCoachId = data[0].id;
     }
 
-    await loadAllDataFromFirestore();
+    await loadAllDataFromSupabase();
 
     currentCoach = coaches.find((c) => c.id === editingCoachId) || null;
     const select = document.getElementById("coachSelect");
@@ -430,6 +463,42 @@ async function saveCoach() {
     updateSummary();
   } catch (e) {
     alert("Error saving coach: " + e.message);
+  }
+}
+
+async function deleteCoach() {
+  if (!currentUser || !isCurrentUserAdmin()) {
+    alert("Only admin can delete coach profiles.");
+    return;
+  }
+  if (!editingCoachId) return;
+
+  if (!confirm("Are you sure you want to delete this coach? This will also delete all associated time data.")) {
+    return;
+  }
+
+  try {
+    // Delete the coach
+    const { error: error1 } = await supabase.from('coaches').delete().eq('id', editingCoachId);
+    if (error1) throw error1;
+
+    // Delete all timeData for this coach
+    const { error: error2 } = await supabase.from('time_data').delete().eq('coach_id', editingCoachId);
+    if (error2) throw error2;
+
+    await loadAllDataFromSupabase();
+
+    currentCoach = null;
+    const select = document.getElementById("coachSelect");
+    select.value = "";
+
+    document.getElementById("coachModal").classList.remove("active");
+    clearCoachForm();
+    editMode = false;
+    editingCoachId = null;
+    updateSummary();
+  } catch (e) {
+    alert("Error deleting coach: " + e.message);
   }
 }
 
@@ -548,7 +617,7 @@ function openDayModal(dateStr) {
       ownerEmail: currentUser ? currentUser.email : null
     };
 
-  document.getElementById("dayTitle").textContent = `Edit ${dateStr}`;
+  document.getElementById("dayTitle").textContent = `Modifier ${dateStr}`;
   document.getElementById("trainingHours").value = dayData.hours || 0;
   document.getElementById("competitionDay").checked =
     dayData.competition || false;
@@ -558,6 +627,8 @@ function openDayModal(dateStr) {
   document.getElementById("departurePlace").value =
     dayData.departurePlace || "";
   document.getElementById("arrivalPlace").value = dayData.arrivalPlace || "";
+  document.getElementById("peage").value = dayData.peage || 0;
+  document.getElementById("peageJustification").value = "";
 
   document.getElementById("travelGroup").style.display = dayData.competition
     ? "block"
@@ -579,29 +650,49 @@ async function saveDay() {
     .getElementById("departurePlace")
     .value.trim();
   const arrivalPlace = document.getElementById("arrivalPlace").value.trim();
+  const peage = parseFloat(document.getElementById("peage").value) || 0;
+  const file = document.getElementById("peageJustification").files[0];
 
   const key = `${currentCoach.id}-${selectedDay}`;
   const existing = timeData[key];
 
-  if (hours === 0 && !competition && km === 0 && !description) {
+  let justificationUrl = existing ? existing.justificationUrl || "" : "";
+
+  if (file) {
+    try {
+      const { data, error } = await supabase.storage.from('justifications').upload(`${currentUser.id}/${selectedDay}_${file.name}`, file);
+      if (error) throw error;
+      justificationUrl = supabase.storage.from('justifications').getPublicUrl(data.path).data.publicUrl;
+    } catch (e) {
+      alert("Erreur lors de l'upload du justificatif: " + e.message);
+      return; // Don't save if upload fails
+    }
+  }
+
+  if (hours === 0 && !competition && km === 0 && !description && peage === 0) {
     if (existing && existing.id) {
-      await deleteDoc(doc(db, "clubTimeData", existing.id));
+      const { error } = await supabase.from('time_data').delete().eq('id', existing.id);
+      if (error) throw error;
     }
     delete timeData[key];
   } else {
+    const data = {
+      coach_id: currentCoach.id,
+      date: selectedDay,
+      hours,
+      competition,
+      km,
+      description,
+      departure_place: departurePlace,
+      arrival_place: arrivalPlace,
+      peage,
+      justification_url: justificationUrl,
+      owner_uid: currentUser.id,
+      owner_email: currentUser.email
+    };
     if (existing && existing.id) {
-      await updateDoc(doc(db, "clubTimeData", existing.id), {
-        coachId: currentCoach.id,
-        date: selectedDay,
-        hours,
-        competition,
-        km,
-        description,
-        departurePlace,
-        arrivalPlace,
-        ownerUid: currentUser.uid,
-        ownerEmail: currentUser.email
-      });
+      const { error } = await supabase.from('time_data').update(data).eq('id', existing.id);
+      if (error) throw error;
       timeData[key] = {
         hours,
         competition,
@@ -609,25 +700,16 @@ async function saveDay() {
         description,
         departurePlace,
         arrivalPlace,
+        peage,
+        justificationUrl,
         coachId: currentCoach.id,
-        ownerUid: currentUser.uid,
+        ownerUid: currentUser.id,
         ownerEmail: currentUser.email,
         id: existing.id
       };
     } else {
-      const colRef = timeDataCol();
-      const docRef = await addDoc(colRef, {
-        coachId: currentCoach.id,
-        date: selectedDay,
-        hours,
-        competition,
-        km,
-        description,
-        departurePlace,
-        arrivalPlace,
-        ownerUid: currentUser.uid,
-        ownerEmail: currentUser.email
-      });
+      const { data: inserted, error } = await supabase.from('time_data').insert(data).select();
+      if (error) throw error;
       timeData[key] = {
         hours,
         competition,
@@ -635,10 +717,12 @@ async function saveDay() {
         description,
         departurePlace,
         arrivalPlace,
+        peage,
+        justificationUrl,
         coachId: currentCoach.id,
-        ownerUid: currentUser.uid,
+        ownerUid: currentUser.id,
         ownerEmail: currentUser.email,
-        id: docRef.id
+        id: inserted[0].id
       };
     }
   }
@@ -653,7 +737,8 @@ async function deleteDay() {
   const key = `${currentCoach.id}-${selectedDay}`;
   const existing = timeData[key];
   if (existing && existing.id) {
-    await deleteDoc(doc(db, "clubTimeData", existing.id));
+    const { error } = await supabase.from('time_data').delete().eq('id', existing.id);
+    if (error) throw error;
   }
   delete timeData[key];
 
@@ -690,15 +775,15 @@ function updateSummary() {
     }
   });
 
-  const trainingPayment = totalHours * currentCoach.hourlyRate;
-  const compPayment = compDays * currentCoach.dailyAllowance;
-  const kmPayment = totalKm * currentCoach.kmRate;
+  const trainingPayment = totalHours * currentCoach.hourly_rate;
+  const compPayment = compDays * currentCoach.daily_allowance;
+  const kmPayment = totalKm * currentCoach.km_rate;
   const totalPayment = trainingPayment + compPayment + kmPayment;
 
   document.getElementById("totalHours").textContent = totalHours.toFixed(1);
   document.getElementById(
     "hourlyRate"
-  ).textContent = `€${currentCoach.hourlyRate.toFixed(2)}`;
+  ).textContent = `€${currentCoach.hourly_rate.toFixed(2)}`;
   document.getElementById(
     "trainingPayment"
   ).textContent = `€${trainingPayment.toFixed(2)}`;
@@ -732,9 +817,9 @@ function exportToCSV() {
       const date = key.split("-").slice(1).join("-");
       const data = timeData[key];
       const payment =
-        data.hours * currentCoach.hourlyRate +
-        (data.competition ? currentCoach.dailyAllowance : 0) +
-        data.km * currentCoach.kmRate;
+        data.hours * currentCoach.hourly_rate +
+        (data.competition ? currentCoach.daily_allowance : 0) +
+        data.km * currentCoach.km_rate;
       csv +=
         `${date},${data.hours},${data.competition ? "Yes" : "No"},` +
         `"${data.description || ""}",${data.km},€${payment.toFixed(2)}\n`;
@@ -766,7 +851,7 @@ function exportMileageHTML() {
       const date = key.split("-").slice(1).join("-");
       const data = timeData[key];
       if (!data.km || data.km <= 0) return;
-      const amount = data.km * currentCoach.kmRate;
+      const amount = data.km * currentCoach.km_rate;
       total += amount;
       rows.push({ date, ...data, amount });
     });
@@ -942,7 +1027,7 @@ function exportMileageHTML() {
     <p><strong>Adresse :</strong> ${currentCoach.address || "Non renseignée"}</p>
     <p><strong>Poste :</strong> Entraîneur</p>
     <p><strong>Véhicule :</strong> ${currentCoach.vehicle || "Non renseigné"}</p>
-    <p><strong>Puissance fiscale :</strong> ${currentCoach.fiscalPower || "Non renseignée"} CV</p>
+    <p><strong>Puissance fiscale :</strong> ${currentCoach.fiscal_power || "Non renseignée"} CV</p>
   </div>
 
   <table>
@@ -967,7 +1052,7 @@ ${rows
         <td>${r.departurePlace || "-"}</td>
         <td>${r.arrivalPlace || "-"}</td>
         <td style="text-align:right">${r.km}</td>
-        <td style="text-align:right">${currentCoach.kmRate
+        <td style="text-align:right">${currentCoach.km_rate
           .toFixed(2)
           .replace(".", ",")}</td>
         <td style="text-align:right">${r.amount
@@ -1020,32 +1105,6 @@ ${rows
 
 // Expose the function
 window.exportMileageHTML = exportMileageHTML;
-
-// Pour l'Admin : charge TOUT
-async function loadAllCoaches() {
-  const snap = await getDocs(collection(db, "clubCoaches"));
-  allCoaches = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  updateCoachSelect();
-}
-
-// Pour le Coach : charge seulement SON profil via ownerUid
-async function loadMyCoachProfile(uid) {
-  const q = query(collection(db, "clubCoaches"), where("ownerUid", "==", uid));
-  const snap = await getDocs(q);
-  allCoaches = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  updateCoachSelect();
-}
-
-// Fonction commune pour remplir le menu déroulant
-function updateCoachSelect() {
-  coachSelect.innerHTML = allCoaches.map(c => 
-    `<option value="${c.id}">${c.name}</option>`
-  ).join("");
-  if (allCoaches.length > 0) {
-    currentCoach = allCoaches[0];
-    initCalendar(); // Ou le nom de ta fonction qui affiche le calendrier
-  }
-}
 // ===== Import JSON =====
 async function importCoachData(data) {
   if (!currentCoach || !currentUser) {
@@ -1060,23 +1119,23 @@ async function importCoachData(data) {
     if (!ok) return;
   }
 
-  const batch = writeBatch(db);
-  const colRef = timeDataCol();
+  const inserts = [];
 
   if (data.heures) {
     Object.entries(data.heures).forEach(([date, hours]) => {
-      const ref = doc(colRef);
-      batch.set(ref, {
-        coachId: currentCoach.id,
+      inserts.push({
+        coach_id: currentCoach.id,
         date,
         hours: Number(hours) || 0,
         competition: false,
         km: 0,
         description: "",
-        departurePlace: "",
-        arrivalPlace: "",
-        ownerUid: currentUser.uid,
-        ownerEmail: currentUser.email
+        departure_place: "",
+        arrival_place: "",
+        peage: 0,
+        justification_url: "",
+        owner_uid: currentUser.id,
+        owner_email: currentUser.email
       });
     });
   }
@@ -1084,24 +1143,28 @@ async function importCoachData(data) {
   if (data.manifestations) {
     Object.keys(data.manifestations).forEach((date) => {
       const desc = data.manifestations[date] || "";
-      const ref = doc(colRef);
-      batch.set(ref, {
-        coachId: currentCoach.id,
+      inserts.push({
+        coach_id: currentCoach.id,
         date,
         hours: 0,
         competition: true,
         km: 0,
         description: desc,
-        departurePlace: "",
-        arrivalPlace: "",
-        ownerUid: currentUser.uid,
-        ownerEmail: currentUser.email
+        departure_place: "",
+        arrival_place: "",
+        peage: 0,
+        justification_url: "",
+        owner_uid: currentUser.id,
+        owner_email: currentUser.email
       });
     });
   }
 
-  await batch.commit();
-  await loadAllDataFromFirestore();
+  if (inserts.length > 0) {
+    const { error } = await supabase.from('time_data').insert(inserts);
+    if (error) throw error;
+  }
+  await loadAllDataFromSupabase();
   updateCalendar();
   updateSummary();
   alert("Import completed.");

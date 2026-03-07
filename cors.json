@@ -1,0 +1,1 @@
+[{"origin": ["https://judo-coach-tracker.web.app"], "method": ["GET", "POST", "PUT", "DELETE"], "maxAgeSeconds": 3600, "responseHeader": ["Content-Type", "Authorization", "Content-Length"]}]
