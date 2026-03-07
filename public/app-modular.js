@@ -396,6 +396,9 @@ function loadCoaches() {
 }
 
 async function saveCoach() {
+  console.log('DEBUG saveCoach currentUser:', currentUser);
+  console.log('DEBUG isCurrentUserAdmin():', isCurrentUserAdmin());
+
   if (!currentUser) return;
   if (!isCurrentUserAdmin()) {
     alert("Only admin can edit coach profiles.");
