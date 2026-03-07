@@ -412,8 +412,11 @@ async function saveCoach() {
   const allowance = parseFloat(document.getElementById("dailyAllowance").value);
   const kmRate = parseFloat(document.getElementById("kmRate").value);
 
-  if (!name || isNaN(rate) || isNaN(allowance) || isNaN(kmRate)) {
-    alert("Please fill all required fields with valid numbers");
+  const ownerUidInput = document.getElementById("coachOwnerUid");
+  const ownerUid = ownerUidInput.value.trim();
+
+  if (!name || isNaN(rate) || isNaN(allowance) || isNaN(kmRate) || !ownerUid) {
+    alert("Please fill all required fields with valid numbers and owner UID");
     return;
   }
 
@@ -427,25 +430,24 @@ async function saveCoach() {
     hourly_rate: rate,
     daily_allowance: allowance,
     km_rate: kmRate,
-    owner_uid: currentUser.id
+    owner_uid: ownerUid
   };
 
   try {
     if (editMode && editingCoachId) {
-      const { error } = await supabase.from('coaches').update(coachData).eq('id', editingCoachId);
+      const { error } = await supabase
+        .from('coaches')
+        .update(coachData)
+        .eq('id', editingCoachId);
       if (error) throw error;
     } else {
-      const { data, error } = await supabase.from('coaches').insert(coachData).select();
+      const { error } = await supabase
+        .from('coaches')
+        .insert(coachData);
       if (error) throw error;
-      editingCoachId = data[0].id;
     }
 
     await loadAllDataFromSupabase();
-
-    currentCoach = coaches.find((c) => c.id === editingCoachId) || null;
-    const select = document.getElementById("coachSelect");
-    if (currentCoach) select.value = currentCoach.id;
-
     document.getElementById("coachModal").classList.remove("active");
     clearCoachForm();
     editMode = false;
@@ -455,6 +457,7 @@ async function saveCoach() {
     alert("Error saving coach: " + e.message);
   }
 }
+
 
 async function deleteCoach() {
   if (!currentUser || !isCurrentUserAdmin()) {
