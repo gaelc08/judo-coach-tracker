@@ -62,13 +62,20 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log('DEBUG logoutBtn found, attaching event listener');
     logoutBtn.addEventListener('click', async () => {
       console.log('DEBUG logout click');
-      const { error } = await supabase.auth.signOut({ scope: 'local' });
-      if (error) console.error('Logout error:', error);
-      else {
-        currentUser = null;
-        document.getElementById('appContainer').style.display = 'none';
-        document.getElementById('authRow').style.display = 'block';
-        console.log('DEBUG manual UI reset');
+      try {
+        const { error } = await supabase.auth.signOut({ scope: 'local' });
+        if (error) {
+          console.error('Logout error:', error);
+          alert('Logout failed: ' + error.message);
+        } else {
+          currentUser = null;
+          document.getElementById('appContainer').style.display = 'none';
+          document.getElementById('authRow').style.display = 'block';
+          console.log('DEBUG manual UI reset');
+        }
+      } catch (e) {
+        console.error('Logout exception:', e);
+        alert('Logout exception: ' + e.message);
       }
     });
   } else {
@@ -569,9 +576,9 @@ const coachData = {
     console.log('DEBUG DB start');
     let res;
     if (editMode && editingCoachId) {
-      res = await supabase.from('coaches').update([coachData]).eq('id', editingCoachId);
+      res = await supabase.from('coaches').update([coachData]).eq('id', editingCoachId).select();
     } else {
-      res = await supabase.from('coaches').insert([coachData]);
+      res = await supabase.from('coaches').insert([coachData]).select();
     }
     console.log('DEBUG DB full response:', JSON.stringify(res, null, 2));
     if (res.error) {
