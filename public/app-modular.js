@@ -8,7 +8,7 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-09-admin-rest-cache-1';
+const __BUILD_ID = '2026-03-09-coachlist-stability-1';
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 // ===== Network debug (Supabase requests) =====
@@ -219,6 +219,7 @@ let editingCoachId = null;
 let currentUser = null;
 let currentSession = null;
 let currentAccessToken = null;
+let __eventListenersSetup = false;
 
 async function __coachWriteViaRest(coachData, { editingId = null } = {}) {
   if (!currentAccessToken) {
@@ -257,6 +258,47 @@ async function __coachWriteViaRest(coachData, { editingId = null } = {}) {
     } catch {
       json = null;
     }
+
+    if (!res.ok) {
+      const message = (json && (json.message || json.error_description || json.error))
+        ? (json.message || json.error_description || json.error)
+        : (text || `${res.status} ${res.statusText}`);
+      return { data: null, error: { message }, status: res.status, statusText: res.statusText };
+    }
+
+    return { data: Array.isArray(json) ? json : (json ? [json] : []), error: null, status: res.status, statusText: res.statusText };
+  } catch (e) {
+    return { data: null, error: { message: e?.message || String(e) }, status: 0, statusText: 'FETCH_ERROR' };
+  }
+}
+
+async function __restSelect(table, { select = '*', filters = [] } = {}) {
+  if (!currentAccessToken) {
+    return {
+      data: null,
+      error: { message: 'No access token available' },
+      status: 0,
+      statusText: 'NO_TOKEN'
+    };
+  }
+
+  const urlObj = new URL(`${supabaseUrl}/rest/v1/${table}`);
+  urlObj.searchParams.set('select', select);
+  for (const [col, op, value] of filters) {
+    urlObj.searchParams.set(col, `${op}.${value}`);
+  }
+  const url = urlObj.toString();
+
+  try {
+    const res = await globalThis.fetch(url, {
+      headers: {
+        apikey: supabaseKey,
+        Authorization: `Bearer ${currentAccessToken}`
+      }
+    });
+    const text = await res.text();
+    let json = null;
+    try { json = text ? JSON.parse(text) : null; } catch { json = null; }
 
     if (!res.ok) {
       const message = (json && (json.message || json.error_description || json.error))
@@ -520,10 +562,6 @@ function setupAuthListeners() {
     }
     const user = session?.user;
     const select = document.getElementById("coachSelect");
-    select.innerHTML = '<option value="">-- Select Coach --</option>';
-    coaches = [];
-    timeData = {};
-    currentCoach = null;
 
     if (user) {
       currentUser = user;
@@ -545,12 +583,30 @@ function setupAuthListeners() {
         document.getElementById("editCoachBtn").style.display = "none";
       }
 
+      // Reload data, but don't wipe the UI first; if a background auth lock stalls,
+      // we prefer to keep the last known data visible.
+      const prevCoaches = coaches;
+      const prevTimeData = timeData;
+      const prevCurrentCoach = currentCoach;
+
       try {
         await loadAllDataFromSupabase();
+        // Ensure select is populated after load.
+        if (select) loadCoaches();
+        if (currentCoach) select.value = currentCoach.id;
       } catch (e) {
         console.error("Failed to load data:", e);
+        // Keep previous state on failure
+        coaches = (coaches && coaches.length) ? coaches : (prevCoaches || []);
+        timeData = (timeData && Object.keys(timeData).length) ? timeData : (prevTimeData || {});
+        currentCoach = currentCoach || prevCurrentCoach || null;
+        if (select) loadCoaches();
       }
-      setupEventListeners();
+
+      if (!__eventListenersSetup) {
+        setupEventListeners();
+        __eventListenersSetup = true;
+      }
       try {
         updateCalendar();
         updateSummary();
@@ -561,6 +617,10 @@ function setupAuthListeners() {
       currentUser = null;
       currentSession = null;
       currentAccessToken = null;
+      coaches = [];
+      timeData = {};
+      currentCoach = null;
+      if (select) select.innerHTML = '<option value="">-- Select Coach --</option>';
       statusSpan.textContent = "Not logged in.";
       document.getElementById("authRow").style.display = "block";
       document.getElementById("registerBtn").style.display = "inline-block";
@@ -577,43 +637,43 @@ async function loadAllDataFromSupabase() {
   const isAdmin = await isCurrentUserAdminDB();
   console.log('DEBUG loadAllDataFromSupabase start, isAdmin=', isAdmin);
   if (!currentUser) return;
+  if (!currentAccessToken) throw new Error('No access token; cannot load data');
   
   // Coaches
   coaches = [];
   if (isAdmin) {
-    const { data, error } = await supabase.from('coaches').select('*');
-    if (error) throw error;
-    coaches = data.map(d => ({ id: d.id, ...d }));
+    const res = await __restSelect('coaches');
+    if (res.error) throw new Error(res.error.message);
+    coaches = (res.data || []).map(d => ({ id: d.id, ...d }));
   } else {
     // For coach, find by email
-    const { data, error } = await supabase.from('coaches').select('*').eq('email', currentUser.email);
-    if (error) throw error;
-    coaches = data.map(d => ({ id: d.id, ...d }));
+    const res = await __restSelect('coaches', { filters: [['email', 'eq', currentUser.email]] });
+    if (res.error) throw new Error(res.error.message);
+    coaches = (res.data || []).map(d => ({ id: d.id, ...d }));
   }
   loadCoaches();
 
   // Time data
   timeData = {};
-  let timeSnap;
+  let timeSnap = [];
 
   if (isAdmin) {
-    const { data, error } = await supabase.from('time_data').select('*');
-    if (error) throw error;
-    timeSnap = data;
+    const res = await __restSelect('time_data');
+    if (res.error) throw new Error(res.error.message);
+    timeSnap = res.data || [];
   } else {
     // For coach, load timeData for their coach
     if (coaches.length > 0) {
       const coachId = coaches[0].id;
-      const { data, error } = await supabase.from('time_data').select('*').eq('coach_id', coachId);
-      if (error) throw error;
-      timeSnap = data;
+      const res = await __restSelect('time_data', { filters: [['coach_id', 'eq', coachId]] });
+      if (res.error) throw new Error(res.error.message);
+      timeSnap = res.data || [];
     } else {
       timeSnap = [];
     }
   }
 
-  timeSnap.forEach((d) => {
-    const data = d;
+  (timeSnap || []).forEach((data) => {
     const key = `${data.coach_id}-${data.date}`;
     timeData[key] = {
       hours: data.hours || 0,
@@ -627,9 +687,10 @@ async function loadAllDataFromSupabase() {
       coachId: data.coach_id || null,
       ownerUid: data.owner_uid || null,
       ownerEmail: data.owner_email || null,
-      id: d.id
+      id: data.id
     };
   });
+
 
   // Filtre local par coach sélectionné (utile surtout pour l'admin)
   if (currentCoach) {
