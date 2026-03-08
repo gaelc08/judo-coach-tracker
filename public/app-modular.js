@@ -549,8 +549,8 @@ const coachData = {
   try {
     console.log('DEBUG DB start');
     const res = editMode && editingCoachId 
-      ? await supabase.from('coaches').update(coachData).eq('id', editingCoachId)
-      : await supabase.from('coaches').insert(coachData);
+      ? await supabase.from('coaches').update([coachData]).eq('id', editingCoachId)
+      : await supabase.from('coaches').insert([coachData])
     console.log('DEBUG DB res FULL:', JSON.stringify(res, null, 2));
     if (res.error) throw res.error;
     console.log('DEBUG SAVE SUCCESS');
