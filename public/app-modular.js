@@ -60,7 +60,7 @@ document.addEventListener("DOMContentLoaded", () => {
 // ===== Auth =====
 async function isCurrentUserAdminDB() {
   if (!currentUser) return false;
-  const { data, error } = await supabase.rpc('is_admin');
+  const { data, error } = await supabase.rpc('is_admin').then(r => console.log('RPC is_admin:', r));
   if (error) {
     console.error('isAdmin RPC error:', error);
     return false;
@@ -491,6 +491,7 @@ async function saveCoach() {
     return;
   }
   console.log('DEBUG saveCoach currentUser:', currentUser);
+  console.log('DEBUG isAdmin:', await isCurrentUserAdminDB());
 
   if (!await isCurrentUserAdminDB()) {
     console.log('DEBUG saveCoach: not admin');
