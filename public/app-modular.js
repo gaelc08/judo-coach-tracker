@@ -531,18 +531,19 @@ async function saveCoach() {
     return;
   }
   
-  const coachData = {
-    name, 
-    firstname: firstName, 
-    email, 
-    address, 
-    vehicle, 
-    fiscalpower: fiscalPower,
-    hourlyrate: rate, 
-    dailyallowance: allowance, 
-    kmrate: kmRate, 
-    owneruid: ownerUid
-  };
+const coachData = {
+  name, 
+  first_name: firstName,      // first_name
+  email, 
+  address, 
+  vehicle, 
+  fiscal_power: fiscalPower,
+  hourly_rate: rate,          // hourly_rate
+  daily_allowance: allowance,
+  km_rate: kmRate,
+  owner_uid: ownerUid         // owner_uid
+};
+
   console.log('DEBUG coachData:', coachData);
 
   try {
