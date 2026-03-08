@@ -156,8 +156,8 @@ logoutBtn.addEventListener('click', async () => {
       logoutBtn.style.display = "inline-block";
       document.getElementById("appContainer").style.display = "block";
 
-      const role = adminEmails.some(email => email.toLowerCase() === user.email.toLowerCase()) ? 'admin' : 'coach';
-      if (role === 'admin') {
+      const isAdmin = await isCurrentUserAdminDB();
+      if (isAdmin) {
         document.getElementById("addCoachBtn").style.display = "inline-block";
         document.getElementById("editCoachBtn").style.display = "inline-block";
       } else {
@@ -225,14 +225,11 @@ logoutBtn.addEventListener('click', async () => {
       document.getElementById("appContainer").style.display = "block";
 
       // --- VERIFICATION DU ROLE ---
-      const role = adminEmails.some(email => email.toLowerCase() === user.email.toLowerCase()) ? 'admin' : 'coach';
-
-      if (role === 'admin') {
-        // L'admin voit les boutons et tous les coaches
+      const isAdmin = await isCurrentUserAdminDB();
+      if (isAdmin) {
         document.getElementById("addCoachBtn").style.display = "inline-block";
         document.getElementById("editCoachBtn").style.display = "inline-block";
       } else {
-        // Le coach ne voit rien et seulement son profil
         document.getElementById("addCoachBtn").style.display = "none";
         document.getElementById("editCoachBtn").style.display = "none";
       }
