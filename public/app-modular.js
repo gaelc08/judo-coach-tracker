@@ -18,14 +18,6 @@ let editMode = false;
 let editingCoachId = null;
 let currentUser = null;
 
-// ===== Admin emails =====
-const adminEmails = ["gael.cantarero@gmail.com"];
-
-// ===== Admin helper =====
-function isCurrentUserAdmin() {
-  return currentUser && adminEmails.some(email => email.toLowerCase() === currentUser.email.toLowerCase());
-}
-
 // ===== Static data =====
 const holidays2026 = {
   "2026-01-01": "New Year",
@@ -272,12 +264,12 @@ logoutBtn.addEventListener('click', async () => {
 
 // ===== Data loading =====
 async function loadAllDataFromSupabase() {
-  console.log('DEBUG loadAllDataFromSupabase start, isAdmin=', isCurrentUserAdmin());
+  console.log('DEBUG loadAllDataFromSupabase start, isAdmin=', await isCurrentUserAdminDB());
   if (!currentUser) return;
   
   // Coaches
   coaches = [];
-  if (isCurrentUserAdmin()) {
+  if (await isCurrentUserAdminDB()) {
     const { data, error } = await supabase.from('coaches').select('*');
     if (error) throw error;
     coaches = data.map(d => ({ id: d.id, ...d }));
@@ -293,7 +285,7 @@ async function loadAllDataFromSupabase() {
   timeData = {};
   let timeSnap;
 
-  if (isCurrentUserAdmin()) {
+  if (await isCurrentUserAdminDB()) {
     const { data, error } = await supabase.from('time_data').select('*');
     if (error) throw error;
     timeSnap = data;
@@ -493,12 +485,12 @@ async function saveCoach() {
   }
   console.log('DEBUG saveCoach currentUser:', currentUser);
 
-  if (!isCurrentUserAdmin()) {
+  if (!await isCurrentUserAdminDB()) {
     console.log('DEBUG saveCoach: not admin');
     alert("Only admin can edit coach profiles.");
     return;
   }
-  console.log('DEBUG isCurrentUserAdmin():', isCurrentUserAdmin());
+  console.log('DEBUG await isCurrentUserAdminDB():', await isCurrentUserAdminDB());
 
   const name = document.getElementById("coachName").value.trim();
   const firstName = document.getElementById("coachFirstName").value.trim();
@@ -590,7 +582,7 @@ async function saveCoach() {
 
 
 async function deleteCoach() {
-  if (!currentUser || !isCurrentUserAdmin()) {
+  if (!currentUser || !await isCurrentUserAdminDB()) {
     alert("Only admin can delete coach profiles.");
     return;
   }
