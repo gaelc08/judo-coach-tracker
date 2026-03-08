@@ -709,7 +709,9 @@ function setupEventListeners() {
     editMode = false;
     editingCoachId = null;
     clearCoachForm();
-    document.getElementById("coachOwnerUid").value = currentUser.id;  
+    // Important: do NOT default to the admin UID.
+    // This field must be the coach's Supabase Auth user id (UUID).
+    document.getElementById("coachOwnerUid").value = "";
     document.getElementById("coachModal").classList.add("active");
   };
 
@@ -730,7 +732,7 @@ function setupEventListeners() {
     document.getElementById("coachRate").value = currentCoach.hourly_rate;
     document.getElementById("dailyAllowance").value = currentCoach.daily_allowance;
     document.getElementById("kmRate").value = currentCoach.km_rate;
-    document.getElementById("coachOwnerUid").value = currentUser.id;
+    document.getElementById("coachOwnerUid").value = currentCoach.owner_uid || "";
     document.getElementById("coachModal").classList.add("active");
     document.getElementById("deleteCoach").style.display = "inline-block";
   };
