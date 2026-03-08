@@ -55,6 +55,24 @@ document.addEventListener("DOMContentLoaded", () => {
   console.log('DEBUG DOMContentLoaded');
   setupAuthListeners();
   debugSession();
+  // Attach logout event listener after DOM is ready
+  const logoutBtn = document.getElementById("logoutBtn");
+  if (logoutBtn) {
+    console.log('DEBUG logoutBtn found, attaching event listener');
+    logoutBtn.addEventListener('click', async () => {
+      console.log('DEBUG logout click');
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
+      if (error) console.error('Logout error:', error);
+      else {
+        currentUser = null;
+        document.getElementById('appContainer').style.display = 'none';
+        document.getElementById('authRow').style.display = 'block';
+        console.log('DEBUG manual UI reset');
+      }
+    });
+  } else {
+    console.error('DEBUG logoutBtn not found in DOM');
+  }
 });
 
 // ===== Auth =====
