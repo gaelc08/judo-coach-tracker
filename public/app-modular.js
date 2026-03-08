@@ -6,44 +6,68 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 // ----- Supabase config -----
 const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
-const supabase = createClient(supabaseUrl, supabaseKey);
-window.supabase = supabase;
 
 // ===== Network debug (Supabase requests) =====
-// Logs only requests targeting the Supabase project domain.
-if (!window.__supabaseFetchDebugWrapped) {
-  window.__supabaseFetchDebugWrapped = true;
-  const originalFetch = window.fetch?.bind(window);
-  if (originalFetch) {
-    window.fetch = async (...args) => {
-      try {
-        const url = String(args?.[0] ?? '');
-        if (url.includes('.supabase.co')) {
-          console.log('DEBUG fetch ->', url, args?.[1] ?? {});
-        }
-      } catch (e) {
-        console.warn('DEBUG fetch log failed:', e);
-      }
+// We pass a custom fetch into createClient so requests can't bypass our logs.
+const __originalFetch = globalThis.fetch?.bind(globalThis);
+const __supabaseFetchDebugWrapped = async (input, init = {}) => {
+  const url = typeof input === 'string' ? input : (input?.url ?? '');
+  const isSupabase = String(url).includes('.supabase.co');
 
-      try {
-        const res = await originalFetch(...args);
-        try {
-          const url = String(args?.[0] ?? '');
-          if (url.includes('.supabase.co')) {
-            console.log('DEBUG fetch <-', url, res.status, res.statusText);
-          }
-        } catch {}
-        return res;
-      } catch (e) {
-        console.error('DEBUG fetch error:', e);
-        throw e;
-      }
-    };
-    console.log('DEBUG fetch wrapper installed');
+  if (isSupabase) {
+    console.log('DEBUG fetch ->', url, init);
+  }
+
+  if (!__originalFetch) {
+    throw new Error('fetch is not available in this browser environment');
+  }
+
+  // Add a fetch-level timeout for Supabase calls so they never hang forever.
+  let timeoutId;
+  let controller;
+  let finalInit = init;
+  if (isSupabase && !init.signal && typeof AbortController !== 'undefined') {
+    controller = new AbortController();
+    finalInit = { ...init, signal: controller.signal };
+    timeoutId = setTimeout(() => {
+      try { controller.abort(); } catch {}
+    }, 15000);
+  }
+
+  try {
+    const res = await __originalFetch(input, finalInit);
+    if (isSupabase) {
+      console.log('DEBUG fetch <-', url, res.status, res.statusText);
+    }
+    return res;
+  } catch (e) {
+    if (isSupabase) {
+      console.error('DEBUG fetch error:', url, e);
+    }
+    throw e;
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+};
+
+if (!window.__supabaseFetchDebugWrappedInstalled) {
+  window.__supabaseFetchDebugWrappedInstalled = true;
+  if (__originalFetch) {
+    globalThis.fetch = __supabaseFetchDebugWrapped;
+    window.fetch = __supabaseFetchDebugWrapped;
+    console.log('DEBUG fetch wrapper installed (globalThis + window)');
+    console.log('DEBUG fetch equality:', window.fetch === globalThis.fetch);
   } else {
-    console.warn('DEBUG window.fetch not found; cannot instrument network');
+    console.warn('DEBUG fetch not found; cannot instrument network');
   }
 }
+
+const supabase = createClient(supabaseUrl, supabaseKey, {
+  global: {
+    fetch: __supabaseFetchDebugWrapped
+  }
+});
+window.supabase = supabase;
 
 // ===== In‑memory state =====
 let coaches = [];
@@ -92,31 +116,6 @@ document.addEventListener("DOMContentLoaded", () => {
   console.log('DEBUG DOMContentLoaded');
   setupAuthListeners();
   debugSession();
-  // Attach logout event listener after DOM is ready
-  const logoutBtn = document.getElementById("logoutBtn");
-  if (logoutBtn) {
-    console.log('DEBUG logoutBtn found, attaching event listener');
-    logoutBtn.addEventListener('click', async () => {
-      console.log('DEBUG logout click');
-      try {
-        const { error } = await supabase.auth.signOut({ scope: 'local' });
-        if (error) {
-          console.error('Logout error:', error);
-          alert('Logout failed: ' + error.message);
-        } else {
-          currentUser = null;
-          document.getElementById('appContainer').style.display = 'none';
-          document.getElementById('authRow').style.display = 'block';
-          console.log('DEBUG manual UI reset');
-        }
-      } catch (e) {
-        console.error('Logout exception:', e);
-        alert('Logout exception: ' + e.message);
-      }
-    });
-  } else {
-    console.error('DEBUG logoutBtn not found in DOM');
-  }
 });
 
 // ===== Auth =====
@@ -204,73 +203,31 @@ function setupAuthListeners() {
     }
   });
 
-logoutBtn.addEventListener('click', async () => {
-  console.log('DEBUG logout click');
-  const { error } = await supabase.auth.signOut({ scope: 'local' });
-  if (error) console.error('Logout error:', error);
-  else {
-    currentUser = null;  // Clear global state
-    document.getElementById('appContainer').style.display = 'none';
-    document.getElementById('authRow').style.display = 'block';
-    console.log('DEBUG manual UI reset');
-  }
-});
-
-
-
-  // Auth state change
-  supabase.auth.onAuthStateChange(async (event, session) => {
-    console.log('DEBUG onAuthStateChange:', event, session);
-    const user = session?.user;
-    const select = document.getElementById("coachSelect");
-    select.innerHTML = '';
-    coaches = [];
-    timeData = {};
-    currentCoach = null;
-
-    if (user) {
-      currentUser = user;
-      statusSpan.textContent = `Logged in as ${user.email}`;
-      document.getElementById("authRow").style.display = "none";
-      document.getElementById("registerBtn").style.display = "none";
-      document.getElementById("loginBtn").style.display = "none";
-      document.getElementById("resetPasswordBtn").style.display = "none";
-      logoutBtn.style.display = "inline-block";
-      document.getElementById("appContainer").style.display = "block";
-
-      const isAdmin = await isCurrentUserAdminDB();
-      if (isAdmin) {
-        document.getElementById("addCoachBtn").style.display = "inline-block";
-        document.getElementById("editCoachBtn").style.display = "inline-block";
-      } else {
-        document.getElementById("addCoachBtn").style.display = "none";
-        document.getElementById("editCoachBtn").style.display = "none";
+  logoutBtn.addEventListener('click', async () => {
+    console.log('DEBUG logout click');
+    logoutBtn.disabled = true;
+    try {
+      const { error } = await supabase.auth.signOut({ scope: 'global' });
+      if (error) {
+        console.error('Logout error:', error);
+        alert('Logout failed: ' + error.message);
+        return;
       }
-
-      try {
-        await loadAllDataFromSupabase();
-      } catch (e) {
-        console.error("Failed to load data:", e);
-      }
-      setupEventListeners();
-      try {
-        updateCalendar();
-        updateSummary();
-      } catch (e) {
-        console.error("Failed to update UI:", e);
-      }
-    } else {
       currentUser = null;
-      statusSpan.textContent = "Not logged in.";
-      document.getElementById("authRow").style.display = "block";
-      document.getElementById("registerBtn").style.display = "inline-block";
-      document.getElementById("loginBtn").style.display = "inline-block";
-      document.getElementById("resetPasswordBtn").style.display = "inline-block";
-      logoutBtn.style.display = "none";
-      document.getElementById("appContainer").style.display = "none";
+      document.getElementById('appContainer').style.display = 'none';
+      document.getElementById('authRow').style.display = 'block';
+      console.log('DEBUG manual UI reset');
+    } catch (e) {
+      console.error('Logout exception:', e);
+      alert('Logout exception: ' + e.message);
+    } finally {
+      logoutBtn.disabled = false;
     }
   });
-  
+
+
+
+  // Auth state change (single handler)
 
   resetPasswordBtn.addEventListener("click", async () => {
     const email = emailInput.value.trim();
