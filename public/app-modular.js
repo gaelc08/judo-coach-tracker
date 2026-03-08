@@ -9,6 +9,42 @@ const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 const supabase = createClient(supabaseUrl, supabaseKey);
 window.supabase = supabase;
 
+// ===== Network debug (Supabase requests) =====
+// Logs only requests targeting the Supabase project domain.
+if (!window.__supabaseFetchDebugWrapped) {
+  window.__supabaseFetchDebugWrapped = true;
+  const originalFetch = window.fetch?.bind(window);
+  if (originalFetch) {
+    window.fetch = async (...args) => {
+      try {
+        const url = String(args?.[0] ?? '');
+        if (url.includes('.supabase.co')) {
+          console.log('DEBUG fetch ->', url, args?.[1] ?? {});
+        }
+      } catch (e) {
+        console.warn('DEBUG fetch log failed:', e);
+      }
+
+      try {
+        const res = await originalFetch(...args);
+        try {
+          const url = String(args?.[0] ?? '');
+          if (url.includes('.supabase.co')) {
+            console.log('DEBUG fetch <-', url, res.status, res.statusText);
+          }
+        } catch {}
+        return res;
+      } catch (e) {
+        console.error('DEBUG fetch error:', e);
+        throw e;
+      }
+    };
+    console.log('DEBUG fetch wrapper installed');
+  } else {
+    console.warn('DEBUG window.fetch not found; cannot instrument network');
+  }
+}
+
 // ===== In‑memory state =====
 let coaches = [];
 let timeData = {};
@@ -575,11 +611,18 @@ const coachData = {
   try {
     console.log('DEBUG DB start');
     let res;
-    if (editMode && editingCoachId) {
-      res = await supabase.from('coaches').update([coachData]).eq('id', editingCoachId).select();
-    } else {
-      res = await supabase.from('coaches').insert([coachData]).select();
-    }
+    console.log('DEBUG about to call Supabase write. editMode=', editMode, 'editingCoachId=', editingCoachId);
+
+    const timeoutMs = 8000;
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`Supabase write timed out after ${timeoutMs}ms (no response)`)), timeoutMs)
+    );
+
+    const dbPromise = (editMode && editingCoachId)
+      ? supabase.from('coaches').update([coachData]).eq('id', editingCoachId).select()
+      : supabase.from('coaches').insert([coachData]).select();
+
+    res = await Promise.race([dbPromise, timeoutPromise]);
     console.log('DEBUG DB full response:', JSON.stringify(res, null, 2));
     if (res.status) console.log('DEBUG Supabase status:', res.status, res.statusText);
     if (res.error) {
