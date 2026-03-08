@@ -75,16 +75,11 @@ const __installLocksShim = () => {
         finalOptions = undefined;
       }
 
-      const isLikelySupabaseLock = /supabase|gotrue|auth|session/i.test(lockName);
-      if (isLikelySupabaseLock) console.log('DEBUG locks.request ->', lockName);
+      console.log('DEBUG locks.request ->', lockName);
 
       const timeoutMs = 2500;
       const timeoutPromise = new Promise((resolve, reject) => {
         setTimeout(() => {
-          if (!isLikelySupabaseLock) {
-            reject(new Error(`locks.request timed out after ${timeoutMs}ms for ${lockName}`));
-            return;
-          }
           console.warn('DEBUG locks.request TIMEOUT (fail-open):', lockName);
           try {
             if (typeof finalCallback === 'function') {
@@ -101,13 +96,11 @@ const __installLocksShim = () => {
       const actualPromise = originalRequest(lockName, finalOptions, finalCallback);
       return Promise.race([actualPromise, timeoutPromise])
         .then((result) => {
-          if (isLikelySupabaseLock) {
-            console.log('DEBUG locks.request <-', lockName, `${Math.round(performance.now() - startedAt)}ms`);
-          }
+          console.log('DEBUG locks.request <-', lockName, `${Math.round(performance.now() - startedAt)}ms`);
           return result;
         })
         .catch((e) => {
-          if (isLikelySupabaseLock) console.error('DEBUG locks.request error:', lockName, e);
+          console.error('DEBUG locks.request error:', lockName, e);
           throw e;
         });
     };
@@ -147,9 +140,28 @@ async function debugSupabaseHealthFetch() {
   }
 }
 
+// ===== Auth storage override (avoid getSession/storage lock hangs) =====
+// Some environments/extensions can cause session storage locking to hang forever.
+// We use an in-memory storage + disable persistence as a pragmatic workaround.
+// Tradeoff: users must log in again after a refresh.
+const __memoryAuthStorage = (() => {
+  const store = new Map();
+  return {
+    getItem: (key) => (store.has(key) ? store.get(key) : null),
+    setItem: (key, value) => { store.set(key, String(value)); },
+    removeItem: (key) => { store.delete(key); }
+  };
+})();
+
 const supabase = createClient(supabaseUrl, supabaseKey, {
   global: {
     fetch: __supabaseFetchDebugWrapped
+  },
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+    detectSessionInUrl: false,
+    storage: __memoryAuthStorage
   }
 });
 window.supabase = supabase;
