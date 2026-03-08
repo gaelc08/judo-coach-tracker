@@ -50,6 +50,75 @@ const __supabaseFetchDebugWrapped = async (input, init = {}) => {
   }
 };
 
+// ===== Lock debug (Supabase auth/session can hang before fetch) =====
+// Supabase Auth uses the Web Locks API in some browsers to coordinate storage access.
+// If an extension or browser bug causes a lock promise to never resolve, all DB calls can hang.
+const __installLocksShim = () => {
+  try {
+    const locks = globalThis.navigator?.locks;
+    if (!locks || typeof locks.request !== 'function') {
+      console.log('DEBUG locks: navigator.locks not available');
+      return;
+    }
+    if (locks.__supabaseDebugWrapped) return;
+
+    const originalRequest = locks.request.bind(locks);
+    locks.__supabaseDebugWrapped = true;
+    locks.request = (name, options, callback) => {
+      const lockName = String(name);
+      const startedAt = performance.now();
+
+      let finalOptions = options;
+      let finalCallback = callback;
+      if (typeof options === 'function') {
+        finalCallback = options;
+        finalOptions = undefined;
+      }
+
+      const isLikelySupabaseLock = /supabase|gotrue|auth|session/i.test(lockName);
+      if (isLikelySupabaseLock) console.log('DEBUG locks.request ->', lockName);
+
+      const timeoutMs = 2500;
+      const timeoutPromise = new Promise((resolve, reject) => {
+        setTimeout(() => {
+          if (!isLikelySupabaseLock) {
+            reject(new Error(`locks.request timed out after ${timeoutMs}ms for ${lockName}`));
+            return;
+          }
+          console.warn('DEBUG locks.request TIMEOUT (fail-open):', lockName);
+          try {
+            if (typeof finalCallback === 'function') {
+              resolve(finalCallback());
+            } else {
+              resolve(undefined);
+            }
+          } catch (e) {
+            reject(e);
+          }
+        }, timeoutMs);
+      });
+
+      const actualPromise = originalRequest(lockName, finalOptions, finalCallback);
+      return Promise.race([actualPromise, timeoutPromise])
+        .then((result) => {
+          if (isLikelySupabaseLock) {
+            console.log('DEBUG locks.request <-', lockName, `${Math.round(performance.now() - startedAt)}ms`);
+          }
+          return result;
+        })
+        .catch((e) => {
+          if (isLikelySupabaseLock) console.error('DEBUG locks.request error:', lockName, e);
+          throw e;
+        });
+    };
+    console.log('DEBUG locks shim installed');
+  } catch (e) {
+    console.warn('DEBUG locks shim failed to install:', e);
+  }
+};
+
+__installLocksShim();
+
 if (!window.__supabaseFetchDebugWrappedInstalled) {
   window.__supabaseFetchDebugWrappedInstalled = true;
   if (__originalFetch) {
@@ -59,6 +128,22 @@ if (!window.__supabaseFetchDebugWrappedInstalled) {
     console.log('DEBUG fetch equality:', window.fetch === globalThis.fetch);
   } else {
     console.warn('DEBUG fetch not found; cannot instrument network');
+  }
+}
+
+async function debugSupabaseHealthFetch() {
+  try {
+    const url = `${supabaseUrl}/auth/v1/health`;
+    console.log('DEBUG health fetch start:', url);
+    const res = await globalThis.fetch(url, {
+      headers: {
+        apikey: supabaseKey
+      }
+    });
+    const text = await res.text();
+    console.log('DEBUG health fetch done:', res.status, text.slice(0, 200));
+  } catch (e) {
+    console.error('DEBUG health fetch error:', e);
   }
 }
 
@@ -116,6 +201,9 @@ document.addEventListener("DOMContentLoaded", () => {
   console.log('DEBUG DOMContentLoaded');
   setupAuthListeners();
   debugSession();
+  // Low-noise probe that should always produce a network request if fetch works.
+  // Helps distinguish "Supabase hangs before fetch" from "network blocked".
+  debugSupabaseHealthFetch();
 });
 
 // ===== Auth =====
@@ -569,6 +657,20 @@ const coachData = {
     console.log('DEBUG DB start');
     let res;
     console.log('DEBUG about to call Supabase write. editMode=', editMode, 'editingCoachId=', editingCoachId);
+
+    // Probe whether auth/session retrieval is hanging before any network request.
+    try {
+      const probeTimeoutMs = 3000;
+      const t0 = performance.now();
+      const sessionProbe = supabase.auth.getSession();
+      const sessionRes = await Promise.race([
+        sessionProbe,
+        new Promise((_, reject) => setTimeout(() => reject(new Error(`getSession timed out after ${probeTimeoutMs}ms`)), probeTimeoutMs))
+      ]);
+      console.log('DEBUG getSession probe:', `${Math.round(performance.now() - t0)}ms`, sessionRes);
+    } catch (e) {
+      console.warn('DEBUG getSession probe error:', e);
+    }
 
     const timeoutMs = 8000;
     const timeoutPromise = new Promise((_, reject) =>
