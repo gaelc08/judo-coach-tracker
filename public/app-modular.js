@@ -570,7 +570,7 @@ const coachData = {
   owner_uid: ownerUid         // owner_uid
 };
 
-  console.log('DEBUG coachData:', coachData);
+  console.log('DEBUG coachData:', JSON.stringify(coachData, null, 2));
 
   try {
     console.log('DEBUG DB start');
@@ -581,6 +581,7 @@ const coachData = {
       res = await supabase.from('coaches').insert([coachData]).select();
     }
     console.log('DEBUG DB full response:', JSON.stringify(res, null, 2));
+    if (res.status) console.log('DEBUG Supabase status:', res.status, res.statusText);
     if (res.error) {
       console.error('DEBUG DB error:', res.error);
       alert('Save error: ' + res.error.message);
