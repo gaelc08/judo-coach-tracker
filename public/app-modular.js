@@ -130,14 +130,20 @@ function setupAuthListeners() {
     }
   });
 
-  logoutBtn.addEventListener("click", async () => {
-    console.log('DEBUG logout click');
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      console.error('DEBUG logout error:', error);
-      alert(error.message);
-    }
-  });
+logoutBtn.addEventListener('click', async () => {
+  console.log('DEBUG logout click');
+  try {
+    const { error } = await supabase.auth.signOut({ scope: 'local' });
+    if (error) throw error;
+    console.log('DEBUG logged out');
+    localStorage.removeItem('supabase.auth.token');  // Force clear
+    window.location.href = '/';  // Reload home
+  } catch (error) {
+    console.error('DEBUG logout error:', error);
+    alert('Logout error: ' + error.message);
+  }
+});
+
 
   // Auth state change
   supabase.auth.onAuthStateChange(async (event, session) => {
