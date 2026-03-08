@@ -566,12 +566,24 @@ const coachData = {
 
   try {
     console.log('DEBUG DB start');
-    const res = editMode && editingCoachId 
-      ? await supabase.from('coaches').update([coachData]).eq('id', editingCoachId)
-      : await supabase.from('coaches').insert([coachData])
-    console.log('DEBUG DB res FULL:', JSON.stringify(res, null, 2));
-    if (res.error) throw res.error;
-    console.log('DEBUG SAVE SUCCESS');
+    let res;
+    if (editMode && editingCoachId) {
+      res = await supabase.from('coaches').update([coachData]).eq('id', editingCoachId);
+    } else {
+      res = await supabase.from('coaches').insert([coachData]);
+    }
+    console.log('DEBUG DB res:', res);
+    if (res.error) {
+      console.error('DEBUG DB error:', res.error);
+      alert('Save error: ' + res.error.message);
+      return;
+    }
+    if (!res.data || res.data.length === 0) {
+      console.warn('DEBUG DB no data returned:', res);
+      alert('Save failed: No data returned from Supabase.');
+      return;
+    }
+    console.log('DEBUG SAVE SUCCESS:', res.data);
     await loadAllDataFromSupabase();
     document.getElementById('coachModal').classList.remove('active');
     clearCoachForm();
