@@ -173,22 +173,24 @@ const __authNoHangLock = async (...args) => {
 
   console.log('DEBUG auth.lock ->', lockName, `timeout=${timeoutMs}`);
   try {
-    const result = await Promise.race([
-      Promise.resolve().then(() => fn()),
-      new Promise((_, reject) => setTimeout(() => reject(new Error(`auth.lock timed out after ${timeoutMs}ms for ${lockName}`)), timeoutMs))
+    const fnPromise = Promise.resolve().then(() => fn());
+    const timeoutToken = Symbol('auth.lock.timeout');
+    const raced = await Promise.race([
+      fnPromise,
+      new Promise((resolve) => setTimeout(() => resolve(timeoutToken), timeoutMs))
     ]);
+
+    if (raced === timeoutToken) {
+      console.warn('DEBUG auth.lock TIMEOUT (returning undefined):', lockName);
+      return undefined;
+    }
+
     console.log('DEBUG auth.lock <-', lockName, `${Math.round(performance.now() - startedAt)}ms`);
-    return result;
+    return raced;
   } catch (e) {
     console.error('DEBUG auth.lock error:', lockName, e);
-    // Fail-open: execute the critical section without a lock.
-    try {
-      const result = await fn();
-      console.warn('DEBUG auth.lock fail-open executed fn for', lockName);
-      return result;
-    } catch (e2) {
-      throw e2;
-    }
+    // Fail-open: let callers continue.
+    return undefined;
   }
 };
 
@@ -215,6 +217,59 @@ let selectedDay = null;
 let editMode = false;
 let editingCoachId = null;
 let currentUser = null;
+let currentSession = null;
+let currentAccessToken = null;
+
+async function __coachWriteViaRest(coachData, { editingId = null } = {}) {
+  if (!currentAccessToken) {
+    return {
+      data: null,
+      error: { message: 'No access token available (not logged in yet?)' },
+      status: 0,
+      statusText: 'NO_TOKEN'
+    };
+  }
+
+  const isUpdate = !!editingId;
+  const baseUrl = `${supabaseUrl}/rest/v1/coaches`;
+  const url = isUpdate
+    ? `${baseUrl}?id=eq.${encodeURIComponent(editingId)}`
+    : baseUrl;
+
+  const method = isUpdate ? 'PATCH' : 'POST';
+
+  try {
+    const res = await globalThis.fetch(url, {
+      method,
+      headers: {
+        apikey: supabaseKey,
+        Authorization: `Bearer ${currentAccessToken}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=representation'
+      },
+      body: JSON.stringify(coachData)
+    });
+
+    const text = await res.text();
+    let json = null;
+    try {
+      json = text ? JSON.parse(text) : null;
+    } catch {
+      json = null;
+    }
+
+    if (!res.ok) {
+      const message = (json && (json.message || json.error_description || json.error))
+        ? (json.message || json.error_description || json.error)
+        : (text || `${res.status} ${res.statusText}`);
+      return { data: null, error: { message }, status: res.status, statusText: res.statusText };
+    }
+
+    return { data: Array.isArray(json) ? json : (json ? [json] : []), error: null, status: res.status, statusText: res.statusText };
+  } catch (e) {
+    return { data: null, error: { message: e?.message || String(e) }, status: 0, statusText: 'FETCH_ERROR' };
+  }
+}
 
 // ===== Static data =====
 const holidays2026 = {
@@ -390,6 +445,14 @@ function setupAuthListeners() {
 
   supabase.auth.onAuthStateChange(async (event, session) => {
     console.log('DEBUG onAuthStateChange:', event, session);
+    currentSession = session || null;
+    currentAccessToken = session?.access_token || null;
+    window.__lastSession = currentSession;
+    if (currentAccessToken) {
+      console.log('DEBUG access token present:', String(currentAccessToken).slice(0, 12) + '...');
+    } else {
+      console.log('DEBUG access token missing');
+    }
     const user = session?.user;
     const select = document.getElementById("coachSelect");
     select.innerHTML = '<option value="">-- Select Coach --</option>';
@@ -431,6 +494,8 @@ function setupAuthListeners() {
       }
     } else {
       currentUser = null;
+      currentSession = null;
+      currentAccessToken = null;
       statusSpan.textContent = "Not logged in.";
       document.getElementById("authRow").style.display = "block";
       document.getElementById("registerBtn").style.display = "inline-block";
@@ -737,7 +802,18 @@ const coachData = {
       ? supabase.from('coaches').update([coachData]).eq('id', editingCoachId).select()
       : supabase.from('coaches').insert([coachData]).select();
 
-    res = await Promise.race([dbPromise, timeoutPromise]);
+    try {
+      res = await Promise.race([dbPromise, timeoutPromise]);
+    } catch (e) {
+      const msg = String(e?.message || e);
+      const isTimeout = msg.includes('timed out');
+      if (!isTimeout) throw e;
+
+      console.warn('DEBUG Supabase-js write timed out; falling back to direct REST fetch');
+      res = await __coachWriteViaRest(coachData, { editingId: (editMode && editingCoachId) ? editingCoachId : null });
+      console.log('DEBUG REST write response:', JSON.stringify(res, null, 2));
+    }
+
     console.log('DEBUG DB full response:', JSON.stringify(res, null, 2));
     if (res.status) console.log('DEBUG Supabase status:', res.status, res.statusText);
     if (res.error) {
@@ -763,7 +839,20 @@ const coachData = {
       return;
     }
     console.log('DEBUG SAVE SUCCESS:', res.data);
-    await loadAllDataFromSupabase();
+
+    // Update local state/UI without depending on additional Supabase reads (which may hang).
+    const savedRow = Array.isArray(res.data) ? res.data[0] : null;
+    if (savedRow) {
+      const saved = { id: savedRow.id, ...savedRow };
+      if (editMode && editingCoachId) {
+        coaches = coaches.map((c) => (c.id === editingCoachId ? saved : c));
+      } else {
+        coaches = [...coaches, saved];
+      }
+      currentCoach = saved;
+      loadCoaches();
+    }
+
     document.getElementById('coachModal').classList.remove('active');
     clearCoachForm();
     editMode = false;
