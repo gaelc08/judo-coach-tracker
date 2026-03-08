@@ -8,7 +8,7 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-09-admin-unbypass-1';
+const __BUILD_ID = '2026-03-09-admin-rest-cache-1';
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 // ===== Network debug (Supabase requests) =====
@@ -318,11 +318,47 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // ===== Auth =====
-function __withTimeout(promise, ms, label) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms))
-  ]);
+let __adminCache = { userId: null, value: null, atMs: 0 };
+let __adminInFlight = null;
+
+async function __isAdminViaRest() {
+  if (!currentUser) return false;
+  if (!currentAccessToken) return false;
+
+  const url = `${supabaseUrl}/rest/v1/rpc/is_admin`;
+  const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+  const timeoutMs = 10000;
+  const timeoutId = controller ? setTimeout(() => {
+    try { controller.abort(); } catch {}
+  }, timeoutMs) : null;
+
+  try {
+    const res = await globalThis.fetch(url, {
+      method: 'POST',
+      headers: {
+        apikey: supabaseKey,
+        Authorization: `Bearer ${currentAccessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: '{}',
+      signal: controller?.signal
+    });
+
+    const text = await res.text();
+    let json;
+    try { json = text ? JSON.parse(text) : null; } catch { json = null; }
+
+    if (!res.ok) {
+      const message = (json && (json.message || json.error_description || json.error))
+        ? (json.message || json.error_description || json.error)
+        : (text || `${res.status} ${res.statusText}`);
+      throw new Error(`is_admin REST failed: ${message}`);
+    }
+
+    return !!json;
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
 }
 
 async function isCurrentUserAdminDB() {
@@ -330,17 +366,39 @@ async function isCurrentUserAdminDB() {
     console.log('DEBUG no currentUser');
     return false;
   }
-  try {
-    const response = await supabase.rpc('is_admin');
-    console.log('DEBUG full RPC:', response);
-    if (!response || response.error) {
-      console.error('DEBUG RPC fail:', response?.error);
-      return false;
+
+  const ttlMs = 5 * 60 * 1000;
+  if (__adminCache.userId === currentUser.id && typeof __adminCache.value === 'boolean' && (Date.now() - __adminCache.atMs) < ttlMs) {
+    return __adminCache.value;
+  }
+
+  if (__adminInFlight) {
+    try {
+      return await __adminInFlight;
+    } catch {
+      // fall through
     }
-    return !!response.data;
+  }
+
+  __adminInFlight = (async () => {
+    const value = await __isAdminViaRest();
+    __adminCache = { userId: currentUser.id, value, atMs: Date.now() };
+    return value;
+  })();
+
+  try {
+    const value = await __adminInFlight;
+    console.log('DEBUG is_admin (REST):', value);
+    return value;
   } catch (e) {
-    console.error('DEBUG RPC catch:', e);
+    console.warn('DEBUG is_admin (REST) failed:', e);
+    if (__adminCache.userId === currentUser.id && typeof __adminCache.value === 'boolean') {
+      console.warn('DEBUG is_admin using cached value:', __adminCache.value);
+      return __adminCache.value;
+    }
     return false;
+  } finally {
+    __adminInFlight = null;
   }
 }
 
@@ -478,13 +536,7 @@ function setupAuthListeners() {
       document.getElementById("appContainer").style.display = "block";
 
       // --- VERIFICATION DU ROLE ---
-      let isAdmin = false;
-      try {
-        isAdmin = await __withTimeout(isCurrentUserAdminDB(), 3000, 'is_admin');
-      } catch (e) {
-        console.warn('DEBUG admin check failed:', e);
-        isAdmin = false;
-      }
+      const isAdmin = await isCurrentUserAdminDB();
       if (isAdmin) {
         document.getElementById("addCoachBtn").style.display = "inline-block";
         document.getElementById("editCoachBtn").style.display = "inline-block";
@@ -522,13 +574,7 @@ function setupAuthListeners() {
 
 // ===== Data loading =====
 async function loadAllDataFromSupabase() {
-  let isAdmin = false;
-  try {
-    isAdmin = await __withTimeout(isCurrentUserAdminDB(), 3000, 'is_admin');
-  } catch (e) {
-    console.warn('DEBUG loadAllDataFromSupabase admin check failed:', e);
-    isAdmin = false;
-  }
+  const isAdmin = await isCurrentUserAdminDB();
   console.log('DEBUG loadAllDataFromSupabase start, isAdmin=', isAdmin);
   if (!currentUser) return;
   
@@ -750,13 +796,7 @@ async function saveCoach() {
   }
   console.log('DEBUG currentUser ID:', currentUser.id);
 
-  let isAdmin = false;
-  try {
-    isAdmin = await __withTimeout(isCurrentUserAdminDB(), 3000, 'is_admin');
-  } catch (e) {
-    console.warn('DEBUG saveCoach admin check failed:', e);
-    isAdmin = false;
-  }
+  const isAdmin = await isCurrentUserAdminDB();
   console.log('DEBUG isAdmin:', isAdmin);
   if (!isAdmin) {
     alert('Only admin');
@@ -897,14 +937,7 @@ const coachData = {
 
 
 async function deleteCoach() {
-  let isAdmin = false;
-  try {
-    isAdmin = await __withTimeout(isCurrentUserAdminDB(), 3000, 'is_admin');
-  } catch (e) {
-    console.warn('DEBUG deleteCoach admin check failed:', e);
-    isAdmin = false;
-  }
-
+  const isAdmin = await isCurrentUserAdminDB();
   if (!currentUser || !isAdmin) {
     alert("Only admin can delete coach profiles.");
     return;
