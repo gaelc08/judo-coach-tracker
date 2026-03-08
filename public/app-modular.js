@@ -583,6 +583,11 @@ function setupAuthListeners() {
         document.getElementById("editCoachBtn").style.display = "none";
       }
 
+      // Coach selector UX: coaches should not have to pick themselves.
+      if (select) {
+        select.disabled = !isAdmin;
+      }
+
       // Reload data, but don't wipe the UI first; if a background auth lock stalls,
       // we prefer to keep the last known data visible.
       const prevCoaches = coaches;
@@ -590,10 +595,13 @@ function setupAuthListeners() {
       const prevCurrentCoach = currentCoach;
 
       try {
-        await loadAllDataFromSupabase();
+        await loadAllDataFromSupabase({ isAdminOverride: isAdmin });
         // Ensure select is populated after load.
         if (select) loadCoaches();
-        if (currentCoach) select.value = currentCoach.id;
+        if (!isAdmin && coaches.length > 0) {
+          currentCoach = coaches[0];
+        }
+        if (currentCoach && select) select.value = currentCoach.id;
       } catch (e) {
         console.error("Failed to load data:", e);
         // Keep previous state on failure
@@ -633,8 +641,8 @@ function setupAuthListeners() {
 }
 
 // ===== Data loading =====
-async function loadAllDataFromSupabase() {
-  const isAdmin = await isCurrentUserAdminDB();
+async function loadAllDataFromSupabase({ isAdminOverride } = {}) {
+  const isAdmin = (typeof isAdminOverride === 'boolean') ? isAdminOverride : await isCurrentUserAdminDB();
   console.log('DEBUG loadAllDataFromSupabase start, isAdmin=', isAdmin);
   if (!currentUser) return;
   if (!currentAccessToken) throw new Error('No access token; cannot load data');
