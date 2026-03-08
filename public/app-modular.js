@@ -354,6 +354,7 @@ function setupEventListeners() {
     editMode = false;
     editingCoachId = null;
     clearCoachForm();
+    document.getElementById("coachOwnerUid").value = currentUser.id;  // AJOUTE ICI
     document.getElementById("coachModal").classList.add("active");
   };
 
@@ -374,7 +375,7 @@ function setupEventListeners() {
     document.getElementById("coachRate").value = currentCoach.hourly_rate;
     document.getElementById("dailyAllowance").value = currentCoach.daily_allowance;
     document.getElementById("kmRate").value = currentCoach.km_rate;
-
+    document.getElementById("coachOwnerUid").value = currentUser.id;
     document.getElementById("coachModal").classList.add("active");
     document.getElementById("deleteCoach").style.display = "inline-block";
   };
@@ -501,7 +502,16 @@ async function saveCoach() {
     return;
   }
   console.log('DEBUG saveCoach currentUser:', currentUser);
-  console.log('DEBUG isAdmin:', await isCurrentUserAdminDB());
+  console.log('DEBUG calling isAdminDB');
+  const isAdminCheck = await isCurrentUserAdminDB();
+  console.log('DEBUG isAdminCheck:', isAdminCheck);
+  if (!isAdminCheck) {
+    console.log('DEBUG not admin, alert');
+    alert('Only admin can edit coach profiles.');
+    return;
+  }
+  console.log('DEBUG form values start');
+
 
   if (!await isCurrentUserAdminDB()) {
     console.log('DEBUG saveCoach: not admin');
@@ -518,28 +528,30 @@ async function saveCoach() {
   const fiscalPower = document.getElementById("coachFiscalPower").value.trim();
   const rate = parseFloat(document.getElementById("coachRate").value);
   const allowance = parseFloat(document.getElementById("dailyAllowance").value);
-  const kmRate = parseFloat(document.getElementById("kmRate").value);
+const kmRate = parseFloat(document.getElementById("kmRate").value || 0.35);
 
-  const ownerUidInput = document.getElementById("coachOwnerUid");
-  const ownerUid = ownerUidInput ? ownerUidInput.value.trim() : "";
+const ownerUidInput = document.getElementById("coachOwnerUid");
+const ownerUid = ownerUidInput ? ownerUidInput.value.trim() || currentUser.id : currentUser.id;
 
-  console.log('DEBUG saveCoach form values:', {
-    name,
-    firstName,
-    email,
-    address,
-    vehicle,
-    fiscalPower,
-    rate,
-    allowance,
-    kmRate,
-    ownerUid
-  });
+console.log('DEBUG saveCoach form values:', {
+  name,
+  firstName,
+  email,
+  address,
+  vehicle,
+  fiscalPower,
+  rate,
+  allowance,
+  kmRate,
+  ownerUid
+});
 
-  if (!name || isNaN(rate) || isNaN(allowance) || isNaN(kmRate) || !ownerUid) {
-    alert("Please fill all required fields with valid numbers AND owner UID");
-    return;
-  }
+if (!name || isNaN(rate) || isNaN(allowance) || isNaN(kmRate) || !ownerUid) {
+  console.log('DEBUG validation FAIL:', {name, rate, allowance, kmRate, ownerUid});
+  alert("Fill required: name, rates numbers, owner UID (ex: " + currentUser.id + ")");
+  return;
+}
+
 
   const coachData = {
     name,
