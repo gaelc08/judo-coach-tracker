@@ -58,6 +58,16 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // ===== Auth =====
+async function isCurrentUserAdminDB() {
+  if (!currentUser) return false;
+  const { data, error } = await supabase.rpc('is_admin');
+  if (error) {
+    console.error('isAdmin RPC error:', error);
+    return false;
+  }
+  return data;
+}
+
 function setupAuthListeners() {
   console.log('DEBUG setupAuthListeners called');
 
