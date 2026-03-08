@@ -1084,7 +1084,7 @@ function openDayModal(dateStr) {
       description: "",
       departurePlace: "",
       arrivalPlace: "",
-      ownerUid: currentUser ? currentUser.uid : null,
+      ownerUid: currentUser ? currentUser.id : null,
       ownerEmail: currentUser ? currentUser.email : null
     };
 
@@ -1147,6 +1147,9 @@ async function saveDay() {
     }
     delete timeData[key];
   } else {
+    // Attribute the row to the selected coach, even when an admin edits it.
+    const ownerUidForRow = currentCoach.owner_uid || currentUser.id;
+    const ownerEmailForRow = currentCoach.email || currentUser.email;
     const data = {
       coach_id: currentCoach.id,
       date: selectedDay,
@@ -1158,8 +1161,8 @@ async function saveDay() {
       arrival_place: arrivalPlace,
       peage,
       justification_url: justificationUrl,
-      owner_uid: currentUser.id,
-      owner_email: currentUser.email
+      owner_uid: ownerUidForRow,
+      owner_email: ownerEmailForRow
     };
     if (existing && existing.id) {
       const { error } = await supabase.from('time_data').update(data).eq('id', existing.id);
@@ -1174,8 +1177,8 @@ async function saveDay() {
         peage,
         justificationUrl,
         coachId: currentCoach.id,
-        ownerUid: currentUser.id,
-        ownerEmail: currentUser.email,
+        ownerUid: ownerUidForRow,
+        ownerEmail: ownerEmailForRow,
         id: existing.id
       };
     } else {
@@ -1191,8 +1194,8 @@ async function saveDay() {
         peage,
         justificationUrl,
         coachId: currentCoach.id,
-        ownerUid: currentUser.id,
-        ownerEmail: currentUser.email,
+        ownerUid: ownerUidForRow,
+        ownerEmail: ownerEmailForRow,
         id: inserted[0].id
       };
     }
