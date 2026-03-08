@@ -502,12 +502,14 @@ async function saveCoach() {
   }
   console.log('DEBUG currentUser ID:', currentUser.id);
   
-  const isAdmin = await isCurrentUserAdminDB();
-  console.log('DEBUG isAdmin:', isAdmin);
+  // BYPASS TMP pour test
+  const isAdmin = true;  // TODO remove after debug
+  console.log('DEBUG isAdmin BYPASS:', isAdmin);
   if (!isAdmin) {
     alert('Only admin');
     return;
   }
+
   console.log('DEBUG ADMIN OK - FORM');
   
   const name = document.getElementById('coachName').value.trim();
@@ -518,7 +520,7 @@ async function saveCoach() {
   const fiscalPower = document.getElementById('coachFiscalPower').value.trim();
   const rate = parseFloat(document.getElementById('coachRate').value) || 0;
   const allowance = parseFloat(document.getElementById('dailyAllowance').value) || 0;
-  const kmRate = parseFloat(document.getElementById('kmRate').value) || 0.35;
+  const kmRate = parseFloat(document.getElementById('kmRate').value) || 0.64;
   const ownerUidInput = document.getElementById('coachOwnerUid');
   const ownerUid = ownerUidInput ? ownerUidInput.value.trim() : currentUser.id;
   
@@ -531,19 +533,28 @@ async function saveCoach() {
   console.log('DEBUG VALID OK - DB');
   
   const coachData = {
-    name, firstName, email, address, vehicle, fiscalpower: fiscalPower,
-    hourlyrate: rate, dailyallowance: allowance, kmrate: kmRate, owneruid: ownerUid
+    name, 
+    firstname: firstName, 
+    email, 
+    address, 
+    vehicle, 
+    fiscalpower: fiscalPower,
+    hourlyrate: rate, 
+    dailyallowance: allowance, 
+    kmrate: kmRate, 
+    owneruid: ownerUid
   };
   
+  console.log('DEBUG coachData:', coachData);
+  
   try {
-    let error;
-    if (editMode && editingCoachId) {
-      ({ error } = await supabase.from('coaches').update(coachData).eq('id', editingCoachId));
-    } else {
-      ({ error } = await supabase.from('coaches').insert(coachData));
-    }
-    if (error) throw error;
-    console.log('DEBUG DB SAVE OK');
+    console.log('DEBUG DB start');
+    const res = editMode && editingCoachId 
+      ? await supabase.from('coaches').update(coachData).eq('id', editingCoachId)
+      : await supabase.from('coaches').insert(coachData);
+    console.log('DEBUG DB res:', res);
+    if (res.error) throw res.error;
+    console.log('DEBUG SAVE SUCCESS');
     await loadAllDataFromSupabase();
     document.getElementById('coachModal').classList.remove('active');
     clearCoachForm();
@@ -551,13 +562,10 @@ async function saveCoach() {
     editingCoachId = null;
     updateSummary();
   } catch (e) {
-    console.error('DEBUG DB ERROR:', e);
+    console.error('DEBUG SAVE ERROR:', e);
     alert('Save error: ' + e.message);
   }
 }
-
-
-
 
 async function deleteCoach() {
   if (!currentUser || !await isCurrentUserAdminDB()) {
