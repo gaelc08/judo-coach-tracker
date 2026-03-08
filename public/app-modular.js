@@ -7,6 +7,10 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
+// Bump this string when deploying to confirm the browser loaded the latest JS.
+const __BUILD_ID = '2026-03-08-lock-override-1';
+console.log('DEBUG BUILD:', __BUILD_ID);
+
 // ===== Network debug (Supabase requests) =====
 // We pass a custom fetch into createClient so requests can't bypass our logs.
 const __originalFetch = globalThis.fetch?.bind(globalThis);
@@ -153,6 +157,41 @@ const __memoryAuthStorage = (() => {
   };
 })();
 
+// Custom lock implementation to avoid Web Locks API hangs.
+// Signature varies by gotrue-js version; we accept (name, fn) or (name, acquireTimeout, fn).
+const __authNoHangLock = async (...args) => {
+  const lockName = String(args?.[0] ?? '');
+  const maybeFn = args[args.length - 1];
+  const fn = (typeof maybeFn === 'function') ? maybeFn : null;
+  const timeoutMs = (typeof args?.[1] === 'number' && args.length >= 3) ? args[1] : 2500;
+  const startedAt = performance.now();
+
+  if (!fn) {
+    console.warn('DEBUG auth.lock called without fn', args);
+    return undefined;
+  }
+
+  console.log('DEBUG auth.lock ->', lockName, `timeout=${timeoutMs}`);
+  try {
+    const result = await Promise.race([
+      Promise.resolve().then(() => fn()),
+      new Promise((_, reject) => setTimeout(() => reject(new Error(`auth.lock timed out after ${timeoutMs}ms for ${lockName}`)), timeoutMs))
+    ]);
+    console.log('DEBUG auth.lock <-', lockName, `${Math.round(performance.now() - startedAt)}ms`);
+    return result;
+  } catch (e) {
+    console.error('DEBUG auth.lock error:', lockName, e);
+    // Fail-open: execute the critical section without a lock.
+    try {
+      const result = await fn();
+      console.warn('DEBUG auth.lock fail-open executed fn for', lockName);
+      return result;
+    } catch (e2) {
+      throw e2;
+    }
+  }
+};
+
 const supabase = createClient(supabaseUrl, supabaseKey, {
   global: {
     fetch: __supabaseFetchDebugWrapped
@@ -161,7 +200,8 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
     persistSession: false,
     autoRefreshToken: false,
     detectSessionInUrl: false,
-    storage: __memoryAuthStorage
+    storage: __memoryAuthStorage,
+    lock: __authNoHangLock
   }
 });
 window.supabase = supabase;
@@ -202,8 +242,12 @@ const schoolHolidays = [
 // ===== Init =====
 async function debugSession() {
   try {
-    const { data, error } = await supabase.auth.getSession();
-    console.log('DEBUG Supabase session:', data, error);
+    const timeoutMs = 3000;
+    const res = await Promise.race([
+      supabase.auth.getSession(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error(`getSession timed out after ${timeoutMs}ms (startup)`)), timeoutMs))
+    ]);
+    console.log('DEBUG Supabase session:', res);
   } catch (e) {
     console.error('DEBUG getSession failed:', e);
   }
