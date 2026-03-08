@@ -8,7 +8,7 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-08-lock-override-1';
+const __BUILD_ID = '2026-03-09-admin-unbypass-1';
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 // ===== Network debug (Supabase requests) =====
@@ -318,6 +318,13 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // ===== Auth =====
+function __withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms))
+  ]);
+}
+
 async function isCurrentUserAdminDB() {
   if (!currentUser) {
     console.log('DEBUG no currentUser');
@@ -471,7 +478,13 @@ function setupAuthListeners() {
       document.getElementById("appContainer").style.display = "block";
 
       // --- VERIFICATION DU ROLE ---
-      const isAdmin = await isCurrentUserAdminDB();
+      let isAdmin = false;
+      try {
+        isAdmin = await __withTimeout(isCurrentUserAdminDB(), 3000, 'is_admin');
+      } catch (e) {
+        console.warn('DEBUG admin check failed:', e);
+        isAdmin = false;
+      }
       if (isAdmin) {
         document.getElementById("addCoachBtn").style.display = "inline-block";
         document.getElementById("editCoachBtn").style.display = "inline-block";
@@ -509,12 +522,19 @@ function setupAuthListeners() {
 
 // ===== Data loading =====
 async function loadAllDataFromSupabase() {
-  console.log('DEBUG loadAllDataFromSupabase start, isAdmin=', await isCurrentUserAdminDB());
+  let isAdmin = false;
+  try {
+    isAdmin = await __withTimeout(isCurrentUserAdminDB(), 3000, 'is_admin');
+  } catch (e) {
+    console.warn('DEBUG loadAllDataFromSupabase admin check failed:', e);
+    isAdmin = false;
+  }
+  console.log('DEBUG loadAllDataFromSupabase start, isAdmin=', isAdmin);
   if (!currentUser) return;
   
   // Coaches
   coaches = [];
-  if (await isCurrentUserAdminDB()) {
+  if (isAdmin) {
     const { data, error } = await supabase.from('coaches').select('*');
     if (error) throw error;
     coaches = data.map(d => ({ id: d.id, ...d }));
@@ -530,7 +550,7 @@ async function loadAllDataFromSupabase() {
   timeData = {};
   let timeSnap;
 
-  if (await isCurrentUserAdminDB()) {
+  if (isAdmin) {
     const { data, error } = await supabase.from('time_data').select('*');
     if (error) throw error;
     timeSnap = data;
@@ -729,10 +749,15 @@ async function saveCoach() {
     return;
   }
   console.log('DEBUG currentUser ID:', currentUser.id);
-  
-  // BYPASS TMP pour test
-  const isAdmin = true;  // TODO remove after debug
-  console.log('DEBUG isAdmin BYPASS:', isAdmin);
+
+  let isAdmin = false;
+  try {
+    isAdmin = await __withTimeout(isCurrentUserAdminDB(), 3000, 'is_admin');
+  } catch (e) {
+    console.warn('DEBUG saveCoach admin check failed:', e);
+    isAdmin = false;
+  }
+  console.log('DEBUG isAdmin:', isAdmin);
   if (!isAdmin) {
     alert('Only admin');
     return;
@@ -872,7 +897,15 @@ const coachData = {
 
 
 async function deleteCoach() {
-  if (!currentUser || !await isCurrentUserAdminDB()) {
+  let isAdmin = false;
+  try {
+    isAdmin = await __withTimeout(isCurrentUserAdminDB(), 3000, 'is_admin');
+  } catch (e) {
+    console.warn('DEBUG deleteCoach admin check failed:', e);
+    isAdmin = false;
+  }
+
+  if (!currentUser || !isAdmin) {
     alert("Only admin can delete coach profiles.");
     return;
   }
