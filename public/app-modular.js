@@ -552,7 +552,7 @@ async function saveCoach() {
     const res = editMode && editingCoachId 
       ? await supabase.from('coaches').update(coachData).eq('id', editingCoachId)
       : await supabase.from('coaches').insert(coachData);
-    console.log('DEBUG DB res:', res);
+    console.log('DEBUG DB res FULL:', res); 
     if (res.error) throw res.error;
     console.log('DEBUG SAVE SUCCESS');
     await loadAllDataFromSupabase();
