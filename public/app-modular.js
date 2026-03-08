@@ -354,7 +354,7 @@ function setupEventListeners() {
     editMode = false;
     editingCoachId = null;
     clearCoachForm();
-    document.getElementById("coachOwnerUid").value = currentUser.id;  // AJOUTE ICI
+    document.getElementById("coachOwnerUid").value = currentUser.id;  
     document.getElementById("coachModal").classList.add("active");
   };
 
@@ -495,119 +495,67 @@ function loadCoaches() {
 }
 
 async function saveCoach() {
-  console.log('DEBUG saveCoach start');
+  console.log('DEBUG saveCoach START');
   if (!currentUser) {
-    console.log('DEBUG saveCoach: no currentUser');
-    alert("No logged user");
+    alert('No logged user');
     return;
   }
-  console.log('DEBUG saveCoach currentUser:', currentUser);
-  console.log('DEBUG calling isAdminDB');
-  const isAdminCheck = await isCurrentUserAdminDB();
-  console.log('DEBUG isAdminCheck:', isAdminCheck);
-  if (!isAdminCheck) {
-    console.log('DEBUG not admin, alert');
-    alert('Only admin can edit coach profiles.');
+  console.log('DEBUG currentUser ID:', currentUser.id);
+  
+  const isAdmin = await isCurrentUserAdminDB();
+  console.log('DEBUG isAdmin:', isAdmin);
+  if (!isAdmin) {
+    alert('Only admin');
     return;
   }
-  console.log('DEBUG form values start');
-
-
-  if (!await isCurrentUserAdminDB()) {
-    console.log('DEBUG saveCoach: not admin');
-    alert("Only admin can edit coach profiles.");
+  console.log('DEBUG ADMIN OK - FORM');
+  
+  const name = document.getElementById('coachName').value.trim();
+  const firstName = document.getElementById('coachFirstName').value.trim();
+  const email = document.getElementById('coachEmail').value.trim();
+  const address = document.getElementById('coachAddress').value.trim();
+  const vehicle = document.getElementById('coachVehicle').value.trim();
+  const fiscalPower = document.getElementById('coachFiscalPower').value.trim();
+  const rate = parseFloat(document.getElementById('coachRate').value) || 0;
+  const allowance = parseFloat(document.getElementById('dailyAllowance').value) || 0;
+  const kmRate = parseFloat(document.getElementById('kmRate').value) || 0.35;
+  const ownerUidInput = document.getElementById('coachOwnerUid');
+  const ownerUid = ownerUidInput ? ownerUidInput.value.trim() : currentUser.id;
+  
+  console.log('DEBUG FORM:', {name, rate, allowance, kmRate, ownerUid});
+  
+  if (!name || isNaN(rate) || isNaN(allowance) || isNaN(kmRate) || !ownerUid) {
+    alert(`Fill: name, rates numbers, ownerUid (${ownerUid})`);
     return;
   }
-  console.log('DEBUG await isCurrentUserAdminDB():', await isCurrentUserAdminDB());
-
-  const name = document.getElementById("coachName").value.trim();
-  const firstName = document.getElementById("coachFirstName").value.trim();
-  const email = document.getElementById("coachEmail").value.trim();
-  const address = document.getElementById("coachAddress").value.trim();
-  const vehicle = document.getElementById("coachVehicle").value.trim();
-  const fiscalPower = document.getElementById("coachFiscalPower").value.trim();
-  const rate = parseFloat(document.getElementById("coachRate").value);
-  const allowance = parseFloat(document.getElementById("dailyAllowance").value);
-const kmRate = parseFloat(document.getElementById("kmRate").value || 0.35);
-
-const ownerUidInput = document.getElementById("coachOwnerUid");
-const ownerUid = ownerUidInput ? ownerUidInput.value.trim() || currentUser.id : currentUser.id;
-
-console.log('DEBUG saveCoach form values:', {
-  name,
-  firstName,
-  email,
-  address,
-  vehicle,
-  fiscalPower,
-  rate,
-  allowance,
-  kmRate,
-  ownerUid
-});
-
-if (!name || isNaN(rate) || isNaN(allowance) || isNaN(kmRate) || !ownerUid) {
-  console.log('DEBUG validation FAIL:', {name, rate, allowance, kmRate, ownerUid});
-  alert("Fill required: name, rates numbers, owner UID (ex: " + currentUser.id + ")");
-  return;
-}
-
-
+  console.log('DEBUG VALID OK - DB');
+  
   const coachData = {
-    name,
-    first_name: firstName,
-    email,
-    address,
-    vehicle,
-    fiscal_power: fiscalPower,
-    hourly_rate: rate,
-    daily_allowance: allowance,
-    km_rate: kmRate,
-    owner_uid: ownerUid
+    name, firstName, email, address, vehicle, fiscalpower: fiscalPower,
+    hourlyrate: rate, dailyallowance: allowance, kmrate: kmRate, owneruid: ownerUid
   };
-
-  console.log('DEBUG coachData to send:', coachData, 'editMode:', editMode, 'editingCoachId:', editingCoachId);
-
+  
   try {
+    let error;
     if (editMode && editingCoachId) {
-      const { error } = await supabase
-        .from('coaches')
-        .update(coachData)
-        .eq('id', editingCoachId);
-      console.log('DEBUG Supabase UPDATE result error:', error);
-      console.log('DEBUG after INSERT before reload');
-
-      if (error) {
-        console.error('Supabase UPDATE error:', error);
-        alert('Supabase UPDATE error: ' + (error.message || JSON.stringify(error)));
-        return;
-      }
+      ({ error } = await supabase.from('coaches').update(coachData).eq('id', editingCoachId));
     } else {
-      const { error } = await supabase
-        .from('coaches')
-        .insert(coachData);
-      console.log('DEBUG Supabase INSERT result error:', error);
-      if (error) {
-        console.error('Supabase INSERT error:', error);
-        alert('Supabase INSERT error: ' + (error.message || JSON.stringify(error)));
-        return;
-      }
+      ({ error } = await supabase.from('coaches').insert(coachData));
     }
-
-    console.log('DEBUG saveCoach: calling loadAllDataFromSupabase');
+    if (error) throw error;
+    console.log('DEBUG DB SAVE OK');
     await loadAllDataFromSupabase();
-
-    document.getElementById("coachModal").classList.remove("active");
+    document.getElementById('coachModal').classList.remove('active');
     clearCoachForm();
     editMode = false;
     editingCoachId = null;
     updateSummary();
-    console.log('DEBUG saveCoach end OK');
   } catch (e) {
-    console.error("Unexpected error saving coach:", e);
-    alert("Unexpected error saving coach: " + e.message);
+    console.error('DEBUG DB ERROR:', e);
+    alert('Save error: ' + e.message);
   }
 }
+
 
 
 
