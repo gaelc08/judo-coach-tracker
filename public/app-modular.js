@@ -1273,3 +1273,7 @@ async function importCoachData(data) {
 
 // Optionally expose some functions globally if needed
 window.exportToCSV = exportToCSV;
+window.saveCoach = saveCoach;
+window.deleteCoach = deleteCoach;
+window.saveDay = saveDay;
+window.deleteDay = deleteDay;
