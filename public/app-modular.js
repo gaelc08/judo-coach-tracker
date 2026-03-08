@@ -646,10 +646,20 @@ async function loadAllDataFromSupabase() {
     if (res.error) throw new Error(res.error.message);
     coaches = (res.data || []).map(d => ({ id: d.id, ...d }));
   } else {
-    // For coach, find by email
-    const res = await __restSelect('coaches', { filters: [['email', 'eq', currentUser.email]] });
+    // For coach, prefer owner_uid = current user id (RLS-friendly)
+    let res = await __restSelect('coaches', { filters: [['owner_uid', 'eq', currentUser.id]] });
     if (res.error) throw new Error(res.error.message);
-    coaches = (res.data || []).map(d => ({ id: d.id, ...d }));
+    let rows = res.data || [];
+
+    // Legacy fallback: some older rows were created with owner_uid mis-set.
+    // This fallback may still be blocked by RLS depending on policies.
+    if (rows.length === 0 && currentUser.email) {
+      res = await __restSelect('coaches', { filters: [['email', 'eq', currentUser.email]] });
+      if (res.error) throw new Error(res.error.message);
+      rows = res.data || [];
+    }
+
+    coaches = rows.map(d => ({ id: d.id, ...d }));
   }
   loadCoaches();
 
