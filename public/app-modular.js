@@ -531,36 +531,42 @@ async function saveCoach() {
     return;
   }
   console.log('DEBUG VALID OK - DB');
-  
-  const coachData = {
-    name, 
-    firstname: firstName, 
-    email, 
-    address, 
-    vehicle, 
-    fiscalpower: fiscalPower,
-    hourlyrate: rate, 
-    dailyallowance: allowance, 
-    kmrate: kmRate, 
-    owneruid: ownerUid
-  };
-  
-  console.log('DEBUG coachData:', coachData);
+const coachData = {
+  name, 
+  firstname: firstName, 
+  email, 
+  address, 
+  vehicle, 
+  fiscalpower: fiscalPower,
+  hourlyrate: rate, 
+  dailyallowance: allowance, 
+  kmrate: kmRate, 
+  owneruid: ownerUid
+};
+console.log('DEBUG coachData:', coachData);
+
+// AJOUT NOUVEAU
+console.log('DEBUG DB INSERT start');
+const res = await supabase.from('coaches').insert(coachData);
+console.log('DEBUG DB res FULL:', JSON.stringify(res, null, 2));
+if (res.error) throw res.error;
+console.log('DEBUG SAVE SUCCESS');
+
   
   try {
-    console.log('DEBUG DB start');
-    const res = editMode && editingCoachId 
-      ? await supabase.from('coaches').update(coachData).eq('id', editingCoachId)
-      : await supabase.from('coaches').insert(coachData);
-    console.log('DEBUG DB res FULL:', res); 
-    if (res.error) throw res.error;
-    console.log('DEBUG SAVE SUCCESS');
-    await loadAllDataFromSupabase();
-    document.getElementById('coachModal').classList.remove('active');
-    clearCoachForm();
-    editMode = false;
-    editingCoachId = null;
-    updateSummary();
+  console.log('DEBUG DB start');
+  const res = editMode && editingCoachId 
+    ? await supabase.from('coaches').update(coachData).eq('id', editingCoachId)
+    : await supabase.from('coaches').insert(coachData);
+  console.log('DEBUG DB res FULL:', JSON.stringify(res, null, 2));
+  if (res.error) throw res.error;
+  console.log('DEBUG SAVE SUCCESS');
+  await loadAllDataFromSupabase();
+  document.getElementById('coachModal').classList.remove('active');
+  clearCoachForm();
+  editMode = false;
+  editingCoachId = null;
+  updateSummary();
   } catch (e) {
     console.error('DEBUG SAVE ERROR:', e);
     alert('Save error: ' + e.message);
