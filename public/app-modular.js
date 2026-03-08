@@ -7,6 +7,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 const supabase = createClient(supabaseUrl, supabaseKey);
+window.supabase = supabase;
 
 // ===== In‑memory state =====
 let coaches = [];
