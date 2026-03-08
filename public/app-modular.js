@@ -132,17 +132,16 @@ function setupAuthListeners() {
 
 logoutBtn.addEventListener('click', async () => {
   console.log('DEBUG logout click');
-  try {
-    const { error } = await supabase.auth.signOut({ scope: 'local' });
-    if (error) throw error;
-    console.log('DEBUG logged out');
-    localStorage.removeItem('supabase.auth.token');  // Force clear
-    window.location.href = '/';  // Reload home
-  } catch (error) {
-    console.error('DEBUG logout error:', error);
-    alert('Logout error: ' + error.message);
+  const { error } = await supabase.auth.signOut({ scope: 'local' });
+  if (error) console.error('Logout error:', error);
+  else {
+    currentUser = null;  // Clear global state
+    document.getElementById('appContainer').style.display = 'none';
+    document.getElementById('authRow').style.display = 'block';
+    console.log('DEBUG manual UI reset');
   }
 });
+
 
 
   // Auth state change
