@@ -573,15 +573,27 @@ const coachData = {
     } else {
       res = await supabase.from('coaches').insert([coachData]);
     }
-    console.log('DEBUG DB res:', res);
+    console.log('DEBUG DB full response:', JSON.stringify(res, null, 2));
     if (res.error) {
       console.error('DEBUG DB error:', res.error);
       alert('Save error: ' + res.error.message);
+      // Always reset modal/UI on error
+      document.getElementById('coachModal').classList.remove('active');
+      clearCoachForm();
+      editMode = false;
+      editingCoachId = null;
+      updateSummary();
       return;
     }
     if (!res.data || res.data.length === 0) {
       console.warn('DEBUG DB no data returned:', res);
-      alert('Save failed: No data returned from Supabase.');
+      alert('Save failed: No data returned from Supabase. Possible RLS issue.');
+      // Always reset modal/UI on failure
+      document.getElementById('coachModal').classList.remove('active');
+      clearCoachForm();
+      editMode = false;
+      editingCoachId = null;
+      updateSummary();
       return;
     }
     console.log('DEBUG SAVE SUCCESS:', res.data);
@@ -594,6 +606,12 @@ const coachData = {
   } catch (e) {
     console.error('DEBUG SAVE ERROR:', e);
     alert('Save error: ' + e.message);
+    // Always reset modal/UI on exception
+    document.getElementById('coachModal').classList.remove('active');
+    clearCoachForm();
+    editMode = false;
+    editingCoachId = null;
+    updateSummary();
   }
 }
 
