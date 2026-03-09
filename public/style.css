@@ -1014,6 +1014,33 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   width: 92vw;
 }
 
+.export-preview-content {
+  width: min(96vw, 1100px);
+  max-width: min(96vw, 1100px);
+  min-width: min(96vw, 320px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.export-preview-toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.export-preview-toolbar button {
+  flex: 1 1 180px;
+}
+
+.export-preview-frame {
+  width: 100%;
+  min-height: 70vh;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-sm);
+  background: white;
+}
+
 .help-section {
   margin-top: 20px;
   padding-bottom: 16px;

@@ -1717,6 +1717,79 @@ function exportToCSV() {
   a.click();
 }
 
+function __isStandaloneApp() {
+  return window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
+}
+
+function __downloadBlob(blob, fileName) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function __closeMileagePreviewModal() {
+  const modal = document.getElementById('mileagePreviewModal');
+  if (modal) modal.classList.remove('active');
+}
+
+function __showMileagePreviewModal(html, fileName) {
+  let modal = document.getElementById('mileagePreviewModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'mileagePreviewModal';
+    modal.className = 'modal export-preview-modal';
+    modal.innerHTML = `
+      <div class="modal-content export-preview-content">
+        <h2>Aperçu note de frais</h2>
+        <div class="export-preview-toolbar">
+          <button id="previewPrintBtn" class="btn-primary">🖨️ Imprimer / PDF</button>
+          <button id="previewDownloadBtn" class="btn-secondary">💾 Télécharger HTML</button>
+          <button id="previewCloseBtn" class="btn-danger">Fermer</button>
+        </div>
+        <iframe id="mileagePreviewFrame" class="export-preview-frame" title="Aperçu note de frais"></iframe>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) __closeMileagePreviewModal();
+    });
+
+    modal.querySelector('#previewCloseBtn')?.addEventListener('click', __closeMileagePreviewModal);
+  }
+
+  const iframe = modal.querySelector('#mileagePreviewFrame');
+  const printBtn = modal.querySelector('#previewPrintBtn');
+  const downloadBtn = modal.querySelector('#previewDownloadBtn');
+
+  if (iframe) {
+    iframe.srcdoc = html;
+  }
+
+  if (printBtn) {
+    printBtn.onclick = () => {
+      try {
+        iframe?.contentWindow?.focus();
+        iframe?.contentWindow?.print();
+      } catch (e) {
+        alert('Impossible d\'imprimer cet aperçu. Utilisez Télécharger HTML.');
+      }
+    };
+  }
+
+  if (downloadBtn) {
+    downloadBtn.onclick = () => {
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8;' });
+      __downloadBlob(blob, fileName);
+    };
+  }
+
+  modal.classList.add('active');
+}
+
 function exportMileageHTML() {
   if (!currentCoach || !currentMonth) {
     alert("Please select a coach and month");
@@ -1975,16 +2048,21 @@ ${rows
 </html>
 `;
 
+  const fileName = `note_frais_km_${currentCoach.name}_${currentMonth}.html`;
   const blob = new Blob([html], { type: "text/html;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `note_frais_km_${currentCoach.name}_${currentMonth}.html`;
-  a.click();
 
-  const newWindow = window.open();
-  newWindow.document.write(html);
-  newWindow.document.close();
+  if (__isStandaloneApp()) {
+    __showMileagePreviewModal(html, fileName);
+    return;
+  }
+
+  __downloadBlob(blob, fileName);
+
+  const newWindow = window.open('', '_blank');
+  if (newWindow) {
+    newWindow.document.write(html);
+    newWindow.document.close();
+  }
 }
 
 // Expose the function
