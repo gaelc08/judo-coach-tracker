@@ -1,12 +1,15 @@
-const CACHE_VERSION = 'judo-coach-pwa-v2';
+const CACHE_VERSION = 'judo-coach-pwa-v3';
+const BASE_PATH = new URL('./', self.location.href).pathname;
+const INDEX_URL = `${BASE_PATH}index.html`;
+const OFFLINE_URL = `${BASE_PATH}offline.html`;
 const APP_SHELL = [
-  '/',
-  '/index.html',
-  '/style.css',
-  '/app-modular.js',
-  '/manifest.webmanifest',
-  '/logo-jcc.png',
-  '/offline.html'
+  BASE_PATH,
+  INDEX_URL,
+  `${BASE_PATH}style.css`,
+  `${BASE_PATH}app-modular.js`,
+  `${BASE_PATH}manifest.webmanifest`,
+  `${BASE_PATH}logo-jcc.png`,
+  OFFLINE_URL
 ];
 
 self.addEventListener('install', (event) => {
@@ -41,13 +44,13 @@ self.addEventListener('fetch', (event) => {
       fetch(request)
         .then((response) => {
           const copy = response.clone();
-          caches.open(CACHE_VERSION).then((cache) => cache.put('/index.html', copy)).catch(() => {});
+          caches.open(CACHE_VERSION).then((cache) => cache.put(INDEX_URL, copy)).catch(() => {});
           return response;
         })
         .catch(async () => {
-          const cachedIndex = await caches.match('/index.html');
+          const cachedIndex = await caches.match(INDEX_URL);
           if (cachedIndex) return cachedIndex;
-          return caches.match('/offline.html');
+          return caches.match(OFFLINE_URL);
         })
     );
     return;
@@ -65,7 +68,7 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_VERSION).then((cache) => cache.put(request, copy)).catch(() => {});
           return response;
         })
-        .catch(() => caches.match('/offline.html'));
+        .catch(() => caches.match(OFFLINE_URL));
     })
   );
 });

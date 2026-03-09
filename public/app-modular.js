@@ -8,7 +8,7 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-09-pwa-ios-layout-2';
+const __BUILD_ID = '2026-03-09-github-pages-pwa-1';
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 let __deferredInstallPrompt = null;
@@ -17,7 +17,11 @@ function setupPWA() {
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
       try {
-        const reg = await navigator.serviceWorker.register('/sw.js');
+        const swUrl = new URL('sw.js', window.location.href);
+        const scopeUrl = new URL('./', window.location.href);
+        const reg = await navigator.serviceWorker.register(swUrl.href, {
+          scope: scopeUrl.pathname
+        });
         console.log('DEBUG service worker registered:', reg.scope);
       } catch (e) {
         console.warn('DEBUG service worker registration failed:', e);
