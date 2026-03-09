@@ -430,6 +430,7 @@ async function fetchSchoolHolidays(year) {
       end: r.end_date ? r.end_date.slice(0, 10) : "",
       name: r.description || r.population || "Vacances scolaires"
     })).filter(h => h.start && h.end);
+    if (holidays.length === 0) throw new Error("API returned empty holidays, using fallback data");
     __schoolHolidaysCache[year] = holidays;
     return holidays;
   } catch (e) {
@@ -1208,10 +1209,15 @@ async function updateCalendar() {
   const [year, month] = currentMonth.split("-").map(Number);
 
   // Fetch holidays for the current year (cached after first fetch)
-  [publicHolidays, schoolHolidays] = await Promise.all([
+  // Also fetch previous year for cross-year holidays (e.g. Christmas break spanning Dec → Jan)
+  const prevYear = month === 1 ? year - 1 : year;
+  const [fetchedPublicHolidays, prevYearSchoolHolidays, curYearSchoolHolidays] = await Promise.all([
     fetchPublicHolidays(year),
+    prevYear !== year ? fetchSchoolHolidays(prevYear) : Promise.resolve([]),
     fetchSchoolHolidays(year)
   ]);
+  publicHolidays = fetchedPublicHolidays;
+  schoolHolidays = [...prevYearSchoolHolidays, ...curYearSchoolHolidays];
 
   const dayNames = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
   dayNames.forEach((dayName) => {
@@ -1529,7 +1535,7 @@ function exportToCSV() {
     .filter((key) => key.startsWith(`${currentCoach.id}-${year}-${month}`))
     .sort()
     .forEach((key) => {
-      const date = key.split("-").slice(1).join("-");
+      const date = key.split("-").slice(-3).join("-");
       const data = timeData[key];
       const payment =
         data.hours * currentCoach.hourly_rate +
@@ -1540,7 +1546,7 @@ function exportToCSV() {
         `"${data.description || ""}",${data.km},€${payment.toFixed(2)}\n`;
     });
 
-  const blob = new Blob([csv], { type: "text/csv" });
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -1563,7 +1569,7 @@ function exportMileageHTML() {
     .filter((key) => key.startsWith(`${currentCoach.id}-${year}-${month}`))
     .sort()
     .forEach((key) => {
-      const date = key.split("-").slice(1).join("-");
+      const date = key.split("-").slice(-3).join("-");
       const data = timeData[key];
       if (!data.km || data.km <= 0) return;
       const amount = data.km * currentCoach.km_rate;
@@ -1898,7 +1904,7 @@ function exportBackupJSON() {
     .filter((key) => key.startsWith(`${currentCoach.id}-`))
     .sort()
     .forEach((key) => {
-      const date = key.split("-").slice(1).join("-");
+      const date = key.split("-").slice(-3).join("-");
       const data = timeData[key];
       entries.push({
         date,
