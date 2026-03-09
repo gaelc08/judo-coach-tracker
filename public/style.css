@@ -565,15 +565,6 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   padding: 11px 20px;
 }
 
-#exportBtn {
-  background: var(--judo-navy);
-  color: white;
-}
-
-#exportBtn:hover {
-  background: var(--judo-red);
-}
-
 #mileageBtn {
   background: var(--gray-200);
   color: var(--gray-900);
