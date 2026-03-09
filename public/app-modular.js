@@ -1316,6 +1316,15 @@ function openDayModal(dateStr) {
   document.getElementById("peage").value = dayData.peage || 0;
   document.getElementById("peageJustification").value = "";
 
+  const existingJustification = document.getElementById("existingJustification");
+  const justificationLink = document.getElementById("justificationLink");
+  if (dayData.justificationUrl) {
+    justificationLink.href = dayData.justificationUrl;
+    existingJustification.style.display = "block";
+  } else {
+    existingJustification.style.display = "none";
+  }
+
   document.getElementById("travelGroup").style.display = dayData.competition
     ? "block"
     : "none";
