@@ -212,7 +212,8 @@ window.supabase = supabase;
 let coaches = [];
 let timeData = {};
 let currentCoach = null;
-let currentMonth = "2026-02";
+const __now = new Date();
+let currentMonth = `${__now.getFullYear()}-${String(__now.getMonth() + 1).padStart(2, "0")}`;
 let selectedDay = null;
 let editMode = false;
 let editingCoachId = null;
@@ -313,28 +314,135 @@ async function __restSelect(table, { select = '*', filters = [] } = {}) {
   }
 }
 
-// ===== Static data =====
-const holidays2026 = {
-  "2026-01-01": "New Year",
-  "2026-04-06": "Easter Monday",
-  "2026-05-01": "Labour Day",
-  "2026-05-08": "Victory Day",
-  "2026-05-14": "Ascension Day",
-  "2026-05-25": "Whit Monday",
-  "2026-07-14": "Bastille Day",
-  "2026-08-15": "Assumption",
-  "2026-11-01": "All Saints",
-  "2026-11-11": "Armistice",
-  "2026-12-25": "Christmas"
+// ===== Holiday data (dynamically fetched, with static fallback) =====
+
+// Static fallback data per year (used if API calls fail)
+const __publicHolidaysFallback = {
+  2025: {
+    "2025-01-01": "Jour de l'An",
+    "2025-04-21": "Lundi de Pâques",
+    "2025-05-01": "Fête du Travail",
+    "2025-05-08": "Victoire 1945",
+    "2025-05-29": "Ascension",
+    "2025-06-09": "Lundi de Pentecôte",
+    "2025-07-14": "Fête Nationale",
+    "2025-08-15": "Assomption",
+    "2025-11-01": "Toussaint",
+    "2025-11-11": "Armistice",
+    "2025-12-25": "Noël"
+  },
+  2026: {
+    "2026-01-01": "Jour de l'An",
+    "2026-04-06": "Lundi de Pâques",
+    "2026-05-01": "Fête du Travail",
+    "2026-05-08": "Victoire 1945",
+    "2026-05-14": "Ascension",
+    "2026-05-25": "Lundi de Pentecôte",
+    "2026-07-14": "Fête Nationale",
+    "2026-08-15": "Assomption",
+    "2026-11-01": "Toussaint",
+    "2026-11-11": "Armistice",
+    "2026-12-25": "Noël"
+  },
+  2027: {
+    "2027-01-01": "Jour de l'An",
+    "2027-03-29": "Lundi de Pâques",
+    "2027-05-01": "Fête du Travail",
+    "2027-05-08": "Victoire 1945",
+    "2027-05-06": "Ascension",
+    "2027-05-17": "Lundi de Pentecôte",
+    "2027-07-14": "Fête Nationale",
+    "2027-08-15": "Assomption",
+    "2027-11-01": "Toussaint",
+    "2027-11-11": "Armistice",
+    "2027-12-25": "Noël"
+  }
 };
 
-const schoolHolidays = [
-  { start: "2026-02-14", end: "2026-03-02", name: "Winter" },
-  { start: "2026-04-11", end: "2026-04-27", name: "Spring" },
-  { start: "2026-07-04", end: "2026-08-31", name: "Summer" },
-  { start: "2026-10-17", end: "2026-11-02", name: "All Saints" },
-  { start: "2026-12-19", end: "2027-01-04", name: "Christmas" }
-];
+const __schoolHolidaysFallback = {
+  2025: [
+    { start: "2025-02-22", end: "2025-03-09", name: "Vacances d'Hiver" },
+    { start: "2025-04-19", end: "2025-05-04", name: "Vacances de Printemps" },
+    { start: "2025-07-05", end: "2025-09-01", name: "Vacances d'Été" },
+    { start: "2025-10-18", end: "2025-11-03", name: "Vacances de Toussaint" },
+    { start: "2025-12-20", end: "2026-01-05", name: "Vacances de Noël" }
+  ],
+  2026: [
+    { start: "2026-02-14", end: "2026-03-02", name: "Vacances d'Hiver" },
+    { start: "2026-04-11", end: "2026-04-27", name: "Vacances de Printemps" },
+    { start: "2026-07-04", end: "2026-08-31", name: "Vacances d'Été" },
+    { start: "2026-10-17", end: "2026-11-02", name: "Vacances de Toussaint" },
+    { start: "2026-12-19", end: "2027-01-04", name: "Vacances de Noël" }
+  ],
+  2027: [
+    { start: "2027-02-13", end: "2027-03-01", name: "Vacances d'Hiver" },
+    { start: "2027-04-10", end: "2027-04-26", name: "Vacances de Printemps" },
+    { start: "2027-07-03", end: "2027-08-31", name: "Vacances d'Été" },
+    { start: "2027-10-23", end: "2027-11-08", name: "Vacances de Toussaint" },
+    { start: "2027-12-18", end: "2028-01-03", name: "Vacances de Noël" }
+  ]
+};
+
+// Runtime caches (in-memory per session, keyed by year)
+const __publicHolidaysCache = {};
+const __schoolHolidaysCache = {};
+
+async function fetchPublicHolidays(year) {
+  if (__publicHolidaysCache[year]) return __publicHolidaysCache[year];
+  try {
+    const res = await globalThis.fetch(
+      `https://date.nager.at/api/v3/PublicHolidays/${year}/FR`,
+      { signal: AbortSignal.timeout(5000) }
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const map = {};
+    for (const h of data) {
+      map[h.date] = h.localName || h.name;
+    }
+    __publicHolidaysCache[year] = map;
+    return map;
+  } catch (e) {
+    console.warn(`fetchPublicHolidays(${year}) failed, using fallback:`, e.message);
+    const fallback = __publicHolidaysFallback[year] || {};
+    __publicHolidaysCache[year] = fallback;
+    return fallback;
+  }
+}
+
+async function fetchSchoolHolidays(year) {
+  if (__schoolHolidaysCache[year]) return __schoolHolidaysCache[year];
+  try {
+    // French government open data API for school holidays (zone C = Paris region)
+    const startDate = `${year - 1}-09-01`;
+    const endDate = `${year + 1}-08-31`;
+    const params = new URLSearchParams({
+      where: `location="Zone C" AND start_date>="${startDate}" AND end_date<="${endDate}"`,
+      limit: "50",
+      timezone: "Europe/Paris"
+    });
+    const url = `https://data.education.gouv.fr/api/explore/v2.1/catalog/datasets/fr-en-calendrier-scolaire/records?${params}`;
+    const res = await globalThis.fetch(url, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    const holidays = (json.results || []).map(r => ({
+      start: r.start_date ? r.start_date.slice(0, 10) : "",
+      end: r.end_date ? r.end_date.slice(0, 10) : "",
+      name: r.description || r.population || "Vacances scolaires"
+    })).filter(h => h.start && h.end);
+    __schoolHolidaysCache[year] = holidays;
+    return holidays;
+  } catch (e) {
+    console.warn(`fetchSchoolHolidays(${year}) failed, using fallback:`, e.message);
+    const fallback = __schoolHolidaysFallback[year] || __schoolHolidaysFallback[2026];
+    __schoolHolidaysCache[year] = fallback;
+    return fallback;
+  }
+}
+
+// Current year's holiday data (populated when calendar renders)
+let publicHolidays = {};
+let schoolHolidays = [];
 
 // ===== Init =====
 async function debugSession() {
@@ -521,7 +629,7 @@ function setupAuthListeners() {
       }
       currentUser = null;
       document.getElementById('appContainer').style.display = 'none';
-      document.getElementById('authRow').style.display = 'block';
+      document.getElementById('authContainer').style.display = 'flex';
       console.log('DEBUG manual UI reset');
     } catch (e) {
       console.error('Logout exception:', e);
@@ -565,12 +673,9 @@ function setupAuthListeners() {
 
     if (user) {
       currentUser = user;
-      statusSpan.textContent = `Logged in as ${user.email}`;
-      document.getElementById("authRow").style.display = "none";
-      document.getElementById("registerBtn").style.display = "none";
-      document.getElementById("loginBtn").style.display = "none";
-      document.getElementById("resetPasswordBtn").style.display = "none";
-      logoutBtn.style.display = "inline-block";
+      statusSpan.textContent = `Connecté : ${user.email}`;
+      // Hide auth container, show app
+      document.getElementById("authContainer").style.display = "none";
       document.getElementById("appContainer").style.display = "block";
 
       // --- VERIFICATION DU ROLE ---
@@ -628,13 +733,10 @@ function setupAuthListeners() {
       coaches = [];
       timeData = {};
       currentCoach = null;
-      if (select) select.innerHTML = '<option value="">-- Select Coach --</option>';
-      statusSpan.textContent = "Not logged in.";
-      document.getElementById("authRow").style.display = "block";
-      document.getElementById("registerBtn").style.display = "inline-block";
-      document.getElementById("loginBtn").style.display = "inline-block";
-      document.getElementById("resetPasswordBtn").style.display = "inline-block";
-      logoutBtn.style.display = "none";
+      if (select) select.innerHTML = '<option value="">-- Sélectionner --</option>';
+      statusSpan.textContent = "Non connecté.";
+      // Show auth container, hide app
+      document.getElementById("authContainer").style.display = "flex";
       document.getElementById("appContainer").style.display = "none";
     }
   });
@@ -723,6 +825,31 @@ async function loadAllDataFromSupabase({ isAdminOverride } = {}) {
 
 // ===== Event listeners =====
 function setupEventListeners() {
+  // Set month picker to the current month
+  document.getElementById("monthSelect").value = currentMonth;
+
+  // App-level logout button (in the header)
+  const logoutBtnApp = document.getElementById("logoutBtnApp");
+  if (logoutBtnApp) {
+    logoutBtnApp.addEventListener("click", async () => {
+      logoutBtnApp.disabled = true;
+      try {
+        const { error } = await supabase.auth.signOut({ scope: "global" });
+        if (error) {
+          alert("Déconnexion échouée : " + error.message);
+          return;
+        }
+        currentUser = null;
+        document.getElementById("appContainer").style.display = "none";
+        document.getElementById("authContainer").style.display = "flex";
+      } catch (e) {
+        alert("Erreur de déconnexion : " + e.message);
+      } finally {
+        logoutBtnApp.disabled = false;
+      }
+    });
+  }
+
   document.getElementById("addCoachBtn").onclick = () => {
     editMode = false;
     editingCoachId = null;
@@ -1055,13 +1182,21 @@ async function deleteCoach() {
 }
 
 // ===== Calendar rendering =====
-function updateCalendar() {
+async function updateCalendar() {
   const calendar = document.getElementById("calendar");
   calendar.innerHTML = "";
 
   if (!currentMonth) return;
 
-  const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const [year, month] = currentMonth.split("-").map(Number);
+
+  // Fetch holidays for the current year (cached after first fetch)
+  [publicHolidays, schoolHolidays] = await Promise.all([
+    fetchPublicHolidays(year),
+    fetchSchoolHolidays(year)
+  ]);
+
+  const dayNames = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
   dayNames.forEach((dayName) => {
     const headerDiv = document.createElement("div");
     headerDiv.className = "calendar-header";
@@ -1069,7 +1204,6 @@ function updateCalendar() {
     calendar.appendChild(headerDiv);
   });
 
-  const [year, month] = currentMonth.split("-").map(Number);
   const firstDay = new Date(year, month - 1, 1);
   const lastDay = new Date(year, month, 0);
   const daysInMonth = lastDay.getDate();
@@ -1101,14 +1235,14 @@ function createDayElement(day, dateStr) {
     dayDiv.classList.add("weekend");
   }
 
-  if (holidays2026[dateStr]) {
+  if (publicHolidays[dateStr]) {
     dayDiv.classList.add("holiday");
   }
 
   const isSchoolHoliday = schoolHolidays.some(
     (holiday) => dateStr >= holiday.start && dateStr <= holiday.end
   );
-  if (isSchoolHoliday && !holidays2026[dateStr]) {
+  if (isSchoolHoliday && !publicHolidays[dateStr]) {
     dayDiv.classList.add("school-holiday");
   }
 
@@ -1128,10 +1262,10 @@ function createDayElement(day, dateStr) {
   dayNumber.textContent = day;
   dayDiv.appendChild(dayNumber);
 
-  if (holidays2026[dateStr]) {
+  if (publicHolidays[dateStr]) {
     const info = document.createElement("div");
     info.className = "day-info";
-    info.textContent = holidays2026[dateStr];
+    info.textContent = publicHolidays[dateStr];
     dayDiv.appendChild(info);
   }
 
