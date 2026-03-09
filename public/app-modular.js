@@ -908,6 +908,20 @@ function setupEventListeners() {
     }
   };
 
+  document.getElementById("helpBtn").onclick = () => {
+    document.getElementById("helpModal").classList.add("active");
+  };
+
+  document.getElementById("closeHelp").onclick = () => {
+    document.getElementById("helpModal").classList.remove("active");
+  };
+
+  document.getElementById("helpModal").onclick = (e) => {
+    if (e.target.id === "helpModal") {
+      document.getElementById("helpModal").classList.remove("active");
+    }
+  };
+
   document.getElementById("coachSelect").onchange = (e) => {
     currentCoach = coaches.find((c) => c.id === e.target.value) || null;
     updateCalendar();
