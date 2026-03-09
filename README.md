@@ -93,13 +93,7 @@ judo-coach-tracker/
 │   └── logo-jcc.png      # Club logo
 ├── supabase/
 │   ├── config.toml       # Supabase project configuration
-│   └── functions/
-│       └── app/
-│           ├── index.ts  # Edge Function (optional: Supabase-hosted frontend)
-│           ├── index.html -> ../../../public/index.html
-│           ├── app-modular.js -> ../../../public/app-modular.js
-│           ├── style.css -> ../../../public/style.css
-│           └── logo-jcc.png -> ../../../public/logo-jcc.png
+│   └── migrations/       # Database migrations
 ├── netlify.toml          # Netlify deployment config (publish dir + SPA redirect)
 └── package.json          # NPM dependencies
 ```
@@ -139,7 +133,6 @@ Then open `http://localhost:8000/` in your browser.
 | **Netlify** ⭐ | `https://judo-coach-tracker.netlify.app` | Free | Connect repo → done |
 | **GitHub Pages** | `https://gaelc08.github.io/judo-coach-tracker/` | Free | Workflow included |
 | **Vercel** | `https://judo-coach-tracker.vercel.app` | Free | `npx vercel --prod` |
-| Supabase Edge Fn | `https://<ref>.supabase.co/functions/v1/app` | Free | CLI deploy |
 
 ---
 
@@ -176,31 +169,6 @@ npx vercel --prod
 Set the output directory to `public` when prompted.
 
 Live URL: `https://judo-coach-tracker.vercel.app`
-
----
-
-**Option D — Supabase Edge Function (keeps everything in one platform)**
-
-The repository includes a Supabase Edge Function (`supabase/functions/app/`) that serves the static files with the correct MIME types. The URL is long but functional.
-
-```bash
-# Install the Supabase CLI (once)
-npm install -g supabase
-
-# Log in
-supabase login
-
-# Deploy the Edge Function
-supabase functions deploy app --project-ref <your-project-ref>
-```
-
-Live URL: `https://<your-project-ref>.supabase.co/functions/v1/app`
-
-> **Note:** The function directory contains symlinks to the `public/` files. If your environment does not resolve symlinks, copy the files manually before deploying:
-> ```bash
-> cp public/{index.html,style.css,app-modular.js,logo-jcc.png} supabase/functions/app/
-> supabase functions deploy app --project-ref <your-project-ref>
-> ```
 
 ---
 

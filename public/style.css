@@ -188,6 +188,25 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   border-color: var(--judo-red);
 }
 
+.btn-help {
+  padding: 8px 16px;
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: var(--radius-sm);
+  background: rgba(255,255,255,0.1);
+  color: white;
+  font-size: 0.85rem;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-help:hover {
+  background: var(--judo-gold);
+  border-color: var(--judo-gold);
+  color: var(--judo-black);
+}
+
 /* ===== App Header ===== */
 .app-header {
   background: rgba(15, 52, 96, 0.95);
@@ -781,4 +800,98 @@ button, .btn-primary, .btn-secondary, .btn-danger {
     gap: 10px;
     padding: 10px 14px;
   }
+}
+
+/* ===== Help Modal ===== */
+.modal-content-help {
+  max-width: 680px;
+  width: 92vw;
+}
+
+.help-section {
+  margin-top: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.help-section:last-of-type {
+  border-bottom: none;
+}
+
+.help-section h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--judo-navy);
+  margin-bottom: 10px;
+}
+
+.help-section p {
+  font-size: 0.9rem;
+  color: var(--gray-700);
+  line-height: 1.6;
+}
+
+.help-section ul {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.help-section ul li {
+  font-size: 0.9rem;
+  color: var(--gray-700);
+  line-height: 1.5;
+  padding-left: 16px;
+  position: relative;
+}
+
+.help-section ul li::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  color: var(--judo-red);
+  font-weight: 700;
+}
+
+.help-color-dot {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 2px solid transparent;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+
+.weekend-dot {
+  background: #e8e8e8;
+  border-color: #999;
+}
+
+.holiday-dot {
+  background: #ffcdd2;
+  border-color: #e57373;
+}
+
+.school-holiday-dot {
+  background: #fff3e0;
+  border-color: #ffb74d;
+}
+
+.has-data-dot {
+  background: #e8f5e9;
+  border-color: #66bb6a;
+}
+
+.has-competition-dot {
+  background: #e3f2fd;
+  border-color: #42a5f5;
+}
+
+.admin-help {
+  background: var(--gray-100);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
 }
