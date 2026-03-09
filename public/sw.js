@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'judo-coach-pwa-v1';
+const CACHE_VERSION = 'judo-coach-pwa-v2';
 const APP_SHELL = [
   '/',
   '/index.html',

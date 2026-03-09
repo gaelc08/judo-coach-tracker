@@ -878,13 +878,14 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   }
 
   .toolbar {
-    flex-direction: row;
-    align-items: stretch;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: end;
     gap: 12px;
   }
 
   .toolbar-label {
-    flex: 1 1 calc(50% - 6px);
+    flex: initial;
     min-width: 0;
   }
 
@@ -892,17 +893,26 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   .toolbar-label input[type="month"] {
     min-width: 0;
     width: 100%;
+    max-width: none;
   }
 
   .toolbar-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     margin-left: 0;
+    gap: 8px;
     width: 100%;
-    justify-content: stretch;
+    grid-column: 1 / -1;
   }
 
   .toolbar-actions button {
-    flex: 1 1 calc(33.333% - 6px);
-    min-width: 140px;
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    padding: 10px 8px;
+    font-size: 0.82rem;
+    line-height: 1.15;
+    white-space: normal;
   }
 
   .summary-grid {
@@ -910,18 +920,40 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   }
 
   .actions {
-    flex-direction: row;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: stretch;
   }
 
   .actions button {
-    flex: 1 1 calc(50% - 5px);
-    min-width: 140px;
-    width: auto;
+    width: 100%;
+    min-width: 0;
   }
 
   .import-group {
     width: 100%;
+    grid-column: 1 / -1;
+  }
+
+  .calendar.card {
+    padding: 10px;
+    overflow: hidden;
+  }
+
+  .calendar {
+    width: 100%;
+    max-width: 100%;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+
+  .calendar-header {
+    font-size: 0.72rem;
+    padding: 8px 2px;
+  }
+
+  .calendar-day {
+    min-height: 0;
+    height: clamp(42px, 11vw, 58px);
   }
 }
 
@@ -930,13 +962,12 @@ button, .btn-primary, .btn-secondary, .btn-danger {
     gap: 10px;
   }
 
-  .toolbar-label {
-    flex-basis: calc(50% - 5px);
+  .toolbar-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .toolbar-actions button,
   .actions button {
-    flex-basis: 100%;
     min-width: 0;
   }
 
