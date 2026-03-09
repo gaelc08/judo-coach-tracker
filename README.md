@@ -202,19 +202,45 @@ Required Supabase resources:
 3. **Storage** — create a public bucket named `justifications` for toll receipt uploads (see below).
 4. **Row-Level Security** — configure RLS policies so each coach can only access their own rows.
 
-#### Creating the `justifications` storage bucket
+#### Applying database migrations
 
-The migration file `supabase/migrations/20240101000000_create_justifications_bucket.sql` automates this step.  Run it in the **Supabase SQL editor** (Dashboard → SQL Editor → New query → paste → Run), or apply it with the Supabase CLI:
+The `supabase/migrations/` folder contains SQL migrations that must be applied to your Supabase project.  Run them all at once with the Supabase CLI:
 
 ```bash
 supabase db push --project-ref <your-project-ref>
 ```
 
-The migration creates the `justifications` bucket (public read, so file URLs work without authentication) and adds RLS policies that restrict write/delete access to the owner of each file.
+Or paste each file individually into the **Supabase SQL editor** (Dashboard → SQL Editor → New query → paste → Run).
+
+The migrations set up, in order:
+
+| File | What it creates |
+|------|----------------|
+| `20240101000000_create_justifications_bucket.sql` | `justifications` storage bucket + RLS policies |
+| `20250101000000_create_is_admin_function.sql` | `public.is_admin()` function used by RLS and the admin RPC check |
+| `20260309150000_create_frozen_timesheets.sql` | `frozen_timesheets` table + RLS policies |
+
+#### Marking a user as admin
+
+The `is_admin()` function reads the `is_admin` flag from the user's `app_metadata` JWT claim.  Set it via the Supabase dashboard or Admin API:
+
+- **Dashboard**: Authentication → Users → select the user → expand *App Metadata* → set `{ "is_admin": true }`.
+- **Admin API** (`service_role` key required):
+  ```bash
+  curl -X PUT https://<project-ref>.supabase.co/auth/v1/admin/users/<user-id> \
+    -H "apikey: <service-role-key>" \
+    -H "Authorization: Bearer <service-role-key>" \
+    -H "Content-Type: application/json" \
+    -d '{"app_metadata": {"is_admin": true}}'
+  ```
+
+> **Troubleshooting — "Erreur lors du gel : Could not find the table 'public.frozen_timesheets' in the schema cache"**
+>
+> This error means the `frozen_timesheets` table does not exist in your Supabase project.  Apply the migrations above (all three files) to create it.  Make sure to run `20250101000000_create_is_admin_function.sql` **before** `20260309150000_create_frozen_timesheets.sql` since the table's RLS policies depend on `public.is_admin()`.
 
 > **Troubleshooting — "Bucket not found" error when viewing a receipt**
 >
-> This error means the `justifications` bucket does not exist (or was deleted) in your Supabase project.  Run the migration above to recreate it.
+> This error means the `justifications` bucket does not exist (or was deleted) in your Supabase project.  Run the `20240101000000_create_justifications_bucket.sql` migration to recreate it.
 
 ---
 
@@ -257,6 +283,20 @@ The migration creates the `justifications` bucket (public read, so file URLs wor
 ### Supabase Storage — `justifications` bucket
 
 Toll receipt files are stored at the path `{user_id}/{date}_{filename}`.
+
+### Supabase — `frozen_timesheets` table
+
+Tracks which coach/month combinations have been locked by an admin to prevent further edits.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | UUID (PK) | Auto-generated identifier |
+| `coach_id` | UUID (FK) | References `coaches.id` (cascade deletes) |
+| `month` | TEXT | Locked month in `YYYY-MM` format |
+| `frozen_at` | TIMESTAMPTZ | When the timesheet was frozen |
+| `frozen_by` | TEXT | Email of the admin who froze the timesheet |
+
+A unique constraint on `(coach_id, month)` ensures each month can only be frozen once.  RLS policies allow all authenticated users to read freeze status, but only admins (as determined by `public.is_admin()`) can insert or delete rows.
 
 ---
 
