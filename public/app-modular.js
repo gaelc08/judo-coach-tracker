@@ -683,9 +683,11 @@ function setupAuthListeners() {
       if (isAdmin) {
         document.getElementById("addCoachBtn").style.display = "inline-block";
         document.getElementById("editCoachBtn").style.display = "inline-block";
+        document.getElementById("importGroup").style.display = "flex";
       } else {
         document.getElementById("addCoachBtn").style.display = "none";
         document.getElementById("editCoachBtn").style.display = "none";
+        document.getElementById("importGroup").style.display = "none";
       }
 
       // Coach selector UX: coaches should not have to pick themselves.
@@ -947,6 +949,7 @@ function setupEventListeners() {
   };
 
   document.getElementById("exportBtn").onclick = exportToCSV;
+  document.getElementById("backupBtn").onclick = exportBackupJSON;
 
   document.getElementById("importBtn").onclick = () => {
     const fileInput = document.getElementById("importFile");
@@ -1882,8 +1885,56 @@ async function importCoachData(data) {
   alert("Import completed.");
 }
 
+// ===== Export backup JSON =====
+function exportBackupJSON() {
+  if (!currentCoach) {
+    alert("Veuillez sélectionner un entraîneur.");
+    return;
+  }
+
+  const entries = [];
+
+  Object.keys(timeData)
+    .filter((key) => key.startsWith(`${currentCoach.id}-`))
+    .sort()
+    .forEach((key) => {
+      const date = key.split("-").slice(1).join("-");
+      const data = timeData[key];
+      entries.push({
+        date,
+        hours: data.hours || 0,
+        competition: data.competition || false,
+        km: data.km || 0,
+        description: data.description || "",
+        departure_place: data.departure_place || "",
+        arrival_place: data.arrival_place || "",
+        peage: data.peage || 0,
+      });
+    });
+
+  const backup = {
+    entraineur: currentCoach.name,
+    prenom: currentCoach.first_name || "",
+    coach_id: currentCoach.id,
+    export_date: new Date().toISOString().split("T")[0],
+    entries,
+  };
+
+  const blob = new Blob([JSON.stringify(backup, null, 2)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  const safeName = currentCoach.name.replace(/[^a-z0-9_\-]/gi, "_");
+  a.download = `backup_${safeName}_${new Date().toISOString().split("T")[0]}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // Optionally expose some functions globally if needed
 window.exportToCSV = exportToCSV;
+window.exportBackupJSON = exportBackupJSON;
 window.saveCoach = saveCoach;
 window.deleteCoach = deleteCoach;
 window.saveDay = saveDay;
