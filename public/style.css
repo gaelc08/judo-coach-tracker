@@ -711,6 +711,20 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   border: 1px solid var(--gray-200);
 }
 
+#existingJustification {
+  margin-top: 8px;
+}
+
+#existingJustification a {
+  color: var(--judo-red);
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+#existingJustification a:hover {
+  text-decoration: underline;
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
   .app-body {
