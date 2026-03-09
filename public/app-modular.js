@@ -1828,6 +1828,10 @@ function exportMileageHTML() {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Note de frais kilométrique - ${currentCoach.name} - ${month}/${year}</title>
 <style>
+  * {
+    box-sizing: border-box;
+  }
+
   @media print {
     @page { margin: 1.5cm; }
     body { margin: 0; }
@@ -1838,6 +1842,8 @@ function exportMileageHTML() {
     font-family: Arial, sans-serif; 
     margin: 20px;
     color: #333;
+    max-width: 100%;
+    overflow-x: hidden;
   }
   
   .header { 
@@ -1886,12 +1892,19 @@ function exportMileageHTML() {
   .info-section p {
     margin: 5px 0;
   }
+
+  .table-wrap {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+  }
   
   table { 
     border-collapse: collapse; 
     width: 100%; 
     margin-top: 20px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    table-layout: fixed;
   }
   
   th, td { 
@@ -1899,6 +1912,9 @@ function exportMileageHTML() {
     padding: 10px; 
     font-size: 0.9rem;
     text-align: left;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    vertical-align: top;
   }
   
   th { 
@@ -1987,6 +2003,7 @@ function exportMileageHTML() {
     <p><strong>Puissance fiscale :</strong> ${currentCoach.fiscal_power || "Non renseignée"} CV</p>
   </div>
 
+  <div class="table-wrap">
   <table>
     <thead>
       <tr>
@@ -2026,6 +2043,7 @@ ${rows
       </tr>
     </tbody>
   </table>
+  </div>
 
   <div class="note">
     <strong>ℹ️ Barème des frais kilométriques :</strong><br>
