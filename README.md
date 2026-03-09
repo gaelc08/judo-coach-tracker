@@ -14,11 +14,9 @@ A web application for tracking judo coach training hours, competition days, mile
   - [Deployment](#deployment)
 - [Configuration](#configuration)
   - [Supabase Setup](#supabase-setup)
-  - [Firebase Setup](#firebase-setup)
 - [Data Models](#data-models)
 - [Application Pages](#application-pages)
   - [Coach Application](#coach-application)
-  - [Admin Dashboard](#admin-dashboard)
 - [Usage](#usage)
   - [For Coaches](#for-coaches)
   - [For Administrators](#for-administrators)
@@ -30,10 +28,7 @@ A web application for tracking judo coach training hours, competition days, mile
 
 Judo Coach Tracker is a client-side web application that allows judo coaches to log their working hours, competition days, travel distances, and toll expenses. Administrators can view all coaches' data, manage coach profiles, and export reports.
 
-The application is entirely static (HTML, CSS, and JavaScript) and relies on two cloud backends:
-
-- **Supabase** — used by coaches for authentication, data storage, and file uploads.
-- **Firebase** — used by administrators for authentication and read-only data access.
+The application is entirely static (HTML, CSS, and JavaScript) and relies on **Supabase** for authentication, data storage, and file uploads.
 
 ---
 
@@ -77,8 +72,7 @@ Days are colour-coded for quick reference:
 | Layer | Technology |
 |-------|-----------|
 | Frontend | HTML5, CSS3, Vanilla JavaScript (ES6 modules) |
-| Coach backend | [Supabase](https://supabase.com) (Auth, PostgreSQL, Storage) |
-| Admin backend | [Firebase](https://firebase.google.com) (Auth, Firestore) |
+| Backend | [Supabase](https://supabase.com) (Auth, PostgreSQL, Storage) |
 | Hosting | Firebase Hosting |
 
 No build tool or bundler is required — the application is served directly as static files.
@@ -90,10 +84,8 @@ No build tool or bundler is required — the application is served directly as s
 ```
 judo-coach-tracker/
 ├── public/
-│   ├── index.html        # Coach application entry point
-│   ├── admin.html        # Admin dashboard entry point
-│   ├── app-modular.js    # Coach application logic (Supabase)
-│   ├── admin-app.js      # Admin application logic (Firebase)
+│   ├── index.html        # Application entry point
+│   ├── app-modular.js    # Application logic (Supabase)
 │   ├── style.css         # Shared stylesheet
 │   └── logo-jcc.png      # Club logo
 ├── .firebaserc           # Firebase project reference
@@ -108,9 +100,7 @@ judo-coach-tracker/
 ### Prerequisites
 
 - A modern web browser (Chrome, Firefox, Edge, Safari)
-- A Supabase project (for coach authentication and data)
-- A Firebase project (for admin authentication and hosting)
-- [Firebase CLI](https://firebase.google.com/docs/cli) (for deployment only)
+- A Supabase project (for authentication and data)
 
 ### Running Locally
 
@@ -124,10 +114,7 @@ cd public && python -m http.server 8000
 npx http-server public -p 8000
 ```
 
-Then open:
-
-- `http://localhost:8000/` — Coach application
-- `http://localhost:8000/admin.html` — Admin dashboard
+Then open `http://localhost:8000/` in your browser.
 
 ### Deployment
 
@@ -165,19 +152,6 @@ Required Supabase resources:
 2. **Database** — create the `coaches` and `time_data` tables (see [Data Models](#data-models)).
 3. **Storage** — create a bucket named `justifications` for toll receipt uploads.
 4. **Row-Level Security** — configure RLS policies so each coach can only access their own rows.
-
-### Firebase Setup
-
-Firebase credentials are loaded via the CDN in `public/admin.html`. Update the `firebaseConfig` object in that file to point to your Firebase project:
-
-```js
-const firebaseConfig = {
-  apiKey: '<your-api-key>',
-  authDomain: '<your-project>.firebaseapp.com',
-  projectId: '<your-project-id>',
-  // ...
-};
-```
 
 ---
 
@@ -237,15 +211,7 @@ The coach application allows authenticated coaches to:
 4. Review the summary panel showing total hours, competition days, distance, and total payment.
 5. Export a salary CSV or mileage HTML report.
 
-### Admin Dashboard
-
-**URL:** `/admin.html`
-
-The admin dashboard requires a separate Firebase admin account. From here, administrators can:
-
-1. Create, edit, and delete coach profiles including rates and personal details.
-2. Select any coach and any month to view their calendar data.
-3. Export a mileage note on behalf of a coach.
+Administrators log in through the same application. Once authenticated as an admin, additional controls become available to manage coach profiles and view any coach's data.
 
 ---
 
@@ -266,7 +232,7 @@ The admin dashboard requires a separate Firebase admin account. From here, admin
 
 ### For Administrators
 
-1. **Log in** to the admin dashboard with your Firebase admin credentials.
+1. **Log in** to the application with your Supabase admin credentials.
 2. **Manage coaches** — use *Ajouter un coach* or *Modifier le coach* to maintain coach profiles and set their rates.
 3. **View coach data** — select a coach and month from the dropdowns.
 4. **Export a mileage note** — click the export button to generate a printable report for the selected coach and month.
@@ -281,7 +247,7 @@ Exported from the coach application. Contains one row per day with columns for d
 
 ### Mileage Note (HTML)
 
-Exported from both the coach application and the admin dashboard. Generates a formatted HTML page including:
+Exported from the application. Generates a formatted HTML page including:
 
 - Coach name, address, and vehicle details.
 - A table of competition travel entries (date, departure, arrival, km, tolls).
