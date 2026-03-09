@@ -1416,7 +1416,7 @@ function exportMileageHTML() {
     return;
   }
 
-  const logoUrl = "https://judo-coach-tracker.web.app/logo-jcc.png";
+  const logoUrl = new URL('logo-jcc.png', window.location.href).href;
 
   const html = `
 <!DOCTYPE html>

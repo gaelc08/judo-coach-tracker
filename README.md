@@ -73,7 +73,7 @@ Days are colour-coded for quick reference:
 |-------|-----------|
 | Frontend | HTML5, CSS3, Vanilla JavaScript (ES6 modules) |
 | Backend | [Supabase](https://supabase.com) (Auth, PostgreSQL, Storage) |
-| Hosting | Any static file server (e.g. GitHub Pages, Netlify, Vercel) |
+| Hosting | Supabase Edge Functions (or any static file server) |
 
 No build tool or bundler is required — the application is served directly as static files.
 
@@ -88,6 +88,15 @@ judo-coach-tracker/
 │   ├── app-modular.js    # Application logic (Supabase)
 │   ├── style.css         # Shared stylesheet
 │   └── logo-jcc.png      # Club logo
+├── supabase/
+│   ├── config.toml       # Supabase project configuration
+│   └── functions/
+│       └── app/
+│           ├── index.ts  # Edge Function (static SPA host)
+│           ├── index.html -> ../../../public/index.html
+│           ├── app-modular.js -> ../../../public/app-modular.js
+│           ├── style.css -> ../../../public/style.css
+│           └── logo-jcc.png -> ../../../public/logo-jcc.png
 └── package.json          # NPM dependencies
 ```
 
@@ -116,7 +125,33 @@ Then open `http://localhost:8000/` in your browser.
 
 ### Deployment
 
-The application is a fully static web app (HTML, CSS, JavaScript) and can be deployed to any static hosting provider.
+**Supabase Edge Functions (recommended — keeps everything in one platform):**
+
+The repository includes a Supabase Edge Function (`supabase/functions/app/`) that serves the static files with the correct MIME types so the browser renders the application properly.
+
+```bash
+# Install the Supabase CLI (once)
+npm install -g supabase
+
+# Log in
+supabase login
+
+# Deploy the Edge Function
+supabase functions deploy app --project-ref <your-project-ref>
+```
+
+Live URL: `https://<your-project-ref>.supabase.co/functions/v1/app`
+
+For this project the ref is `ajbpzueanpeukozjhkiv`, so the live URL is:
+`https://ajbpzueanpeukozjhkiv.supabase.co/functions/v1/app`
+
+> **Note:** The function directory contains symlinks to the `public/` files. If your environment does not resolve symlinks, copy the files manually before deploying:
+> ```bash
+> cp public/{index.html,style.css,app-modular.js,logo-jcc.png} supabase/functions/app/
+> supabase functions deploy app --project-ref <your-project-ref>
+> ```
+
+---
 
 **GitHub Pages:**
 
