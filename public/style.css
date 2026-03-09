@@ -224,6 +224,7 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   padding: 12px 20px;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 14px;
 }
 
@@ -240,6 +241,7 @@ button, .btn-primary, .btn-secondary, .btn-danger {
 
 .header-title {
   flex: 1;
+  min-width: 0;
 }
 
 .header-title h1 {
@@ -247,6 +249,7 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   font-size: 1.3rem;
   font-weight: 800;
   line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
 .header-subtitle {
@@ -776,6 +779,35 @@ button, .btn-primary, .btn-secondary, .btn-danger {
 
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
+  .app-header-inner {
+    padding: 10px 12px;
+    gap: 10px;
+  }
+
+  .header-logo {
+    width: 44px;
+    height: 44px;
+  }
+
+  .header-title {
+    flex: 1 1 calc(100% - 56px);
+  }
+
+  .header-title h1 {
+    font-size: 1rem;
+  }
+
+  .header-subtitle {
+    font-size: 0.7rem;
+    letter-spacing: 0.7px;
+  }
+
+  .app-header-inner > button {
+    flex: 1 1 140px;
+    min-width: 0;
+    text-align: center;
+  }
+
   .app-body {
     padding: 12px;
     gap: 12px;
