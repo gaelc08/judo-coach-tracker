@@ -231,8 +231,22 @@ Required Supabase resources:
 
 1. **Authentication** — enable email/password sign-in.
 2. **Database** — create the `coaches` and `time_data` tables (see [Data Models](#data-models)).
-3. **Storage** — create a bucket named `justifications` for toll receipt uploads.
+3. **Storage** — create a public bucket named `justifications` for toll receipt uploads (see below).
 4. **Row-Level Security** — configure RLS policies so each coach can only access their own rows.
+
+#### Creating the `justifications` storage bucket
+
+The migration file `supabase/migrations/20240101000000_create_justifications_bucket.sql` automates this step.  Run it in the **Supabase SQL editor** (Dashboard → SQL Editor → New query → paste → Run), or apply it with the Supabase CLI:
+
+```bash
+supabase db push --project-ref <your-project-ref>
+```
+
+The migration creates the `justifications` bucket (public read, so file URLs work without authentication) and adds RLS policies that restrict write/delete access to the owner of each file.
+
+> **Troubleshooting — "Bucket not found" error when viewing a receipt**
+>
+> This error means the `justifications` bucket does not exist (or was deleted) in your Supabase project.  Run the migration above to recreate it.
 
 ---
 
