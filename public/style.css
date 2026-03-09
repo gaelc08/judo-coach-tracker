@@ -32,7 +32,22 @@ body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background: linear-gradient(135deg, var(--judo-black) 0%, var(--judo-navy) 100%);
   min-height: 100vh;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
   color: var(--gray-900);
+}
+
+html {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+#appContainer {
+  width: 100%;
+  max-width: 100%;
+  min-height: 100vh;
 }
 
 /* ===== Auth Screen ===== */
@@ -216,6 +231,8 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   top: 0;
   z-index: 100;
   box-shadow: var(--shadow-md);
+  width: 100%;
+  max-width: 100%;
 }
 
 .app-header-inner {
@@ -226,6 +243,7 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   align-items: center;
   flex-wrap: wrap;
   gap: 14px;
+  width: 100%;
 }
 
 .header-logo {
@@ -268,6 +286,7 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  width: 100%;
 }
 
 .app-body > * {
@@ -280,6 +299,8 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   border-radius: var(--radius);
   padding: 20px;
   box-shadow: var(--shadow-md);
+  width: 100%;
+  min-width: 0;
 }
 
 /* ===== Toolbar ===== */
@@ -790,7 +811,7 @@ button, .btn-primary, .btn-secondary, .btn-danger {
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
   .app-header-inner {
-    padding: 10px 12px;
+    padding: calc(10px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px)) 10px calc(12px + env(safe-area-inset-left, 0px));
     gap: 10px;
   }
 
@@ -819,8 +840,12 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   }
 
   .app-body {
-    padding: 12px;
+    padding: 12px calc(12px + env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px));
     gap: 12px;
+  }
+
+  .card {
+    padding: 16px;
   }
 
   .calendar {
