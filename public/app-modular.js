@@ -413,11 +413,11 @@ async function fetchPublicHolidays(year) {
 async function fetchSchoolHolidays(year) {
   if (__schoolHolidaysCache[year]) return __schoolHolidaysCache[year];
   try {
-    // French government open data API for school holidays (zone C = Paris region)
+    // French government open data API for school holidays (zone B = Grand Est region)
     const startDate = `${year - 1}-09-01`;
     const endDate = `${year + 1}-08-31`;
     const params = new URLSearchParams({
-      where: `location="Zone C" AND start_date>="${startDate}" AND end_date<="${endDate}"`,
+      where: `location="Zone B" AND start_date>="${startDate}" AND end_date<="${endDate}"`,
       limit: "50",
       timezone: "Europe/Paris"
     });
