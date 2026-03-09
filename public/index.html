@@ -3,70 +3,126 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Judo Coach Tracker</title>
+    <title>Judo Club Croissy – Suivi Entraîneurs</title>
     <link rel="stylesheet" href="style.css">
   </head>
 <body>
-  
+
   <!-- Auth area -->
   <div id="authContainer" class="auth-container">
-    <h1>Judo Coach Tracker</h1>
+    <div class="auth-logo">
+      <img src="logo-jcc.png" alt="Judo Club Croissy" class="logo">
+      <h1>Judo Club Croissy</h1>
+      <p class="auth-subtitle">Suivi des entraîneurs</p>
+    </div>
 
     <div id="authRow" class="auth-row">
-      <input id="authEmail" type="email" placeholder="Email">
-      <input id="authPassword" type="password" placeholder="Password">
+      <input id="authEmail" type="email" placeholder="Adresse e-mail">
+      <input id="authPassword" type="password" placeholder="Mot de passe">
     </div>
 
     <div id="authButtons" class="auth-buttons">
-      <button id="registerBtn">Register</button>
-      <button id="loginBtn">Login</button>
-      <button id="resetPasswordBtn">Reset Password</button>
-      <button id="logoutBtn" style="display:none">Logout</button>
+      <button id="registerBtn" class="btn-secondary">S'inscrire</button>
+      <button id="loginBtn" class="btn-primary">Se connecter</button>
+      <button id="resetPasswordBtn" class="btn-secondary">Mot de passe oublié</button>
+      <button id="logoutBtn" style="display:none" class="btn-danger">Déconnexion</button>
     </div>
 
-    <div id="authStatus">Not logged in.</div>
+    <div id="authStatus" class="auth-status">Non connecté.</div>
   </div>
 
   <!-- Main app (hidden until logged in) -->
   <div id="appContainer" style="display:none">
-    <div class="toolbar">
-      <label>
-        Entraîneur:
-        <select id="coachSelect">
-          <option value="">-- Sélectionner Entraîneur --</option>
-        </select>
-      </label>
+    <header class="app-header">
+      <div class="app-header-inner">
+        <img src="logo-jcc.png" alt="Judo Club Croissy" class="header-logo">
+        <div class="header-title">
+          <h1>Judo Club Croissy</h1>
+          <span class="header-subtitle">Suivi des entraîneurs</span>
+        </div>
+        <button id="logoutBtnApp" class="btn-logout">Déconnexion</button>
+      </div>
+    </header>
 
-      <label>
-        Mois:
-        <input id="monthSelect" type="month" value="2026-02">
-      </label>
+    <div class="app-body">
+      <div class="toolbar card">
+        <label class="toolbar-label">
+          <span>Entraîneur</span>
+          <select id="coachSelect">
+            <option value="">-- Sélectionner --</option>
+          </select>
+        </label>
 
-      <button id="addCoachBtn" class="admin-only" style="display:none">Ajouter entraîneur</button>
-      <button id="editCoachBtn" class="admin-only" style="display:none">Modifier entraîneur</button>
-    </div>
+        <label class="toolbar-label">
+          <span>Mois</span>
+          <input id="monthSelect" type="month">
+        </label>
 
-    <!-- Calendar -->
-    <div id="calendar" class="calendar"></div>
+        <div class="toolbar-actions">
+          <button id="addCoachBtn" class="admin-only btn-secondary" style="display:none">+ Entraîneur</button>
+          <button id="editCoachBtn" class="admin-only btn-secondary" style="display:none">✏️ Modifier</button>
+        </div>
+      </div>
 
-    <!-- Summary -->
-    <div class="summary">
-      <div>Total des heures: <span id="totalHours">0</span></div>
-      <div>Taux horaire: <span id="hourlyRate">€0.00</span></div>
-      <div>Paiement entraînement: <span id="trainingPayment">€0.00</span></div>
-      <div>Jours de compétition: <span id="compDays">0</span></div>
-      <div>Paiement compétition: <span id="compPayment">€0.00</span></div>
-      <div>Total km: <span id="totalKm">0</span></div>
-      <div>Paiement km: <span id="kmPayment">€0.00</span></div>
-      <div>Paiement total: <span id="totalPayment">€0.00</span></div>
-    </div>
+      <!-- Legend -->
+      <div class="legend card">
+        <span class="legend-item"><span class="legend-dot weekend"></span>Week-end</span>
+        <span class="legend-item"><span class="legend-dot holiday"></span>Férié</span>
+        <span class="legend-item"><span class="legend-dot school-holiday"></span>Vacances scolaires</span>
+        <span class="legend-item"><span class="legend-dot has-data"></span>Entraînement</span>
+        <span class="legend-item"><span class="legend-dot has-competition"></span>Compétition</span>
+      </div>
 
-    <div class="actions">
-      <button id="exportBtn">Exporter salaire (CSV)</button>
-      <button id="mileageBtn">Exporter note de frais km (HTML + PDF)</button>
+      <!-- Calendar -->
+      <div id="calendar" class="calendar card"></div>
 
-      <input id="importFile" type="file" accept=".json">
-      <button id="importBtn">Importer JSON</button>
+      <!-- Summary -->
+      <div class="summary card">
+        <h2 class="summary-title">Récapitulatif mensuel</h2>
+        <div class="summary-grid">
+          <div class="summary-item">
+            <span class="label">Heures d'entraînement</span>
+            <span class="value" id="totalHours">0</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Taux horaire</span>
+            <span class="value" id="hourlyRate">€0,00</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Paiement entraînement</span>
+            <span class="value" id="trainingPayment">€0,00</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Jours de compétition</span>
+            <span class="value" id="compDays">0</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Paiement compétition</span>
+            <span class="value" id="compPayment">€0,00</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Total km</span>
+            <span class="value" id="totalKm">0</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Paiement km</span>
+            <span class="value" id="kmPayment">€0,00</span>
+          </div>
+          <div class="summary-item total">
+            <span class="label">Paiement total</span>
+            <span class="value" id="totalPayment">€0,00</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="actions card">
+        <button id="exportBtn" class="btn-primary">📊 Exporter salaire (CSV)</button>
+        <button id="mileageBtn" class="btn-secondary">🚗 Exporter note de frais km</button>
+        <div class="import-group">
+          <input id="importFile" type="file" accept=".json">
+          <button id="importBtn" class="btn-secondary">📥 Importer JSON</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -88,7 +144,7 @@
       <label>Adresse
         <input id="coachAddress" type="text">
       </label>
-      <label>Véhicule (marque & modèle)
+      <label>Véhicule (marque &amp; modèle)
         <input id="coachVehicle" type="text">
       </label>
       <label>Puissance fiscale (CV)
@@ -105,9 +161,9 @@
       </label>
 
       <div class="modal-actions">
-        <button id="saveCoach">Sauvegarder</button>
-        <button id="deleteCoach" style="display:none">Supprimer</button>
-        <button id="cancelCoach">Annuler</button>
+        <button id="saveCoach" class="btn-primary">Sauvegarder</button>
+        <button id="deleteCoach" class="btn-danger" style="display:none">Supprimer</button>
+        <button id="cancelCoach" class="btn-secondary">Annuler</button>
       </div>
     </div>
   </div>
@@ -148,9 +204,9 @@
       </div>
 
       <div class="modal-actions">
-        <button id="saveDay">Sauvegarder</button>
-        <button id="deleteDay">Supprimer</button>
-        <button id="cancelDay">Annuler</button>
+        <button id="saveDay" class="btn-primary">Sauvegarder</button>
+        <button id="deleteDay" class="btn-danger">Supprimer</button>
+        <button id="cancelDay" class="btn-secondary">Annuler</button>
       </div>
     </div>
   </div>
