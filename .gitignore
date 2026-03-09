@@ -1,9 +1,6 @@
 # Dependencies
 node_modules/
 
-# Firebase cache
-.firebase/
-
 # Logs divers
 *.log
 npm-debug.log*

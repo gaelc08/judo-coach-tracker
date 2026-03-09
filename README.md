@@ -73,7 +73,7 @@ Days are colour-coded for quick reference:
 |-------|-----------|
 | Frontend | HTML5, CSS3, Vanilla JavaScript (ES6 modules) |
 | Backend | [Supabase](https://supabase.com) (Auth, PostgreSQL, Storage) |
-| Hosting | Firebase Hosting |
+| Hosting | Any static file server (e.g. GitHub Pages, Netlify, Vercel) |
 
 No build tool or bundler is required — the application is served directly as static files.
 
@@ -88,8 +88,6 @@ judo-coach-tracker/
 │   ├── app-modular.js    # Application logic (Supabase)
 │   ├── style.css         # Shared stylesheet
 │   └── logo-jcc.png      # Club logo
-├── .firebaserc           # Firebase project reference
-├── firebase.json         # Firebase hosting configuration
 └── package.json          # NPM dependencies
 ```
 
@@ -118,20 +116,33 @@ Then open `http://localhost:8000/` in your browser.
 
 ### Deployment
 
-The application is hosted on Firebase Hosting.
+The application is a fully static web app (HTML, CSS, JavaScript) and can be deployed to any static hosting provider.
+
+**GitHub Pages:**
+
+Push the contents of the `public/` directory to the `gh-pages` branch (or configure GitHub Pages to serve from that branch in repository settings).
+
+**Netlify:**
+
+Drag and drop the `public/` folder onto [app.netlify.com](https://app.netlify.com), or connect your repository and set the publish directory to `public`.
+
+**Vercel:**
 
 ```bash
-# Install Firebase CLI (once)
-npm install -g firebase-tools
-
-# Authenticate
-firebase login
-
-# Deploy
-firebase deploy --project judo-coach-tracker
+npx vercel --prod
 ```
 
-Live URL: `https://judo-coach-tracker.web.app`
+Set the output directory to `public` when prompted.
+
+**Any HTTP server:**
+
+```bash
+# Using Python
+cd public && python -m http.server 8000
+
+# Using Node.js
+npx http-server public -p 8000
+```
 
 ---
 
