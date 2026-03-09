@@ -262,6 +262,11 @@ let currentSession = null;
 let currentAccessToken = null;
 let __eventListenersSetup = false;
 
+function __normalizeMonth(value) {
+  const s = String(value ?? '').trim();
+  return /^\d{4}-\d{2}/.test(s) ? s.slice(0, 7) : s;
+}
+
 async function __coachWriteViaRest(coachData, { editingId = null } = {}) {
   if (!currentAccessToken) {
     return {
@@ -879,7 +884,7 @@ async function loadAllDataFromSupabase({ isAdminOverride } = {}) {
 // ===== Freeze helpers =====
 function isCurrentMonthFrozen() {
   if (!currentCoach || !currentMonth) return false;
-  return frozenMonths.has(`${currentCoach.id}-${currentMonth}`);
+  return frozenMonths.has(`${currentCoach.id}-${__normalizeMonth(currentMonth)}`);
 }
 
 function updateFreezeUI() {
@@ -908,21 +913,56 @@ async function toggleFreezeMonth() {
     alert("Seul l'admin peut geler ou dégeler une fiche.");
     return;
   }
+
+  if (!currentAccessToken) {
+    alert("Session invalide. Reconnectez-vous puis réessayez.");
+    return;
+  }
+
+  const normalizedMonth = __normalizeMonth(currentMonth);
   const frozen = isCurrentMonthFrozen();
-  const key = `${currentCoach.id}-${currentMonth}`;
+  const key = `${currentCoach.id}-${normalizedMonth}`;
   if (frozen) {
-    const { error } = await supabase.from('frozen_timesheets')
-      .delete()
-      .eq('coach_id', currentCoach.id)
-      .eq('month', currentMonth);
-    if (error) { alert("Erreur lors du dégel : " + error.message); return; }
+    const urlObj = new URL(`${supabaseUrl}/rest/v1/frozen_timesheets`);
+    urlObj.searchParams.set('coach_id', `eq.${currentCoach.id}`);
+    urlObj.searchParams.set('month', `eq.${normalizedMonth}`);
+    const res = await globalThis.fetch(urlObj.toString(), {
+      method: 'DELETE',
+      headers: {
+        apikey: supabaseKey,
+        Authorization: `Bearer ${currentAccessToken}`
+      }
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      alert("Erreur lors du dégel : " + (text || `${res.status} ${res.statusText}`));
+      return;
+    }
     frozenMonths.delete(key);
   } else {
-    const { error } = await supabase.from('frozen_timesheets')
-      .insert({ coach_id: currentCoach.id, month: currentMonth, frozen_by: currentUser?.email || null });
-    if (error) { alert("Erreur lors du gel : " + error.message); return; }
+    const res = await globalThis.fetch(`${supabaseUrl}/rest/v1/frozen_timesheets`, {
+      method: 'POST',
+      headers: {
+        apikey: supabaseKey,
+        Authorization: `Bearer ${currentAccessToken}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=representation,resolution=merge-duplicates'
+      },
+      body: JSON.stringify({ coach_id: currentCoach.id, month: normalizedMonth, frozen_by: currentUser?.email || null })
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      const lower = String(text || '').toLowerCase();
+      if (lower.includes('check constraint') || lower.includes('23514')) {
+        alert("Erreur lors du gel : la colonne month de frozen_timesheets refuse la valeur. Appliquez la correction SQL du format YYYY-MM dans la migration frozen_timesheets.");
+      } else {
+        alert("Erreur lors du gel : " + (text || `${res.status} ${res.statusText}`));
+      }
+      return;
+    }
     frozenMonths.add(key);
   }
+  currentMonth = normalizedMonth;
   updateFreezeUI();
 }
 
@@ -1032,9 +1072,10 @@ function setupEventListeners() {
   };
 
   document.getElementById("monthSelect").onchange = (e) => {
-    currentMonth = e.target.value;
+    currentMonth = __normalizeMonth(e.target.value);
     updateCalendar();
     updateSummary();
+    updateFreezeUI();
   };
 
   document.getElementById("competitionDay").onchange = (e) => {

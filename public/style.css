@@ -310,7 +310,9 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   font-size: 0.95rem;
   background: white;
   transition: border-color 0.2s;
-  min-width: 180px;
+  width: 220px;
+  min-width: 220px;
+  max-width: 220px;
   color: var(--gray-900);
 }
 

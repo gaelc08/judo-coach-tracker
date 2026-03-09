@@ -2,7 +2,7 @@
 create table if not exists frozen_timesheets (
   id uuid default gen_random_uuid() primary key,
   coach_id uuid not null references coaches(id) on delete cascade,
-  month text not null check (month ~ '^\d{4}-\d{2}$'), -- format: "YYYY-MM"
+  month text not null check (month ~ '^[0-9]{4}-[0-9]{2}$'), -- format: "YYYY-MM"
   frozen_at timestamptz default now() not null,
   frozen_by text,            -- email of the admin who froze the timesheet
   unique(coach_id, month)
