@@ -73,7 +73,7 @@ Days are colour-coded for quick reference:
 |-------|-----------|
 | Frontend | HTML5, CSS3, Vanilla JavaScript (ES6 modules) |
 | Backend | [Supabase](https://supabase.com) (Auth, PostgreSQL, Storage) |
-| Hosting | Firebase Hosting |
+| Hosting | Netlify / GitHub Pages (frontend) + Supabase (backend) |
 
 No build tool or bundler is required — the application is served directly as static files.
 
@@ -83,13 +83,24 @@ No build tool or bundler is required — the application is served directly as s
 
 ```
 judo-coach-tracker/
+├── .github/
+│   └── workflows/
+│       └── deploy-pages.yml  # GitHub Pages auto-deploy on push to main
 ├── public/
 │   ├── index.html        # Application entry point
 │   ├── app-modular.js    # Application logic (Supabase)
 │   ├── style.css         # Shared stylesheet
 │   └── logo-jcc.png      # Club logo
-├── .firebaserc           # Firebase project reference
-├── firebase.json         # Firebase hosting configuration
+├── supabase/
+│   ├── config.toml       # Supabase project configuration
+│   └── functions/
+│       └── app/
+│           ├── index.ts  # Edge Function (optional: Supabase-hosted frontend)
+│           ├── index.html -> ../../../public/index.html
+│           ├── app-modular.js -> ../../../public/app-modular.js
+│           ├── style.css -> ../../../public/style.css
+│           └── logo-jcc.png -> ../../../public/logo-jcc.png
+├── netlify.toml          # Netlify deployment config (publish dir + SPA redirect)
 └── package.json          # NPM dependencies
 ```
 
@@ -118,20 +129,90 @@ Then open `http://localhost:8000/` in your browser.
 
 ### Deployment
 
-The application is hosted on Firebase Hosting.
+> **TL;DR — recommended split:**  
+> Use **Supabase** for the backend (auth, database, storage) and a dedicated static host for the frontend. Dedicated hosts give clean, professional URLs and one-click deployments at no cost.
+
+#### Hosting option comparison
+
+| Platform | Resulting URL | Cost | Setup effort |
+|----------|--------------|------|--------------|
+| **Netlify** ⭐ | `https://judo-coach-tracker.netlify.app` | Free | Connect repo → done |
+| **GitHub Pages** | `https://gaelc08.github.io/judo-coach-tracker/` | Free | Workflow included |
+| **Vercel** | `https://judo-coach-tracker.vercel.app` | Free | `npx vercel --prod` |
+| Supabase Edge Fn | `https://<ref>.supabase.co/functions/v1/app` | Free | CLI deploy |
+
+---
+
+**Option A — Netlify (recommended: cleanest URL, zero config)**
+
+1. Go to [app.netlify.com](https://app.netlify.com) → *Add new site* → *Import an existing project*.
+2. Connect this GitHub repository.
+3. Netlify auto-detects `netlify.toml` and sets publish directory to `public`.
+4. Click **Deploy site** — done.
+5. Optionally rename the site to `judo-coach-tracker` under *Site settings → General → Site name*.
+
+Live URL: `https://judo-coach-tracker.netlify.app`
+
+---
+
+**Option B — GitHub Pages (automatic CI/CD, no external account needed)**
+
+A GitHub Actions workflow is already included in `.github/workflows/deploy-pages.yml`. To activate it:
+
+1. Go to your repository on GitHub → **Settings** → **Pages**.
+2. Under *Source*, select **GitHub Actions**.
+3. Push to `main` (or trigger the workflow manually from the **Actions** tab).
+
+Live URL: `https://gaelc08.github.io/judo-coach-tracker/`
+
+---
+
+**Option C — Vercel**
 
 ```bash
-# Install Firebase CLI (once)
-npm install -g firebase-tools
-
-# Authenticate
-firebase login
-
-# Deploy
-firebase deploy --project judo-coach-tracker
+npx vercel --prod
 ```
 
-Live URL: `https://judo-coach-tracker.web.app`
+Set the output directory to `public` when prompted.
+
+Live URL: `https://judo-coach-tracker.vercel.app`
+
+---
+
+**Option D — Supabase Edge Function (keeps everything in one platform)**
+
+The repository includes a Supabase Edge Function (`supabase/functions/app/`) that serves the static files with the correct MIME types. The URL is long but functional.
+
+```bash
+# Install the Supabase CLI (once)
+npm install -g supabase
+
+# Log in
+supabase login
+
+# Deploy the Edge Function
+supabase functions deploy app --project-ref <your-project-ref>
+```
+
+Live URL: `https://<your-project-ref>.supabase.co/functions/v1/app`
+
+> **Note:** The function directory contains symlinks to the `public/` files. If your environment does not resolve symlinks, copy the files manually before deploying:
+> ```bash
+> cp public/{index.html,style.css,app-modular.js,logo-jcc.png} supabase/functions/app/
+> supabase functions deploy app --project-ref <your-project-ref>
+> ```
+
+---
+
+**Any HTTP server (local / self-hosted)**
+
+```bash
+# Using Python
+cd public && python -m http.server 8000
+
+# Using Node.js
+npx http-server public -p 8000
+```
 
 ---
 

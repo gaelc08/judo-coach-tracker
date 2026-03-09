@@ -1,0 +1,12 @@
+# Netlify configuration for Judo Coach Tracker
+# Connect this repository on app.netlify.com and Netlify will use these settings automatically.
+# Result: https://<site-name>.netlify.app  (e.g. https://judo-coach-tracker.netlify.app)
+
+[build]
+  publish = "public"
+
+# SPA fallback — serve index.html for any path that doesn't match a static file
+[[redirects]]
+  from = "/*"
+  to   = "/index.html"
+  status = 200
