@@ -270,6 +270,10 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   gap: 16px;
 }
 
+.app-body > * {
+  min-width: 0;
+}
+
 /* ===== Card ===== */
 .card {
   background: rgba(255,255,255,0.97);
@@ -289,6 +293,7 @@ button, .btn-primary, .btn-secondary, .btn-danger {
 .toolbar-label {
   display: flex;
   flex-direction: column;
+  flex: 1 1 220px;
   gap: 5px;
   font-weight: 600;
   font-size: 0.85rem;
@@ -395,6 +400,9 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 8px;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .calendar-header {
@@ -817,6 +825,11 @@ button, .btn-primary, .btn-secondary, .btn-danger {
     gap: 4px;
   }
 
+  .calendar-header,
+  .calendar-day {
+    min-width: 0;
+  }
+
   .calendar-day {
     padding: 4px;
     min-height: 44px;
@@ -838,12 +851,31 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   }
 
   .toolbar {
-    flex-direction: column;
+    flex-direction: row;
+    align-items: stretch;
     gap: 12px;
+  }
+
+  .toolbar-label {
+    flex: 1 1 calc(50% - 6px);
+    min-width: 0;
+  }
+
+  .toolbar-label select,
+  .toolbar-label input[type="month"] {
+    min-width: 0;
+    width: 100%;
   }
 
   .toolbar-actions {
     margin-left: 0;
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .toolbar-actions button {
+    flex: 1 1 calc(33.333% - 6px);
+    min-width: 140px;
   }
 
   .summary-grid {
@@ -851,11 +883,48 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   }
 
   .actions {
-    flex-direction: column;
+    flex-direction: row;
+    align-items: stretch;
   }
 
   .actions button {
+    flex: 1 1 calc(50% - 5px);
+    min-width: 140px;
+    width: auto;
+  }
+
+  .import-group {
     width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .toolbar {
+    gap: 10px;
+  }
+
+  .toolbar-label {
+    flex-basis: calc(50% - 5px);
+  }
+
+  .toolbar-actions button,
+  .actions button {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+
+  .calendar {
+    gap: 3px;
+  }
+
+  .calendar-header {
+    font-size: 0.7rem;
+    padding: 8px 2px;
+  }
+
+  .calendar-day {
+    padding: 3px;
+    min-height: 40px;
   }
 
   .legend {
