@@ -212,6 +212,7 @@ window.supabase = supabase;
 let coaches = [];
 let timeData = {};
 let currentCoach = null;
+let frozenMonths = new Set(); // keys: "coach_id-YYYY-MM"
 const __now = new Date();
 let currentMonth = `${__now.getFullYear()}-${String(__now.getMonth() + 1).padStart(2, "0")}`;
 let selectedDay = null;
@@ -684,10 +685,12 @@ function setupAuthListeners() {
       if (isAdmin) {
         document.getElementById("addCoachBtn").style.display = "inline-block";
         document.getElementById("editCoachBtn").style.display = "inline-block";
+        document.getElementById("freezeBtn").style.display = "inline-block";
         document.getElementById("importGroup").style.display = "flex";
       } else {
         document.getElementById("addCoachBtn").style.display = "none";
         document.getElementById("editCoachBtn").style.display = "none";
+        document.getElementById("freezeBtn").style.display = "none";
         document.getElementById("importGroup").style.display = "none";
       }
 
@@ -823,8 +826,65 @@ async function loadAllDataFromSupabase({ isAdminOverride } = {}) {
       }
     });
   }
+
+  // Load frozen timesheets
+  frozenMonths = new Set();
+  const frozenRes = await __restSelect('frozen_timesheets');
+  if (!frozenRes.error) {
+    (frozenRes.data || []).forEach(r => frozenMonths.add(`${r.coach_id}-${r.month}`));
+  }
 }
 
+
+// ===== Freeze helpers =====
+function isCurrentMonthFrozen() {
+  if (!currentCoach || !currentMonth) return false;
+  return frozenMonths.has(`${currentCoach.id}-${currentMonth}`);
+}
+
+function updateFreezeUI() {
+  const frozen = isCurrentMonthFrozen();
+  const banner = document.getElementById("frozenBanner");
+  const btn = document.getElementById("freezeBtn");
+  if (banner) banner.style.display = frozen ? "block" : "none";
+  if (btn) {
+    if (frozen) {
+      btn.textContent = "🔓 Dégeler la fiche";
+      btn.classList.add("frozen");
+    } else {
+      btn.textContent = "🔒 Geler la fiche";
+      btn.classList.remove("frozen");
+    }
+  }
+}
+
+async function toggleFreezeMonth() {
+  if (!currentCoach || !currentMonth) {
+    alert("Veuillez sélectionner un entraîneur et un mois.");
+    return;
+  }
+  const isAdmin = await isCurrentUserAdminDB();
+  if (!isAdmin) {
+    alert("Seul l'admin peut geler ou dégeler une fiche.");
+    return;
+  }
+  const frozen = isCurrentMonthFrozen();
+  const key = `${currentCoach.id}-${currentMonth}`;
+  if (frozen) {
+    const { error } = await supabase.from('frozen_timesheets')
+      .delete()
+      .eq('coach_id', currentCoach.id)
+      .eq('month', currentMonth);
+    if (error) { alert("Erreur lors du dégel : " + error.message); return; }
+    frozenMonths.delete(key);
+  } else {
+    const { error } = await supabase.from('frozen_timesheets')
+      .insert({ coach_id: currentCoach.id, month: currentMonth, frozen_by: currentUser?.email || null });
+    if (error) { alert("Erreur lors du gel : " + error.message); return; }
+    frozenMonths.add(key);
+  }
+  updateFreezeUI();
+}
 
 // ===== Event listeners =====
 function setupEventListeners() {
@@ -972,6 +1032,7 @@ function setupEventListeners() {
   };
 
   document.getElementById("mileageBtn").onclick = exportMileageHTML;
+  document.getElementById("freezeBtn").onclick = toggleFreezeMonth;
 }
 
 // ===== Coach management =====
@@ -1245,6 +1306,8 @@ async function updateCalendar() {
     const dayDiv = createDayElement(day, dateStr);
     calendar.appendChild(dayDiv);
   }
+
+  updateFreezeUI();
 }
 
 function createDayElement(day, dateStr) {
@@ -1358,6 +1421,13 @@ function openDayModal(dateStr) {
 async function saveDay() {
   if (!currentCoach || !currentUser) return;
 
+  const isAdmin = await isCurrentUserAdminDB();
+  if (!isAdmin && isCurrentMonthFrozen()) {
+    alert("Cette fiche est gelée. Les modifications ne sont pas autorisées.");
+    document.getElementById("dayModal").classList.remove("active");
+    return;
+  }
+
   const hours =
     parseFloat(document.getElementById("trainingHours").value) || 0;
   const competition = document.getElementById("competitionDay").checked;
@@ -1455,6 +1525,14 @@ async function saveDay() {
 
 async function deleteDay() {
   if (!currentCoach || !currentUser) return;
+
+  const isAdmin = await isCurrentUserAdminDB();
+  if (!isAdmin && isCurrentMonthFrozen()) {
+    alert("Cette fiche est gelée. Les modifications ne sont pas autorisées.");
+    document.getElementById("dayModal").classList.remove("active");
+    return;
+  }
+
   const key = `${currentCoach.id}-${selectedDay}`;
   const existing = timeData[key];
   if (existing && existing.id) {

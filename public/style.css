@@ -575,6 +575,16 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   background: var(--gray-300);
 }
 
+#backupBtn {
+  background: var(--gray-200);
+  color: var(--gray-900);
+  border: none;
+}
+
+#backupBtn:hover {
+  background: var(--gray-300);
+}
+
 .import-group {
   display: flex;
   gap: 8px;
@@ -595,6 +605,35 @@ button, .btn-primary, .btn-secondary, .btn-danger {
 
 #importBtn:hover {
   background: var(--gray-300);
+}
+
+#freezeBtn {
+  background: var(--judo-navy);
+  color: white;
+  border: none;
+}
+
+#freezeBtn:hover {
+  background: var(--judo-red);
+}
+
+#freezeBtn.frozen {
+  background: var(--judo-red);
+}
+
+#freezeBtn.frozen:hover {
+  background: var(--judo-red-dark);
+}
+
+.frozen-banner {
+  background: rgba(192, 57, 43, 0.08);
+  border: 1px solid var(--judo-red);
+  border-radius: var(--radius-sm);
+  padding: 10px 16px;
+  color: var(--judo-red);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-align: center;
 }
 
 /* ===== Modals ===== */
