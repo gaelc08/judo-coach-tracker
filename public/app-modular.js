@@ -371,6 +371,28 @@ function __collectInviteDebug({ token = currentAccessToken, inviteEmail, ...extr
   };
 }
 
+function __getInviteDebugReport() {
+  return [
+    '=== INVITE DEBUG REPORT START ===',
+    JSON.stringify({
+      generatedAt: new Date().toISOString(),
+      debug: window.__inviteDebugLast || null
+    }, null, 2),
+    '=== INVITE DEBUG REPORT END ==='
+  ].join('\n');
+}
+
+async function __copyInviteDebugReport() {
+  const report = __getInviteDebugReport();
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(report);
+  }
+  return report;
+}
+
+window.__getInviteDebugReport = __getInviteDebugReport;
+window.__copyInviteDebugReport = __copyInviteDebugReport;
+
 function __normalizeMonth(value) {
   const s = String(value ?? '').trim();
   return /^\d{4}-\d{2}/.test(s) ? s.slice(0, 7) : s;
@@ -1605,10 +1627,12 @@ async function inviteCoach(email) {
       const jwtDetail = json?.debug?.userError || null;
       const extraLines = [
         requestId ? `Référence debug : ${requestId}` : '',
-        jwtDetail ? `Détail JWT : ${jwtDetail}` : ''
+        jwtDetail ? `Détail JWT : ${jwtDetail}` : '',
+        'Console navigateur : window.__getInviteDebugReport()'
       ].filter(Boolean);
       const extra = extraLines.length ? `\n${extraLines.join('\n')}` : '';
 
+      console.log('DEBUG inviteCoach share command:', 'window.__getInviteDebugReport()');
       alert(`Échec de l'invitation : ${msg}${extra}`);
       return false;
     }
