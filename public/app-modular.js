@@ -1430,16 +1430,27 @@ async function inviteCoach(email) {
     return false;
   }
 
-  // Always fetch the freshest access token so the Edge Function call is not
-  // rejected with HTTP 401 due to a stale token cached in currentAccessToken.
+  // Always use a fresh access token so the Edge Function call is not rejected
+  // due to a stale or expired token cached in currentAccessToken.
+  // refreshSession() exchanges the in-memory refresh token for a new access
+  // token, which handles the case where the access token has expired (the
+  // default Supabase access token lifetime is 1 hour).
   let accessToken = currentAccessToken;
   try {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await supabase.auth.refreshSession();
     if (session?.access_token) {
       accessToken = session.access_token;
+      currentAccessToken = accessToken;
+    } else {
+      // refreshSession() returned no session; fall back to getSession() in case
+      // the current token is still valid (e.g. refresh token already consumed).
+      const { data: { session: existing } } = await supabase.auth.getSession();
+      if (existing?.access_token) {
+        accessToken = existing.access_token;
+      }
     }
   } catch (_) {
-    // Fall back to currentAccessToken if getSession() unexpectedly throws
+    // Fall back to currentAccessToken if the refresh unexpectedly throws
   }
 
   if (!accessToken) {

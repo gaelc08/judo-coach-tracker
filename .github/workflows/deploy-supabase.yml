@@ -29,6 +29,6 @@ jobs:
       # Generate a personal access token at https://app.supabase.com/account/tokens
       # then add it under Settings → Secrets and variables → Actions in this repo.
       - name: Deploy invite-coach Edge Function
-        run: supabase functions deploy invite-coach --project-ref ajbpzueanpeukozjhkiv
+        run: supabase functions deploy invite-coach --project-ref ajbpzueanpeukozjhkiv --no-verify-jwt
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
