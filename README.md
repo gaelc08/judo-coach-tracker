@@ -73,7 +73,7 @@ Days are colour-coded for quick reference:
 |-------|-----------|
 | Frontend | HTML5, CSS3, Vanilla JavaScript (ES6 modules) |
 | Backend | [Supabase](https://supabase.com) (Auth, PostgreSQL, Storage) |
-| Hosting | Netlify / GitHub Pages (frontend) + Supabase (backend) |
+| Hosting | GitHub Pages (frontend) + Supabase (backend) |
 
 No build tool or bundler is required — the application is served directly as static files.
 
@@ -94,7 +94,6 @@ judo-coach-tracker/
 ├── supabase/
 │   ├── config.toml       # Supabase project configuration
 │   └── migrations/       # Database migrations
-├── netlify.toml          # Netlify deployment config (publish dir + SPA redirect)
 └── package.json          # NPM dependencies
 ```
 
@@ -130,25 +129,12 @@ Then open `http://localhost:8000/` in your browser.
 
 | Platform | Resulting URL | Cost | Setup effort |
 |----------|--------------|------|--------------|
-| **Netlify** ⭐ | `https://judo-coach-tracker.netlify.app` | Free | Connect repo → done |
-| **GitHub Pages** | `https://gaelc08.github.io/judo-coach-tracker/` | Free | Workflow included |
+| **GitHub Pages** ⭐ | `https://gaelc08.github.io/judo-coach-tracker/` | Free | Workflow included |
 | **Vercel** | `https://judo-coach-tracker.vercel.app` | Free | `npx vercel --prod` |
 
 ---
 
-**Option A — Netlify (recommended: cleanest URL, zero config)**
-
-1. Go to [app.netlify.com](https://app.netlify.com) → *Add new site* → *Import an existing project*.
-2. Connect this GitHub repository.
-3. Netlify auto-detects `netlify.toml` and sets publish directory to `public`.
-4. Click **Deploy site** — done.
-5. Optionally rename the site to `judo-coach-tracker` under *Site settings → General → Site name*.
-
-Live URL: `https://judo-coach-tracker.netlify.app`
-
----
-
-**Option B — GitHub Pages (automatic CI/CD, no external account needed)**
+**Option A — GitHub Pages (automatic CI/CD, no external account needed)**
 
 A GitHub Actions workflow is already included in `.github/workflows/deploy-pages.yml`. To activate it:
 
@@ -160,7 +146,7 @@ Live URL: `https://gaelc08.github.io/judo-coach-tracker/`
 
 ---
 
-**Option C — Vercel**
+**Option B — Vercel**
 
 ```bash
 npx vercel --prod
