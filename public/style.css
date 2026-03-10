@@ -523,6 +523,19 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   font-weight: 600;
 }
 
+/* Competition/training days override combined weekend+holiday selectors (higher specificity) */
+.calendar-day.weekend.school-holiday.has-data,
+.calendar-day.weekend.holiday.has-data {
+  background: #e8f5e9;
+  border-color: #66bb6a;
+}
+
+.calendar-day.weekend.school-holiday.has-competition,
+.calendar-day.weekend.holiday.has-competition {
+  background: #e3f2fd;
+  border-color: #42a5f5;
+}
+
 .day-number {
   font-weight: 700;
   font-size: 1rem;
