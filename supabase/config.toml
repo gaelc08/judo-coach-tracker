@@ -21,3 +21,8 @@ additional_redirect_urls = [
 # verify_jwt = false is intentional: this function serves a public static SPA
 # and does not require an authenticated Supabase session to access.
 verify_jwt = false
+
+[functions.invite-coach]
+# verify_jwt = true (default): only authenticated users can reach this function.
+# The function additionally checks that the caller has app_metadata.is_admin = true.
+verify_jwt = true

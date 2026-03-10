@@ -1,0 +1,34 @@
+name: Deploy Supabase Edge Functions
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "supabase/functions/**"
+  # Allow manual re-deployment from the Actions tab (useful for first-time setup)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Deploys the invite-coach Edge Function to the Supabase project.
+      #
+      # PREREQUISITE: add a repository secret named SUPABASE_ACCESS_TOKEN.
+      # Generate a personal access token at https://app.supabase.com/account/tokens
+      # then add it under Settings → Secrets and variables → Actions in this repo.
+      - name: Deploy invite-coach Edge Function
+        run: supabase functions deploy invite-coach --project-ref ajbpzueanpeukozjhkiv
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
