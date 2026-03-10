@@ -843,12 +843,29 @@ async function loadAllDataFromSupabase({ isAdminOverride } = {}) {
     if (res.error) throw new Error(res.error.message);
     let rows = res.data || [];
 
-    // Legacy fallback: some older rows were created with owner_uid mis-set.
-    // This fallback may still be blocked by RLS depending on policies.
+    // If no profile found by owner_uid, try to claim one by email.
+    // This handles the invitation flow: admin pre-created a profile (owner_uid = null)
+    // and the coach has now logged in for the first time after accepting the invite.
     if (rows.length === 0 && currentUser.email) {
-      res = await __restSelect('coaches', { filters: [['email', 'eq', currentUser.email]] });
-      if (res.error) throw new Error(res.error.message);
-      rows = res.data || [];
+      const claimRes = await globalThis.fetch(`${supabaseUrl}/rest/v1/rpc/claim_coach_profile`, {
+        method: 'POST',
+        headers: {
+          apikey: supabaseKey,
+          Authorization: `Bearer ${currentAccessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: '{}'
+      });
+      if (claimRes.ok) {
+        // Successfully claimed (or no unclaimed profile found — either way, re-query by owner_uid)
+        res = await __restSelect('coaches', { filters: [['owner_uid', 'eq', currentUser.id]] });
+        if (res.error) throw new Error(res.error.message);
+        rows = res.data || [];
+      } else {
+        // Log the failure but do not block the user; they simply won't have a linked profile yet.
+        const text = await claimRes.text().catch(() => '');
+        console.warn('DEBUG claim_coach_profile failed:', claimRes.status, text);
+      }
     }
 
     coaches = rows.map(d => ({ id: d.id, ...d }));
@@ -1028,9 +1045,8 @@ function setupEventListeners() {
     editMode = false;
     editingCoachId = null;
     clearCoachForm();
-    // Important: do NOT default to the admin UID.
-    // This field must be the coach's Supabase Auth user id (UUID).
     document.getElementById("coachOwnerUid").value = "";
+    document.getElementById("inviteCoach").style.display = "none";
     document.getElementById("coachModal").classList.add("active");
   };
 
@@ -1052,17 +1068,29 @@ function setupEventListeners() {
     document.getElementById("dailyAllowance").value = currentCoach.daily_allowance;
     document.getElementById("kmRate").value = currentCoach.km_rate;
     document.getElementById("coachOwnerUid").value = currentCoach.owner_uid || "";
+    // Show the invite button when the coach profile has an email (re-send invite at any time)
+    const inviteBtn = document.getElementById("inviteCoach");
+    inviteBtn.style.display = currentCoach.email ? "inline-block" : "none";
     document.getElementById("coachModal").classList.add("active");
     document.getElementById("deleteCoach").style.display = "inline-block";
   };
 
   document.getElementById("saveCoach").onclick = saveCoach;
+  document.getElementById("inviteCoach").onclick = async () => {
+    const email = document.getElementById("coachEmail").value.trim();
+    if (!email) {
+      alert("Veuillez renseigner l'adresse e-mail de l'entraîneur.");
+      return;
+    }
+    await inviteCoach(email);
+  };
   document.getElementById("cancelCoach").onclick = () => {
     document.getElementById("coachModal").classList.remove("active");
     clearCoachForm();
     editMode = false;
     editingCoachId = null;
     document.getElementById("deleteCoach").style.display = "none";
+    document.getElementById("inviteCoach").style.display = "none";
   };
 
   document.getElementById("deleteCoach").onclick = deleteCoach;
@@ -1073,6 +1101,7 @@ function setupEventListeners() {
       clearCoachForm();
       editMode = false;
       editingCoachId = null;
+      document.getElementById("inviteCoach").style.display = "none";
     }
   };
 
@@ -1218,8 +1247,8 @@ async function saveCoach() {
   
   console.log('DEBUG FORM:', {name, rate, allowance, kmRate, ownerUid});
   
-  if (!name || isNaN(rate) || isNaN(allowance) || isNaN(kmRate) || !ownerUid) {
-    alert(`Fill: name, rates numbers, ownerUid (${ownerUid})`);
+  if (!name || isNaN(rate) || isNaN(allowance) || isNaN(kmRate)) {
+    alert('Veuillez renseigner le nom et les tarifs (taux horaire, indemnité journalière, taux km).');
     return;
   }
   
@@ -1233,7 +1262,7 @@ const coachData = {
   hourly_rate: rate,          // hourly_rate
   daily_allowance: allowance,
   km_rate: kmRate,
-  owner_uid: ownerUid         // owner_uid
+  owner_uid: ownerUid || null      // owner_uid (null until the coach claims their profile)
 };
 
   console.log('DEBUG coachData:', JSON.stringify(coachData, null, 2));
@@ -1319,9 +1348,20 @@ const coachData = {
 
     document.getElementById('coachModal').classList.remove('active');
     clearCoachForm();
+    const wasNewCoach = !editMode;
     editMode = false;
     editingCoachId = null;
     updateSummary();
+
+    // Offer to send an invitation email when a new coach was created without a UUID
+    if (wasNewCoach && !ownerUid && email) {
+      const sendInvite = confirm(
+        `Profil créé avec succès.\n\nVoulez-vous envoyer une invitation par e-mail à ${email} ?\n\nL'entraîneur recevra un lien pour choisir son mot de passe et se connecter.`
+      );
+      if (sendInvite) {
+        await inviteCoach(email);
+      }
+    }
   } catch (e) {
     console.error('DEBUG SAVE ERROR:', e);
     alert('Save error: ' + e.message);
@@ -1369,6 +1409,54 @@ async function deleteCoach() {
     updateSummary();
   } catch (e) {
     alert("Error deleting coach: " + e.message);
+  }
+}
+
+/**
+ * inviteCoach — sends an invitation email to a coach using the `invite-coach`
+ * Supabase Edge Function.  The coach receives a link to set their password and
+ * log in; on first login their pre-created profile is automatically linked to
+ * their auth account via `claim_coach_profile()`.
+ *
+ * @param {string} email - The coach's email address
+ * @returns {Promise<boolean>} true on success, false on failure
+ */
+async function inviteCoach(email) {
+  if (!currentUser || !currentAccessToken) return false;
+
+  const isAdmin = await isCurrentUserAdminDB();
+  if (!isAdmin) {
+    alert("Seul un administrateur peut envoyer des invitations.");
+    return false;
+  }
+
+  try {
+    const res = await globalThis.fetch(`${supabaseUrl}/functions/v1/invite-coach`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${currentAccessToken}`,
+        'Content-Type': 'application/json',
+        'apikey': supabaseKey
+      },
+      body: JSON.stringify({
+        email,
+        redirectTo: window.location.origin + window.location.pathname
+      })
+    });
+
+    const json = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      const msg = json.error || `Erreur HTTP ${res.status}`;
+      alert(`Échec de l'invitation : ${msg}`);
+      return false;
+    }
+
+    alert(`Invitation envoyée à ${email}.\nL'entraîneur recevra un e-mail pour créer son mot de passe.`);
+    return true;
+  } catch (e) {
+    alert(`Erreur lors de l'envoi de l'invitation : ${e.message}`);
+    return false;
   }
 }
 
@@ -2229,5 +2317,6 @@ window.exportToCSV = exportToCSV;
 window.exportBackupJSON = exportBackupJSON;
 window.saveCoach = saveCoach;
 window.deleteCoach = deleteCoach;
+window.inviteCoach = inviteCoach;
 window.saveDay = saveDay;
 window.deleteDay = deleteDay;

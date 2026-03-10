@@ -153,8 +153,11 @@
       <label>Email
         <input id="coachEmail" type="email">
       </label>
-      <label for="coachOwnerUid">Owner UID (id Supabase du coach)</label>
-        <input type="text" id="coachOwnerUid" placeholder="UUID du coach">
+      <div class="field-group">
+        <label for="coachOwnerUid">UID Supabase (lien compte coach)</label>
+        <input type="text" id="coachOwnerUid" placeholder="Laissez vide — rempli automatiquement à la 1re connexion">
+        <p class="field-hint">Optionnel. Si vide, l'entraîneur sera automatiquement lié à son compte lors de sa première connexion après avoir accepté l'invitation.</p>
+      </div>
       <label>Adresse
         <input id="coachAddress" type="text">
       </label>
@@ -176,6 +179,7 @@
 
       <div class="modal-actions">
         <button id="saveCoach" class="btn-primary">Sauvegarder</button>
+        <button id="inviteCoach" class="btn-secondary" style="display:none">✉ Envoyer l'invitation</button>
         <button id="deleteCoach" class="btn-danger" style="display:none">Supprimer</button>
         <button id="cancelCoach" class="btn-secondary">Annuler</button>
       </div>
