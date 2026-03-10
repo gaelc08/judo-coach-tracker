@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'judo-coach-pwa-v3';
+const CACHE_VERSION = 'judo-coach-pwa-v4';
 const BASE_PATH = new URL('./', self.location.href).pathname;
 const INDEX_URL = `${BASE_PATH}index.html`;
 const OFFLINE_URL = `${BASE_PATH}offline.html`;
