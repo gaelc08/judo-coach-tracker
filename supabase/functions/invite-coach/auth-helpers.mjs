@@ -25,6 +25,13 @@ export function decodeJwtPayload(token) {
 }
 
 export function hasAdminClaim(token) {
-  const isAdmin = decodeJwtPayload(token)?.app_metadata?.is_admin
-  return isAdmin === true || isAdmin === 'true'
+  return isAdminValue(decodeJwtPayload(token)?.app_metadata?.is_admin)
+}
+
+export function hasAdminAccess(token, user) {
+  return hasAdminClaim(token) || isAdminValue(user?.app_metadata?.is_admin)
+}
+
+function isAdminValue(value) {
+  return value === true || value === 'true'
 }
