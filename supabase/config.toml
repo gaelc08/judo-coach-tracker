@@ -5,7 +5,7 @@ project_id = "ajbpzueanpeukozjhkiv"
 # This is used by Supabase as the default redirect destination in auth emails
 # (e.g. password-reset links).  Keep this in sync with the value set in the
 # Supabase dashboard under Authentication → URL Configuration → Site URL.
-site_url = "https://jccattenom.cantarero.fr"
+site_url = "https://jccattenom.cantarero.fr/"
 
 # Additional URLs that Supabase Auth is allowed to redirect to after an auth
 # flow (e.g. after a user clicks the password-reset link in their email).
@@ -13,6 +13,8 @@ site_url = "https://jccattenom.cantarero.fr"
 # so that the `redirectTo` parameter passed in resetPasswordForEmail() is
 # honoured.  Without a matching entry Supabase falls back to `site_url`.
 additional_redirect_urls = [
+  "https://jccattenom.cantarero.fr",
+  "https://jccattenom.cantarero.fr/",
   "https://gaelc08.github.io/judo-coach-tracker",
   "https://gaelc08.github.io/judo-coach-tracker/"
 ]

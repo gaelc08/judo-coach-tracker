@@ -8,7 +8,7 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-10-invite-jwt-2';
+const __BUILD_ID = '2026-03-10-invite-jwt-3';
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 let __deferredInstallPrompt = null;
@@ -188,15 +188,48 @@ async function debugSupabaseHealthFetch() {
 }
 
 // ===== Auth storage override (avoid getSession/storage lock hangs) =====
-// Some environments/extensions can cause session storage locking to hang forever.
-// We use an in-memory storage + disable persistence as a pragmatic workaround.
-// Tradeoff: users must log in again after a refresh.
-const __memoryAuthStorage = (() => {
+// Prefer persistent localStorage so invite / password-reset sessions survive a
+// reload, but fall back to in-memory storage if Web Storage is unavailable.
+const __authStorage = (() => {
   const store = new Map();
+  let persistentStorage = null;
+
+  try {
+    const probeKey = '__judo_coach_tracker_auth_probe__';
+    window.localStorage.setItem(probeKey, '1');
+    window.localStorage.removeItem(probeKey);
+    persistentStorage = window.localStorage;
+  } catch (_) {
+    persistentStorage = null;
+  }
+
   return {
-    getItem: (key) => (store.has(key) ? store.get(key) : null),
-    setItem: (key, value) => { store.set(key, String(value)); },
-    removeItem: (key) => { store.delete(key); }
+    getItem: (key) => {
+      try {
+        const value = persistentStorage?.getItem(key);
+        if (value != null) return value;
+      } catch (_) {
+        persistentStorage = null;
+      }
+      return store.has(key) ? store.get(key) : null;
+    },
+    setItem: (key, value) => {
+      const normalized = String(value);
+      try {
+        persistentStorage?.setItem(key, normalized);
+      } catch (_) {
+        persistentStorage = null;
+      }
+      store.set(key, normalized);
+    },
+    removeItem: (key) => {
+      try {
+        persistentStorage?.removeItem(key);
+      } catch (_) {
+        persistentStorage = null;
+      }
+      store.delete(key);
+    }
   };
 })();
 
@@ -242,10 +275,10 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
     fetch: __supabaseFetchDebugWrapped
   },
   auth: {
-    persistSession: false,
-    autoRefreshToken: false,
+    persistSession: true,
+    autoRefreshToken: true,
     detectSessionInUrl: true,
-    storage: __memoryAuthStorage,
+    storage: __authStorage,
     lock: __authNoHangLock
   }
 });
