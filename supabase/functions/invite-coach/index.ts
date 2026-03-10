@@ -26,7 +26,27 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+function jsonResponse(body: Record<string, unknown>, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
+}
+
+function buildAuthDebug(authHeader: string | null, token: string, userError?: { message?: string } | null) {
+  const authScheme = authHeader ? authHeader.split(/\s+/, 1)[0] : null
+  return {
+    hasAuthorizationHeader: !!authHeader,
+    authScheme,
+    tokenLength: token.length,
+    tokenSegments: token ? token.split('.').length : 0,
+    userError: userError?.message ?? null,
+  }
+}
+
 Deno.serve(async (req: Request): Promise<Response> => {
+  const requestId = crypto.randomUUID()
+
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -37,10 +57,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
     if (!supabaseUrl || !serviceRoleKey) {
-      return new Response(
-        JSON.stringify({ error: 'Server configuration error' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      console.error('DEBUG invite-coach missing configuration:', { requestId })
+      return jsonResponse({ error: 'Server configuration error', requestId }, 500)
     }
 
     // Create an admin client (service role — never exposed to the browser)
@@ -51,37 +69,30 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // Verify the caller is authenticated
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Missing Authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      const debug = buildAuthDebug(authHeader, '')
+      console.warn('DEBUG invite-coach missing auth header:', { requestId, debug })
+      return jsonResponse({ error: 'Missing Authorization header', requestId, debug }, 401)
     }
 
-    const token = authHeader.replace('Bearer ', '')
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader
     const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token)
     if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      const debug = buildAuthDebug(authHeader, token, userError)
+      console.warn('DEBUG invite-coach auth failed:', { requestId, debug })
+      return jsonResponse({ error: 'Unauthorized', requestId, debug }, 401)
     }
 
     // Only admins may send invitations
     const isAdmin = user.app_metadata?.is_admin === true
     if (!isAdmin) {
-      return new Response(
-        JSON.stringify({ error: 'Forbidden: admin only' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      console.warn('DEBUG invite-coach forbidden:', { requestId, userId: user.id })
+      return jsonResponse({ error: 'Forbidden: admin only', requestId }, 403)
     }
 
     // Parse request body
     const { email, redirectTo } = await req.json()
     if (!email || typeof email !== 'string') {
-      return new Response(
-        JSON.stringify({ error: 'Missing or invalid email' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return jsonResponse({ error: 'Missing or invalid email', requestId }, 400)
     }
 
     // Determine the redirect URL for the invitation link
@@ -97,20 +108,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
     )
 
     if (inviteError) {
-      return new Response(
-        JSON.stringify({ error: inviteError.message }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      console.error('DEBUG invite-coach invite failed:', { requestId, error: inviteError.message, email })
+      return jsonResponse({ error: inviteError.message, requestId }, 400)
     }
 
-    return new Response(
-      JSON.stringify({ success: true, userId: data.user?.id }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    console.log('DEBUG invite-coach success:', { requestId, email, userId: data.user?.id })
+    return jsonResponse({ success: true, userId: data.user?.id, requestId }, 200)
   } catch (e) {
-    return new Response(
-      JSON.stringify({ error: String(e) }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    console.error('DEBUG invite-coach unexpected error:', { requestId, error: String(e) })
+    return jsonResponse({ error: String(e), requestId }, 500)
   }
 })
