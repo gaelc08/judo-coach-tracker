@@ -8,7 +8,7 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-10-invite-jwt-3';
+const __BUILD_ID = '2026-03-10-invite-jwt-4';
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 let __deferredInstallPrompt = null;
@@ -298,6 +298,105 @@ let currentUser = null;
 let currentSession = null;
 let currentAccessToken = null;
 let __eventListenersSetup = false;
+
+function __safeBase64UrlDecode(value) {
+  const normalized = String(value || '').replace(/-/g, '+').replace(/_/g, '/');
+  const remainder = normalized.length % 4;
+  const padLength = remainder === 0 ? 0 : 4 - remainder;
+  const padded = normalized + '='.repeat(padLength);
+  return window.atob(padded);
+}
+
+function __maskEmail(email) {
+  if (email == null) return null;
+  const value = String(email).trim();
+  if (!value) return null;
+  const atIndex = value.indexOf('@');
+  if (atIndex <= 0) return '[invalid-email]';
+
+  const local = value.slice(0, atIndex);
+  const domain = value.slice(atIndex + 1);
+  const maskedLocal = local.length <= 2
+    ? `${local[0]}${'*'.repeat(Math.max(local.length - 1, 0))}`
+    : `${local[0]}${'*'.repeat(Math.max(local.length - 2, 1))}${local.slice(-1)}`;
+
+  return `${maskedLocal}@${domain}`;
+}
+
+function __decodeJwtPayload(token) {
+  const parts = String(token || '').split('.');
+  if (parts.length < 2) return null;
+  try {
+    return JSON.parse(__safeBase64UrlDecode(parts[1]));
+  } catch {
+    return null;
+  }
+}
+
+function __describeJwt(token) {
+  const value = String(token || '').trim();
+  if (!value) {
+    return { present: false };
+  }
+
+  const payload = __decodeJwtPayload(value);
+  const expMs = typeof payload?.exp === 'number' ? payload.exp * 1000 : null;
+
+  return {
+    present: true,
+    length: value.length,
+    segments: value.split('.').length,
+    sub: payload?.sub || null,
+    email: __maskEmail(payload?.email),
+    role: payload?.role || null,
+    aud: payload?.aud || null,
+    iss: payload?.iss || null,
+    exp: payload?.exp ?? null,
+    expIso: expMs ? new Date(expMs).toISOString() : null,
+    expired: expMs ? expMs <= Date.now() : null
+  };
+}
+
+function __collectInviteDebug({ token = currentAccessToken, inviteEmail, ...extra } = {}) {
+  return {
+    buildId: __BUILD_ID,
+    href: window.location.href,
+    currentUserId: currentUser?.id || null,
+    currentUserEmail: __maskEmail(currentUser?.email),
+    currentSessionUserId: currentSession?.user?.id || null,
+    currentSessionEmail: __maskEmail(currentSession?.user?.email),
+    sessionExpiresAt: currentSession?.expires_at || null,
+    jwt: __describeJwt(token),
+    ...extra,
+    inviteEmail: __maskEmail(inviteEmail)
+  };
+}
+
+function __getInviteDebugReport() {
+  return [
+    '=== INVITE DEBUG REPORT START ===',
+    JSON.stringify({
+      generatedAt: new Date().toISOString(),
+      debug: window.__inviteDebugLast || null
+    }, null, 2),
+    '=== INVITE DEBUG REPORT END ==='
+  ].join('\n');
+}
+
+async function __copyInviteDebugReport() {
+  const report = __getInviteDebugReport();
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(report);
+    } catch (e) {
+      console.warn('DEBUG invite report clipboard copy failed:', e);
+    }
+  }
+  return report;
+}
+
+window.__getInviteDebugReport = __getInviteDebugReport;
+window.__copyInviteDebugReport = __copyInviteDebugReport;
 
 function __normalizeMonth(value) {
   const s = String(value ?? '').trim();
@@ -751,6 +850,7 @@ function setupAuthListeners() {
     window.__lastSession = currentSession;
     if (currentAccessToken) {
       console.log('DEBUG access token present:', String(currentAccessToken).slice(0, 12) + '...');
+      console.log('DEBUG access token details:', __describeJwt(currentAccessToken));
     } else {
       console.log('DEBUG access token missing');
     }
@@ -1469,6 +1569,9 @@ async function inviteCoach(email) {
   // token, which handles the case where the access token has expired (the
   // default Supabase access token lifetime is 1 hour).
   let accessToken = currentAccessToken;
+  const inviteDebugStart = __collectInviteDebug({ inviteEmail: email, stage: 'beforeRefresh' });
+  window.__inviteDebugLast = inviteDebugStart;
+  console.log('DEBUG inviteCoach start:', inviteDebugStart);
   try {
     const { data: { session } } = await supabase.auth.refreshSession();
     if (session?.access_token) {
@@ -1487,11 +1590,17 @@ async function inviteCoach(email) {
   }
 
   if (!accessToken) {
+    const noTokenDebug = __collectInviteDebug({ inviteEmail: email, stage: 'noTokenAfterRefresh', token: accessToken });
+    window.__inviteDebugLast = noTokenDebug;
+    console.warn('DEBUG inviteCoach missing access token:', noTokenDebug);
     alert("Session expirée. Veuillez vous reconnecter.");
     return false;
   }
 
   try {
+    const inviteDebugRequest = __collectInviteDebug({ inviteEmail: email, stage: 'beforeRequest', token: accessToken });
+    window.__inviteDebugLast = inviteDebugRequest;
+    console.log('DEBUG inviteCoach request context:', inviteDebugRequest);
     const res = await globalThis.fetch(`${supabaseUrl}/functions/v1/invite-coach`, {
       method: 'POST',
       headers: {
@@ -1510,13 +1619,42 @@ async function inviteCoach(email) {
     if (!res.ok) {
       // Supabase gateway errors use "message"; function errors use "error"
       const msg = json.error || json.message || `Erreur HTTP ${res.status}`;
-      alert(`Échec de l'invitation : ${msg}`);
+      const inviteDebugFailure = {
+        ...inviteDebugRequest,
+        responseStatus: res.status,
+        responseStatusText: res.statusText,
+        responseBody: json
+      };
+      window.__inviteDebugLast = inviteDebugFailure;
+      console.error('DEBUG inviteCoach failed:', inviteDebugFailure);
+
+      const requestId = json.requestId || null;
+      const jwtDetail = json?.debug?.userError || null;
+      const extraLines = [
+        requestId ? `Référence debug : ${requestId}` : '',
+        jwtDetail ? `Détail JWT : ${jwtDetail}` : '',
+        'Console navigateur : window.__getInviteDebugReport()',
+        'Copie auto (dans la console) : await window.__copyInviteDebugReport()'
+      ].filter(Boolean);
+      const extra = extraLines.length ? `\n${extraLines.join('\n')}` : '';
+
+      console.log('DEBUG inviteCoach share commands:', {
+        print: 'window.__getInviteDebugReport()',
+        copy: 'await window.__copyInviteDebugReport()'
+      });
+      alert(`Échec de l'invitation : ${msg}${extra}`);
       return false;
     }
 
     alert(`Invitation envoyée à ${email}.\nL'entraîneur recevra un e-mail pour créer son mot de passe.`);
     return true;
   } catch (e) {
+    const inviteDebugError = {
+      ...__collectInviteDebug({ inviteEmail: email, stage: 'requestException', token: accessToken }),
+      errorMessage: e?.message || String(e)
+    };
+    window.__inviteDebugLast = inviteDebugError;
+    console.error('DEBUG inviteCoach exception:', inviteDebugError);
     const hint = e instanceof TypeError
       ? `\n\nVérifiez que la fonction Edge "invite-coach" est bien déployée sur Supabase.`
       : '';
