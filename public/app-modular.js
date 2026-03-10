@@ -1455,7 +1455,10 @@ async function inviteCoach(email) {
     alert(`Invitation envoyée à ${email}.\nL'entraîneur recevra un e-mail pour créer son mot de passe.`);
     return true;
   } catch (e) {
-    alert(`Erreur lors de l'envoi de l'invitation : ${e.message}`);
+    const hint = e instanceof TypeError
+      ? `\n\nVérifiez que la fonction Edge "invite-coach" est bien déployée sur Supabase.`
+      : '';
+    alert(`Erreur lors de l'envoi de l'invitation : ${e.message}${hint}`);
     return false;
   }
 }
