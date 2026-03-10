@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { decodeJwtPayload, hasAdminClaim } from './auth-helpers.mjs'
+import { decodeJwtPayload, hasAdminAccess, hasAdminClaim } from './auth-helpers.mjs'
 
 function encodeBase64Url(value) {
   return Buffer.from(value, 'utf8')
@@ -42,4 +42,18 @@ test('hasAdminClaim accepts the string form used by some JWT serializers', () =>
   const token = createJwt({ app_metadata: { is_admin: 'true' } })
 
   assert.equal(hasAdminClaim(token), true)
+})
+
+test('hasAdminAccess accepts a fresh admin flag from the auth user when the JWT claim is missing', () => {
+  const token = createJwt({ app_metadata: {} })
+  const user = { app_metadata: { is_admin: true } }
+
+  assert.equal(hasAdminAccess(token, user), true)
+})
+
+test('hasAdminAccess rejects callers when neither the JWT nor auth user is admin', () => {
+  const token = createJwt({ app_metadata: {} })
+  const user = { app_metadata: { is_admin: false } }
+
+  assert.equal(hasAdminAccess(token, user), false)
 })
