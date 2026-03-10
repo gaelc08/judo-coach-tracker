@@ -225,6 +225,8 @@ The migrations set up, in order:
 | `20240101000000_create_justifications_bucket.sql` | `justifications` storage bucket + RLS policies |
 | `20250101000000_create_is_admin_function.sql` | `public.is_admin()` function used by RLS and the admin RPC check |
 | `20260309150000_create_frozen_timesheets.sql` | `frozen_timesheets` table + RLS policies |
+| `20260310000000_add_coach_invite_support.sql` | `claim_coach_profile()` function — lets a coach atomically claim a profile with `owner_uid = NULL` on first login |
+| `20260310120000_fix_coaches_rls_for_invite_flow.sql` | Replaces `coaches` table RLS policies so admins can INSERT profiles with `owner_uid = NULL` (required for the invitation flow) |
 
 #### Marking a user as admin
 
@@ -247,6 +249,10 @@ The `is_admin()` function reads the `is_admin` flag from the user's `app_metadat
 > **Troubleshooting — "Bucket not found" error when viewing a receipt**
 >
 > This error means the `justifications` bucket does not exist (or was deleted) in your Supabase project.  Run the `20240101000000_create_justifications_bucket.sql` migration to recreate it.
+
+> **Troubleshooting — Admin cannot create a new coach (save returns no data / RLS error)**
+>
+> The `coaches` table RLS INSERT policy may still require `owner_uid = auth.uid()`, which rejects inserts with `owner_uid = NULL`.  Apply `20260310120000_fix_coaches_rls_for_invite_flow.sql` to replace the policies with ones that allow admins to insert profiles with a null owner UID.
 
 ---
 
