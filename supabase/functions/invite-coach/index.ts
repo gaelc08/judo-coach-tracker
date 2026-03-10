@@ -45,10 +45,11 @@ function buildAuthDebug(authHeader: string | null, token: string, userError?: { 
 }
 
 function maskEmail(email: string | null | undefined): string | null {
-  const value = String(email ?? '').trim()
+  if (email == null) return null
+  const value = String(email).trim()
   if (!value) return null
   const atIndex = value.indexOf('@')
-  if (atIndex <= 0) return value
+  if (atIndex <= 0) return '[invalid-email]'
 
   const local = value.slice(0, atIndex)
   const domain = value.slice(atIndex + 1)

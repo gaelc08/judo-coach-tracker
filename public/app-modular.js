@@ -308,10 +308,11 @@ function __safeBase64UrlDecode(value) {
 }
 
 function __maskEmail(email) {
-  const value = String(email || '').trim();
+  if (email == null) return null;
+  const value = String(email).trim();
   if (!value) return null;
   const atIndex = value.indexOf('@');
-  if (atIndex <= 0) return value;
+  if (atIndex <= 0) return '[invalid-email]';
 
   const local = value.slice(0, atIndex);
   const domain = value.slice(atIndex + 1);
@@ -385,7 +386,11 @@ function __getInviteDebugReport() {
 async function __copyInviteDebugReport() {
   const report = __getInviteDebugReport();
   if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(report);
+    try {
+      await navigator.clipboard.writeText(report);
+    } catch (e) {
+      console.warn('DEBUG invite report clipboard copy failed:', e);
+    }
   }
   return report;
 }
@@ -1628,11 +1633,15 @@ async function inviteCoach(email) {
       const extraLines = [
         requestId ? `Référence debug : ${requestId}` : '',
         jwtDetail ? `Détail JWT : ${jwtDetail}` : '',
-        'Console navigateur : window.__getInviteDebugReport()'
+        'Console navigateur : window.__getInviteDebugReport()',
+        'Copie auto (dans la console) : await window.__copyInviteDebugReport()'
       ].filter(Boolean);
       const extra = extraLines.length ? `\n${extraLines.join('\n')}` : '';
 
-      console.log('DEBUG inviteCoach share command:', 'window.__getInviteDebugReport()');
+      console.log('DEBUG inviteCoach share commands:', {
+        print: 'window.__getInviteDebugReport()',
+        copy: 'await window.__copyInviteDebugReport()'
+      });
       alert(`Échec de l'invitation : ${msg}${extra}`);
       return false;
     }
