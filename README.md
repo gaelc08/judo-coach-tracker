@@ -188,6 +188,26 @@ Required Supabase resources:
 3. **Storage** — create a public bucket named `justifications` for toll receipt uploads (see below).
 4. **Row-Level Security** — configure RLS policies so each coach can only access their own rows.
 
+#### Configuring the Site URL (required for password-reset emails)
+
+Supabase embeds its configured **Site URL** into every auth email it sends (including password-reset links).  If this value is wrong, reset links will point to the wrong domain.
+
+1. Open the [Supabase dashboard](https://app.supabase.com) → your project → **Authentication** → **URL Configuration**.
+2. Set **Site URL** to `https://jccattenom.cantarero.fr` (or your actual deployment URL).
+3. Under **Redirect URLs**, add every additional origin the app may be served from, e.g.:
+   - `https://gaelc08.github.io/judo-coach-tracker`
+   - `https://gaelc08.github.io/judo-coach-tracker/`
+4. Save.
+
+These values are mirrored in `supabase/config.toml` (`[auth]` section) so that the Supabase CLI can push them:
+
+```bash
+supabase link --project-ref <your-project-ref>
+supabase config push
+```
+
+> **Why this matters**: the application calls `supabase.auth.resetPasswordForEmail()` with a `redirectTo` value equal to the current page URL.  Supabase will only honour that redirect URL if it matches one of the registered Redirect URLs above; otherwise it falls back to the Site URL.
+
 #### Applying database migrations
 
 The `supabase/migrations/` folder contains SQL migrations that must be applied to your Supabase project.  Run them all at once with the Supabase CLI:
