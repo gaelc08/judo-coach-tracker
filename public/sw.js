@@ -1,4 +1,5 @@
-const CACHE_VERSION = 'judo-coach-pwa-v4';
+const CACHE_VERSION = 'judo-coach-pwa-v5';
+const APP_BUILD_ID = '2026-03-10-invite-jwt-2';
 const BASE_PATH = new URL('./', self.location.href).pathname;
 const INDEX_URL = `${BASE_PATH}index.html`;
 const OFFLINE_URL = `${BASE_PATH}offline.html`;
@@ -6,7 +7,7 @@ const APP_SHELL = [
   BASE_PATH,
   INDEX_URL,
   `${BASE_PATH}style.css`,
-  `${BASE_PATH}app-modular.js`,
+  `${BASE_PATH}app-modular.js?v=${APP_BUILD_ID}`,
   `${BASE_PATH}manifest.webmanifest`,
   `${BASE_PATH}logo-jcc.png`,
   OFFLINE_URL
