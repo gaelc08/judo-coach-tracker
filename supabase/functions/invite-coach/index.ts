@@ -20,6 +20,7 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { hasAdminClaim } from './auth-helpers.mjs'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -99,9 +100,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     // Only admins may send invitations
-    const isAdmin = user.app_metadata?.is_admin === true
+    const isAdmin = hasAdminClaim(token)
     if (!isAdmin) {
-      console.warn('DEBUG invite-coach forbidden:', { requestId, userId: user.id })
+      console.warn('DEBUG invite-coach forbidden:', {
+        requestId,
+        userId: user.id,
+        userAppMetadataIsAdmin: user.app_metadata?.is_admin ?? null,
+      })
       return jsonResponse({ error: 'Forbidden: admin only', requestId }, 403)
     }
 
