@@ -39,9 +39,24 @@ function buildAuthDebug(authHeader: string | null, token: string, userError?: { 
     hasAuthorizationHeader: !!authHeader,
     authScheme,
     tokenLength: token.length,
-    tokenSegments: token ? token.split('.').length : 0,
+    tokenSegments: token.split('.').length,
     userError: userError?.message ?? null,
   }
+}
+
+function maskEmail(email: string | null | undefined): string | null {
+  const value = String(email ?? '').trim()
+  if (!value) return null
+  const atIndex = value.indexOf('@')
+  if (atIndex <= 0) return value
+
+  const local = value.slice(0, atIndex)
+  const domain = value.slice(atIndex + 1)
+  const maskedLocal = local.length <= 2
+    ? `${local[0]}${'*'.repeat(Math.max(local.length - 1, 0))}`
+    : `${local[0]}${'*'.repeat(Math.max(local.length - 2, 1))}${local.slice(-1)}`
+
+  return `${maskedLocal}@${domain}`
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
@@ -108,11 +123,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
     )
 
     if (inviteError) {
-      console.error('DEBUG invite-coach invite failed:', { requestId, error: inviteError.message, email })
+      console.error('DEBUG invite-coach invite failed:', { requestId, error: inviteError.message, email: maskEmail(email) })
       return jsonResponse({ error: inviteError.message, requestId }, 400)
     }
 
-    console.log('DEBUG invite-coach success:', { requestId, email, userId: data.user?.id })
+    console.log('DEBUG invite-coach success:', { requestId, email: maskEmail(email), userId: data.user?.id })
     return jsonResponse({ success: true, userId: data.user?.id, requestId }, 200)
   } catch (e) {
     console.error('DEBUG invite-coach unexpected error:', { requestId, error: String(e) })

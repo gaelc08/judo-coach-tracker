@@ -301,8 +301,25 @@ let __eventListenersSetup = false;
 
 function __safeBase64UrlDecode(value) {
   const normalized = String(value || '').replace(/-/g, '+').replace(/_/g, '/');
-  const padded = normalized + '='.repeat((4 - (normalized.length % 4 || 4)) % 4);
+  const remainder = normalized.length % 4;
+  const padLength = remainder === 0 ? 0 : 4 - remainder;
+  const padded = normalized + '='.repeat(padLength);
   return window.atob(padded);
+}
+
+function __maskEmail(email) {
+  const value = String(email || '').trim();
+  if (!value) return null;
+  const atIndex = value.indexOf('@');
+  if (atIndex <= 0) return value;
+
+  const local = value.slice(0, atIndex);
+  const domain = value.slice(atIndex + 1);
+  const maskedLocal = local.length <= 2
+    ? `${local[0]}${'*'.repeat(Math.max(local.length - 1, 0))}`
+    : `${local[0]}${'*'.repeat(Math.max(local.length - 2, 1))}${local.slice(-1)}`;
+
+  return `${maskedLocal}@${domain}`;
 }
 
 function __decodeJwtPayload(token) {
@@ -329,7 +346,7 @@ function __describeJwt(token) {
     length: value.length,
     segments: value.split('.').length,
     sub: payload?.sub || null,
-    email: payload?.email || null,
+    email: __maskEmail(payload?.email),
     role: payload?.role || null,
     aud: payload?.aud || null,
     iss: payload?.iss || null,
@@ -339,17 +356,18 @@ function __describeJwt(token) {
   };
 }
 
-function __collectInviteDebug({ token = currentAccessToken, ...extra } = {}) {
+function __collectInviteDebug({ token = currentAccessToken, inviteEmail, ...extra } = {}) {
   return {
     buildId: __BUILD_ID,
     href: window.location.href,
     currentUserId: currentUser?.id || null,
-    currentUserEmail: currentUser?.email || null,
+    currentUserEmail: __maskEmail(currentUser?.email),
     currentSessionUserId: currentSession?.user?.id || null,
-    currentSessionEmail: currentSession?.user?.email || null,
+    currentSessionEmail: __maskEmail(currentSession?.user?.email),
     sessionExpiresAt: currentSession?.expires_at || null,
     jwt: __describeJwt(token),
-    ...extra
+    ...extra,
+    inviteEmail: __maskEmail(inviteEmail)
   };
 }
 
