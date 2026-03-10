@@ -23,6 +23,8 @@ additional_redirect_urls = [
 verify_jwt = false
 
 [functions.invite-coach]
-# verify_jwt = true (default): only authenticated users can reach this function.
-# The function additionally checks that the caller has app_metadata.is_admin = true.
-verify_jwt = true
+# verify_jwt = false: JWT verification is handled inside the function itself via
+# supabaseAdmin.auth.getUser(token).  The gateway-level check (verify_jwt = true)
+# was causing "Invalid JWT" errors when the client's autoRefreshToken is disabled
+# and the token had expired before reaching the function.
+verify_jwt = false
