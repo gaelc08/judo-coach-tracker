@@ -348,6 +348,7 @@ function __describeJwt(token) {
     segments: value.split('.').length,
     sub: payload?.sub || null,
     email: __maskEmail(payload?.email),
+    appMetadataIsAdmin: payload?.app_metadata?.is_admin ?? null,
     role: payload?.role || null,
     aud: payload?.aud || null,
     iss: payload?.iss || null,
@@ -355,6 +356,11 @@ function __describeJwt(token) {
     expIso: expMs ? new Date(expMs).toISOString() : null,
     expired: expMs ? expMs <= Date.now() : null
   };
+}
+
+function __hasAdminClaim(token) {
+  const isAdmin = __decodeJwtPayload(token)?.app_metadata?.is_admin;
+  return isAdmin === true || isAdmin === 'true';
 }
 
 function __collectInviteDebug({ token = currentAccessToken, inviteEmail, ...extra } = {}) {
@@ -1569,14 +1575,20 @@ async function inviteCoach(email) {
   // token, which handles the case where the access token has expired (the
   // default Supabase access token lifetime is 1 hour).
   let accessToken = currentAccessToken;
+  const currentTokenHasAdminClaim = __hasAdminClaim(accessToken);
   const inviteDebugStart = __collectInviteDebug({ inviteEmail: email, stage: 'beforeRefresh' });
   window.__inviteDebugLast = inviteDebugStart;
   console.log('DEBUG inviteCoach start:', inviteDebugStart);
   try {
     const { data: { session } } = await supabase.auth.refreshSession();
     if (session?.access_token) {
-      accessToken = session.access_token;
-      currentAccessToken = accessToken;
+      const refreshedAccessToken = session.access_token;
+      if (currentTokenHasAdminClaim && !__hasAdminClaim(refreshedAccessToken)) {
+        console.warn('DEBUG inviteCoach keeping current token because refreshed token lost admin claim');
+      } else {
+        accessToken = refreshedAccessToken;
+        currentAccessToken = accessToken;
+      }
     } else {
       // refreshSession() returned no session; fall back to getSession() in case
       // the current token is still valid (e.g. refresh token already consumed).
