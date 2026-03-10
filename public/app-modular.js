@@ -1422,7 +1422,7 @@ async function deleteCoach() {
  * @returns {Promise<boolean>} true on success, false on failure
  */
 async function inviteCoach(email) {
-  if (!currentUser || !currentAccessToken) return false;
+  if (!currentUser) return false;
 
   const isAdmin = await isCurrentUserAdminDB();
   if (!isAdmin) {
@@ -1430,11 +1430,28 @@ async function inviteCoach(email) {
     return false;
   }
 
+  // Always fetch the freshest access token so the Edge Function call is not
+  // rejected with HTTP 401 due to a stale token cached in currentAccessToken.
+  let accessToken = currentAccessToken;
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      accessToken = session.access_token;
+    }
+  } catch (_) {
+    // Fall back to currentAccessToken if getSession() unexpectedly throws
+  }
+
+  if (!accessToken) {
+    alert("Session expirée. Veuillez vous reconnecter.");
+    return false;
+  }
+
   try {
     const res = await globalThis.fetch(`${supabaseUrl}/functions/v1/invite-coach`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${currentAccessToken}`,
+        'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
         'apikey': supabaseKey
       },
@@ -1447,7 +1464,8 @@ async function inviteCoach(email) {
     const json = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      const msg = json.error || `Erreur HTTP ${res.status}`;
+      // Supabase gateway errors use "message"; function errors use "error"
+      const msg = json.error || json.message || `Erreur HTTP ${res.status}`;
       alert(`Échec de l'invitation : ${msg}`);
       return false;
     }
