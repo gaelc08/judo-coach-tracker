@@ -12,6 +12,7 @@ A web application for tracking judo coach training hours, competition days, mile
   - [Prerequisites](#prerequisites)
   - [Running Locally](#running-locally)
   - [Deployment](#deployment)
+    - [Deploying Edge Functions](#deploying-the-supabase-edge-functions)
 - [Configuration](#configuration)
   - [Supabase Setup](#supabase-setup)
 - [Data Models](#data-models)
@@ -85,7 +86,8 @@ No build tool or bundler is required — the application is served directly as s
 judo-coach-tracker/
 ├── .github/
 │   └── workflows/
-│       └── deploy-pages.yml  # GitHub Pages auto-deploy on push to main
+│       ├── deploy-pages.yml          # GitHub Pages auto-deploy on push to main
+│       └── deploy-supabase.yml       # Supabase Edge Functions deploy on push to main
 ├── public/
 │   ├── index.html        # Application entry point
 │   ├── app-modular.js    # Application logic (Supabase)
@@ -167,6 +169,24 @@ cd public && python -m http.server 8000
 # Using Node.js
 npx http-server public -p 8000
 ```
+
+---
+
+#### Deploying the Supabase Edge Functions
+
+A GitHub Actions workflow (`.github/workflows/deploy-supabase.yml`) automatically deploys the `invite-coach` Edge Function whenever code under `supabase/functions/` is pushed to `main`.
+
+The workflow authenticates with Supabase using a personal access token stored as a GitHub Actions secret.  You must add this secret once before the workflow can succeed:
+
+1. Generate a personal access token at <https://app.supabase.com/account/tokens>.
+2. In this repository, go to **Settings** → **Secrets and variables** → **Actions**.
+3. Click **New repository secret**.
+4. Name: `SUPABASE_ACCESS_TOKEN` — Value: the token you generated above.
+5. Click **Add secret**.
+
+After adding the secret, re-run the failed workflow from the **Actions** tab (select the run → **Re-run all jobs**) or push a change to `supabase/functions/` to trigger a fresh deploy.
+
+> **Note**: without this secret the deploy step will fail with *"Access token not provided"*.
 
 ---
 
