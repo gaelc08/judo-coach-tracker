@@ -244,7 +244,7 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
     persistSession: false,
     autoRefreshToken: false,
-    detectSessionInUrl: false,
+    detectSessionInUrl: true,
     storage: __memoryAuthStorage,
     lock: __authNoHangLock
   }
@@ -701,7 +701,9 @@ function setupAuthListeners() {
       return;
     }
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + window.location.pathname
+      });
       if (error) throw error;
       alert("Password reset email sent. Check your inbox.");
     } catch (e) {
@@ -719,6 +721,31 @@ function setupAuthListeners() {
     } else {
       console.log('DEBUG access token missing');
     }
+
+    // Handle password recovery: show reset form instead of the main app
+    if (event === 'PASSWORD_RECOVERY') {
+      document.getElementById("passwordResetModal").classList.add("active");
+      // Use onclick assignment (not addEventListener) so re-fires replace the handler cleanly.
+      document.getElementById("updatePasswordBtn").onclick = async () => {
+        const newPass = document.getElementById("newPasswordInput").value;
+        const confirmPass = document.getElementById("confirmPasswordInput").value;
+        if (!newPass) { alert("Veuillez saisir un nouveau mot de passe."); return; }
+        if (newPass.length < 8) { alert("Le mot de passe doit contenir au moins 8 caractères."); return; }
+        if (newPass !== confirmPass) { alert("Les mots de passe ne correspondent pas."); return; }
+        const { error } = await supabase.auth.updateUser({ password: newPass });
+        if (error) {
+          alert(error.message);
+        } else {
+          document.getElementById("newPasswordInput").value = "";
+          document.getElementById("confirmPasswordInput").value = "";
+          document.getElementById("passwordResetModal").classList.remove("active");
+          alert("Mot de passe mis à jour avec succès. Veuillez vous reconnecter.");
+          await supabase.auth.signOut();
+        }
+      };
+      return;
+    }
+
     const user = session?.user;
     const select = document.getElementById("coachSelect");
 

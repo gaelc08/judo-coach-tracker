@@ -298,6 +298,23 @@
     </div>
   </div>
 
+  <!-- Password reset modal (shown after clicking the reset link in the email) -->
+  <div id="passwordResetModal" class="modal">
+    <div class="modal-content">
+      <h2>🔑 Nouveau mot de passe</h2>
+      <p>Saisissez votre nouveau mot de passe.</p>
+      <label>Nouveau mot de passe
+        <input id="newPasswordInput" type="password" placeholder="Nouveau mot de passe">
+      </label>
+      <label>Confirmer le mot de passe
+        <input id="confirmPasswordInput" type="password" placeholder="Confirmer le mot de passe">
+      </label>
+      <div class="modal-actions">
+        <button id="updatePasswordBtn" class="btn-primary">Mettre à jour</button>
+      </div>
+    </div>
+  </div>
+
   <script type="module" src="app-modular.js"></script>
 </body>
 </html>
