@@ -8,7 +8,7 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-11-expense-report-2';
+const __BUILD_ID = '2026-03-11-expense-report-4';
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 let __deferredInstallPrompt = null;
@@ -492,7 +492,7 @@ function __getMileageScaleDescription(fiscalPower) {
 
   const scale = __MILEAGE_SCALE[band];
   const bandLabel = band === 3 ? '3 CV et moins' : (band === 7 ? '7 CV et plus' : `${band} CV`);
-  return `${bandLabel} — jusqu'à 5 000 km : ${__formatNumberFr(scale.upTo5000)} €/km ; de 5 001 à 20 000 km : ${__formatNumberFr(scale.midRate)} €/km + ${scale.midFixed} € ; au-delà de 20 000 km : ${__formatNumberFr(scale.over20000)} €/km`;
+  return `${bandLabel} — jusqu'à 5 000 km : ${__formatNumberFr(scale.upTo5000)} €/km`;
 }
 
 function __calculateAnnualMileageAmount(distanceKm, fiscalPower) {
@@ -1264,6 +1264,8 @@ async function loadAllDataFromSupabase({ isAdminOverride } = {}) {
       justificationUrl: data.justification_url || "",
       hotel: data.hotel || 0,
       hotelJustificationUrl: data.hotel_justification_url || "",
+      achat: data.achat || 0,
+      achatJustificationUrl: data.achat_justification_url || "",
       coachId: data.coach_id || null,
       ownerUid: data.owner_uid || null,
       ownerEmail: data.owner_email || null,
@@ -2186,6 +2188,8 @@ function openDayModal(dateStr) {
       justificationUrl: "",
       hotel: 0,
       hotelJustificationUrl: "",
+      achat: 0,
+      achatJustificationUrl: "",
       ownerUid: currentUser ? currentUser.id : null,
       ownerEmail: currentUser ? currentUser.email : null
     };
@@ -2202,8 +2206,10 @@ function openDayModal(dateStr) {
   document.getElementById("arrivalPlace").value = dayData.arrivalPlace || "";
   document.getElementById("peage").value = dayData.peage || 0;
   document.getElementById("hotel").value = dayData.hotel || 0;
+  document.getElementById("achat").value = dayData.achat || 0;
   document.getElementById("peageJustification").value = "";
   document.getElementById("hotelJustification").value = "";
+  document.getElementById("achatJustification").value = "";
 
   const existingPeageJustification = document.getElementById("existingPeageJustification");
   const peageJustificationLink = document.getElementById("peageJustificationLink");
@@ -2221,6 +2227,15 @@ function openDayModal(dateStr) {
     existingHotelJustification.style.display = "block";
   } else {
     existingHotelJustification.style.display = "none";
+  }
+
+  const existingAchatJustification = document.getElementById("existingAchatJustification");
+  const achatJustificationLink = document.getElementById("achatJustificationLink");
+  if (dayData.achatJustificationUrl) {
+    achatJustificationLink.href = dayData.achatJustificationUrl;
+    existingAchatJustification.style.display = "block";
+  } else {
+    existingAchatJustification.style.display = "none";
   }
 
   document.getElementById("travelGroup").style.display = dayData.competition
@@ -2252,14 +2267,17 @@ async function saveDay() {
   const arrivalPlace = document.getElementById("arrivalPlace").value.trim();
   const peage = parseFloat(document.getElementById("peage").value) || 0;
   const hotel = parseFloat(document.getElementById("hotel").value) || 0;
+  const achat = parseFloat(document.getElementById("achat").value) || 0;
   const peageFile = document.getElementById("peageJustification").files[0];
   const hotelFile = document.getElementById("hotelJustification").files[0];
+  const achatFile = document.getElementById("achatJustification").files[0];
 
   const key = `${currentCoach.id}-${selectedDay}`;
   const existing = timeData[key];
 
   let justificationUrl = existing ? existing.justificationUrl || "" : "";
   let hotelJustificationUrl = existing ? existing.hotelJustificationUrl || "" : "";
+  let achatJustificationUrl = existing ? existing.achatJustificationUrl || "" : "";
 
   if (peageFile) {
     try {
@@ -2279,7 +2297,16 @@ async function saveDay() {
     }
   }
 
-  if (hours === 0 && !competition && km === 0 && !description && peage === 0 && hotel === 0) {
+  if (achatFile) {
+    try {
+      achatJustificationUrl = await __uploadExpenseJustification(achatFile, 'achat');
+    } catch (e) {
+      alert("Erreur lors de l'upload du justificatif d'achat: " + e.message);
+      return;
+    }
+  }
+
+  if (hours === 0 && !competition && km === 0 && !description && peage === 0 && hotel === 0 && achat === 0) {
     if (existing && existing.id) {
       const { error } = await supabase.from('time_data').delete().eq('id', existing.id);
       if (error) throw error;
@@ -2300,8 +2327,10 @@ async function saveDay() {
       arrival_place: arrivalPlace,
       peage,
       hotel,
+      achat,
       justification_url: justificationUrl,
       hotel_justification_url: hotelJustificationUrl,
+      achat_justification_url: achatJustificationUrl,
       owner_uid: ownerUidForRow,
       owner_email: ownerEmailForRow
     };
@@ -2319,6 +2348,8 @@ async function saveDay() {
         justificationUrl,
         hotel,
         hotelJustificationUrl,
+        achat,
+        achatJustificationUrl,
         coachId: currentCoach.id,
         ownerUid: ownerUidForRow,
         ownerEmail: ownerEmailForRow,
@@ -2338,6 +2369,8 @@ async function saveDay() {
         justificationUrl,
         hotel,
         hotelJustificationUrl,
+        achat,
+        achatJustificationUrl,
         coachId: currentCoach.id,
         ownerUid: ownerUidForRow,
         ownerEmail: ownerEmailForRow,
@@ -2386,6 +2419,7 @@ function updateSummary() {
     document.getElementById("kmPayment").textContent = "€0.00";
     document.getElementById("tollPayment").textContent = "€0.00";
     document.getElementById("hotelPayment").textContent = "€0.00";
+    document.getElementById("purchasePayment").textContent = "€0.00";
     document.getElementById("totalPayment").textContent = "€0.00";
     return;
   }
@@ -2395,6 +2429,7 @@ function updateSummary() {
   let compDays = 0;
   let tollPayment = 0;
   let hotelPayment = 0;
+  let purchasePayment = 0;
   const mileageBreakdown = __getMonthlyMileageBreakdown(currentCoach, currentMonth);
   const totalKm = mileageBreakdown.totalKm;
 
@@ -2405,13 +2440,14 @@ function updateSummary() {
       if (data.competition) compDays++;
       tollPayment += data.peage || 0;
       hotelPayment += data.hotel || 0;
+      purchasePayment += data.achat || 0;
     }
   });
 
   const trainingPayment = totalHours * currentCoach.hourly_rate;
   const compPayment = compDays * currentCoach.daily_allowance;
   const kmPayment = mileageBreakdown.totalAmount;
-  const totalPayment = trainingPayment + compPayment + kmPayment + tollPayment + hotelPayment;
+  const totalPayment = trainingPayment + compPayment + kmPayment + tollPayment + hotelPayment + purchasePayment;
 
   document.getElementById("totalHours").textContent = totalHours.toFixed(1);
   document.getElementById(
@@ -2430,6 +2466,7 @@ function updateSummary() {
   ).textContent = `€${kmPayment.toFixed(2)}`;
   document.getElementById("tollPayment").textContent = `€${tollPayment.toFixed(2)}`;
   document.getElementById("hotelPayment").textContent = `€${hotelPayment.toFixed(2)}`;
+  document.getElementById("purchasePayment").textContent = `€${purchasePayment.toFixed(2)}`;
   document.getElementById(
     "totalPayment"
   ).textContent = `€${totalPayment.toFixed(2)}`;
@@ -2444,7 +2481,7 @@ function exportToCSV() {
   const [year, month] = currentMonth.split("-");
   const mileageBreakdown = __getMonthlyMileageBreakdown(currentCoach, currentMonth);
   let csv =
-    "Date,Training Hours,Competition,Competition Description,Kilometers,Tolls,Hotel,Km Reimbursement,Total Payment\n";
+    "Date,Training Hours,Competition,Competition Description,Kilometers,Tolls,Hotel,Purchase,Km Reimbursement,Total Payment\n";
 
   Object.keys(timeData)
     .filter((key) => key.startsWith(`${currentCoach.id}-${year}-${month}`))
@@ -2458,10 +2495,11 @@ function exportToCSV() {
         (data.competition ? currentCoach.daily_allowance : 0) +
         mileageAmount +
         (data.peage || 0) +
-        (data.hotel || 0);
+        (data.hotel || 0) +
+        (data.achat || 0);
       csv +=
         `${date},${data.hours},${data.competition ? "Yes" : "No"},` +
-        `"${data.description || ""}",${data.km},${(data.peage || 0).toFixed(2)},${(data.hotel || 0).toFixed(2)},€${mileageAmount.toFixed(2)},€${payment.toFixed(2)}\n`;
+        `"${data.description || ""}",${data.km},${(data.peage || 0).toFixed(2)},${(data.hotel || 0).toFixed(2)},${(data.achat || 0).toFixed(2)},€${mileageAmount.toFixed(2)},€${payment.toFixed(2)}\n`;
     });
 
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
@@ -2488,6 +2526,29 @@ function __downloadBlob(blob, fileName) {
 function __closeMileagePreviewModal() {
   const modal = document.getElementById('mileagePreviewModal');
   if (modal) modal.classList.remove('active');
+}
+
+function __getMonthlyExpenseReceiptIssues(coachId, year, month) {
+  const issues = [];
+
+  Object.keys(timeData)
+    .filter((key) => key.startsWith(`${coachId}-${year}-${month}`))
+    .sort()
+    .forEach((key) => {
+      const date = key.split("-").slice(-3).join("-");
+      const data = timeData[key] || {};
+      const missing = [];
+
+      if ((data.peage || 0) > 0 && !data.justificationUrl) missing.push('péage');
+      if ((data.hotel || 0) > 0 && !data.hotelJustificationUrl) missing.push('hôtel');
+      if ((data.achat || 0) > 0 && !data.achatJustificationUrl) missing.push('achat');
+
+      if (missing.length) {
+        issues.push({ date, missing });
+      }
+    });
+
+  return issues;
 }
 
 function __showMileagePreviewModal(html, fileName) {
@@ -2553,6 +2614,15 @@ function exportExpenseHTML() {
   const [year, month] = currentMonth.split("-");
   const today = new Date().toLocaleDateString("fr-FR");
   const mileageBreakdown = __getMonthlyMileageBreakdown(currentCoach, currentMonth);
+  const receiptIssues = __getMonthlyExpenseReceiptIssues(currentCoach.id, year, month);
+
+  if (receiptIssues.length) {
+    const details = receiptIssues
+      .map((issue) => `- ${issue.date} : justificatif manquant pour ${issue.missing.join(', ')}`)
+      .join('\n');
+    alert(`Impossible d'exporter la note de frais.\nAjoutez les justificatifs obligatoires pour :\n${details}`);
+    return;
+  }
 
   const rows = [];
   let total = 0;
@@ -2563,10 +2633,10 @@ function exportExpenseHTML() {
     .forEach((key) => {
       const date = key.split("-").slice(-3).join("-");
       const data = timeData[key];
-      const hasExpense = (data.km || 0) > 0 || (data.peage || 0) > 0 || (data.hotel || 0) > 0;
+      const hasExpense = (data.km || 0) > 0 || (data.peage || 0) > 0 || (data.hotel || 0) > 0 || (data.achat || 0) > 0;
       if (!hasExpense) return;
       const mileage = mileageBreakdown.byKey[key] || { amount: 0, effectiveRate: 0 };
-      const amount = mileage.amount + (data.peage || 0) + (data.hotel || 0);
+      const amount = mileage.amount + (data.peage || 0) + (data.hotel || 0) + (data.achat || 0);
       total += amount;
       rows.push({
         date,
@@ -2574,6 +2644,7 @@ function exportExpenseHTML() {
         mileageAmount: mileage.amount,
         tollAmount: data.peage || 0,
         hotelAmount: data.hotel || 0,
+        purchaseAmount: data.achat || 0,
         amount,
         effectiveRate: mileage.effectiveRate,
       });
@@ -2589,8 +2660,8 @@ function exportExpenseHTML() {
   const totalMileageAmount = rows.reduce((sum, row) => sum + (row.mileageAmount || 0), 0);
   const totalTollAmount = rows.reduce((sum, row) => sum + (row.tollAmount || 0), 0);
   const totalHotelAmount = rows.reduce((sum, row) => sum + (row.hotelAmount || 0), 0);
+  const totalPurchaseAmount = rows.reduce((sum, row) => sum + (row.purchaseAmount || 0), 0);
   const totalMileageKm = rows.reduce((sum, row) => sum + (Number(row.km) || 0), 0);
-  const averageMileageRate = totalMileageKm > 0 ? totalMileageAmount / totalMileageKm : 0;
   const mileageScaleDescription = __getMileageScaleDescription(currentCoach.fiscal_power);
 
   const html = `
@@ -2780,7 +2851,7 @@ function exportExpenseHTML() {
 
   .summary-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 12px;
   }
 
@@ -2989,7 +3060,7 @@ function exportExpenseHTML() {
           <div class="info-list">
             <div class="info-row"><span class="label">Véhicule</span><span class="value">${currentCoach.vehicle || "Non renseigné"}</span></div>
             <div class="info-row"><span class="label">Puissance fiscale</span><span class="value">${currentCoach.fiscal_power || "Non renseignée"} CV</span></div>
-            <div class="info-row"><span class="label">Barème appliqué</span><span class="value">${mileageScaleDescription}${totalMileageKm > 0 ? ` — taux moyen constaté sur cette note : ${__formatNumberFr(averageMileageRate)} €/km` : ''}</span></div>
+            <div class="info-row"><span class="label">Barème appliqué</span><span class="value">${mileageScaleDescription}</span></div>
             <div class="info-row"><span class="label">Mois concerné</span><span class="value">${month}/${year}</span></div>
           </div>
         </section>
@@ -3009,6 +3080,10 @@ function exportExpenseHTML() {
           <div class="summary-card">
             <span class="label">Hôtel</span>
             <span class="value">${totalHotelAmount.toFixed(2).replace('.', ',')} €</span>
+          </div>
+          <div class="summary-card">
+            <span class="label">Achats</span>
+            <span class="value">${totalPurchaseAmount.toFixed(2).replace('.', ',')} €</span>
           </div>
           <div class="summary-card total">
             <span class="label">Total à rembourser</span>
@@ -3031,6 +3106,7 @@ function exportExpenseHTML() {
         <th>Remb. km (€)</th>
         <th>Péage (€)</th>
         <th>Hôtel (€)</th>
+        <th>Achat (€)</th>
         <th>Justificatifs</th>
         <th>Total (€)</th>
       </tr>
@@ -3050,12 +3126,15 @@ ${rows
           .replace(".", ",")} €</td>
         <td class="amount">${r.tollAmount.toFixed(2).replace(".", ",")} €</td>
         <td class="amount">${r.hotelAmount.toFixed(2).replace(".", ",")} €</td>
+        <td class="amount">${r.purchaseAmount.toFixed(2).replace(".", ",")} €</td>
         <td>${[
           r.justificationUrl ? `<a href="${r.justificationUrl}" target="_blank" rel="noopener noreferrer">Péage</a>` : '',
-          r.hotelJustificationUrl ? `<a href="${r.hotelJustificationUrl}" target="_blank" rel="noopener noreferrer">Hôtel</a>` : ''
+          r.hotelJustificationUrl ? `<a href="${r.hotelJustificationUrl}" target="_blank" rel="noopener noreferrer">Hôtel</a>` : '',
+          r.achatJustificationUrl ? `<a href="${r.achatJustificationUrl}" target="_blank" rel="noopener noreferrer">Achat</a>` : ''
         ].filter(Boolean).length ? `<div class="justif-links">${[
           r.justificationUrl ? `<a href="${r.justificationUrl}" target="_blank" rel="noopener noreferrer">Péage</a>` : '',
-          r.hotelJustificationUrl ? `<a href="${r.hotelJustificationUrl}" target="_blank" rel="noopener noreferrer">Hôtel</a>` : ''
+          r.hotelJustificationUrl ? `<a href="${r.hotelJustificationUrl}" target="_blank" rel="noopener noreferrer">Hôtel</a>` : '',
+          r.achatJustificationUrl ? `<a href="${r.achatJustificationUrl}" target="_blank" rel="noopener noreferrer">Achat</a>` : ''
         ].filter(Boolean).join('')}</div>` : '<span class="justif-empty">-</span>'}</td>
         <td class="amount">${r.amount
           .toFixed(2)
@@ -3064,7 +3143,7 @@ ${rows
   )
   .join("")}
       <tr class="total-row">
-        <td colspan="9" class="amount">TOTAL TTC</td>
+        <td colspan="10" class="amount">TOTAL TTC</td>
         <td class="amount">${total
           .toFixed(2)
           .replace(".", ",")} €</td>
@@ -3076,7 +3155,7 @@ ${rows
 
       <div class="note">
         <strong>ℹ️ Note :</strong><br>
-        Le remboursement kilométrique est calculé selon le barème légal applicable aux voitures, en fonction du kilométrage cumulé sur l'année civile et de la puissance fiscale du véhicule. Les péages et frais d'hôtel sont ajoutés sur leur montant réel saisi, avec leurs justificatifs lorsqu'ils sont fournis.
+        Le remboursement kilométrique est calculé selon le barème légal applicable aux voitures, en fonction du kilométrage cumulé sur l'année civile et de la puissance fiscale du véhicule. Les péages, frais d'hôtel et achats pour le club sont ajoutés sur leur montant réel saisi. Un justificatif est obligatoire pour chaque péage, hôtel ou achat figurant sur cette note.
       </div>
 
       <div class="signature">
@@ -3146,6 +3225,8 @@ async function importCoachData(data) {
         justification_url: "",
         hotel: 0,
         hotel_justification_url: "",
+        achat: 0,
+        achat_justification_url: "",
         owner_uid: currentUser.id,
         owner_email: currentUser.email
       });
@@ -3168,6 +3249,8 @@ async function importCoachData(data) {
         justification_url: "",
         hotel: 0,
         hotel_justification_url: "",
+        achat: 0,
+        achat_justification_url: "",
         owner_uid: currentUser.id,
         owner_email: currentUser.email
       });
@@ -3211,6 +3294,8 @@ function exportBackupJSON() {
         justification_url: data.justificationUrl || data.justification_url || "",
         hotel: data.hotel || 0,
         hotel_justification_url: data.hotelJustificationUrl || data.hotel_justification_url || "",
+        achat: data.achat || 0,
+        achat_justification_url: data.achatJustificationUrl || data.achat_justification_url || "",
       });
     });
 

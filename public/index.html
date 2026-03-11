@@ -131,6 +131,10 @@
             <span class="label">Remboursement hôtel</span>
             <span class="value" id="hotelPayment">€0,00</span>
           </div>
+          <div class="summary-item">
+            <span class="label">Remboursement achats</span>
+            <span class="value" id="purchasePayment">€0,00</span>
+          </div>
           <div class="summary-item total">
             <span class="label">Paiement total</span>
             <span class="value" id="totalPayment">€0,00</span>
@@ -244,6 +248,16 @@
         </div>
       </div>
 
+      <label>Achat pour le club (€)
+        <input id="achat" type="number" step="0.01" min="0">
+      </label>
+      <label>Justificatif d'achat
+        <input id="achatJustification" type="file" accept=".pdf,.jpg,.png">
+      </label>
+      <div id="existingAchatJustification" style="display:none">
+        <a id="achatJustificationLink" href="#" target="_blank" rel="noopener noreferrer">📎 Voir le justificatif d'achat</a>
+      </div>
+
       <div class="modal-actions">
         <button id="saveDay" class="btn-primary">Sauvegarder</button>
         <button id="deleteDay" class="btn-danger">Supprimer</button>
@@ -274,7 +288,8 @@
           <li>Cliquez sur un jour dans le calendrier pour ouvrir la fenêtre de saisie.</li>
           <li>Indiquez le nombre d'<strong>heures d'entraînement</strong> (par tranches de 0,5 h).</li>
           <li>Cochez <strong>Jour de compétition</strong> si vous avez participé à une compétition ce jour-là, puis renseignez les détails du trajet : kilométrage, départ, arrivée, description, péage éventuel et frais d'hôtel si nécessaire.</li>
-          <li>Vous pouvez joindre un justificatif de péage et un justificatif d'hôtel (PDF, JPG ou PNG).</li>
+          <li>Vous pouvez aussi saisir un <strong>achat pour le club</strong> (matériel, fournitures, etc.) sur la journée concernée.</li>
+          <li>Les justificatifs de <strong>péage</strong>, <strong>hôtel</strong> et <strong>achat</strong> peuvent être joints en PDF, JPG ou PNG. Ils sont obligatoires pour exporter la note de frais si un montant correspondant est saisi.</li>
           <li>Cliquez sur <strong>Sauvegarder</strong> pour enregistrer la journée, ou sur <strong>Supprimer</strong> pour effacer les données du jour.</li>
         </ul>
       </div>
@@ -309,7 +324,7 @@
         <h3>📤 Exports</h3>
         <ul>
           <li><strong>Exporter salaire (CSV)</strong> – génère un fichier tableur avec le détail des jours et le calcul des rémunérations.</li>
-          <li><strong>Exporter note de frais</strong> – génère un document HTML imprimable récapitulant les remboursements kilométriques, les péages et les frais d'hôtel du mois (utilisez la fonction d'impression du navigateur pour le convertir en PDF).</li>
+          <li><strong>Exporter note de frais</strong> – génère un document HTML imprimable récapitulant les remboursements kilométriques, les péages, les frais d'hôtel et les achats du mois (utilisez la fonction d'impression du navigateur pour le convertir en PDF).</li>
           <li><strong>Exporter backup JSON</strong> – enregistre une sauvegarde de vos données du mois dans un fichier JSON.</li>
         </ul>
       </div>
