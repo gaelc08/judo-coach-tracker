@@ -8,7 +8,7 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-11-expense-report-1';
+const __BUILD_ID = '2026-03-11-expense-report-2';
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 let __deferredInstallPrompt = null;
@@ -480,6 +480,19 @@ function __getMileageScaleBand(fiscalPower) {
 function __getLegacyKmRateFromFiscalPower(fiscalPower) {
   const band = __getMileageScaleBand(fiscalPower);
   return band ? __MILEAGE_SCALE[band].upTo5000 : 0;
+}
+
+function __formatNumberFr(value, digits = 3) {
+  return Number(value || 0).toFixed(digits).replace('.', ',');
+}
+
+function __getMileageScaleDescription(fiscalPower) {
+  const band = __getMileageScaleBand(fiscalPower);
+  if (!band) return 'Barème non disponible';
+
+  const scale = __MILEAGE_SCALE[band];
+  const bandLabel = band === 3 ? '3 CV et moins' : (band === 7 ? '7 CV et plus' : `${band} CV`);
+  return `${bandLabel} — jusqu'à 5 000 km : ${__formatNumberFr(scale.upTo5000)} €/km ; de 5 001 à 20 000 km : ${__formatNumberFr(scale.midRate)} €/km + ${scale.midFixed} € ; au-delà de 20 000 km : ${__formatNumberFr(scale.over20000)} €/km`;
 }
 
 function __calculateAnnualMileageAmount(distanceKm, fiscalPower) {
@@ -2576,6 +2589,9 @@ function exportExpenseHTML() {
   const totalMileageAmount = rows.reduce((sum, row) => sum + (row.mileageAmount || 0), 0);
   const totalTollAmount = rows.reduce((sum, row) => sum + (row.tollAmount || 0), 0);
   const totalHotelAmount = rows.reduce((sum, row) => sum + (row.hotelAmount || 0), 0);
+  const totalMileageKm = rows.reduce((sum, row) => sum + (Number(row.km) || 0), 0);
+  const averageMileageRate = totalMileageKm > 0 ? totalMileageAmount / totalMileageKm : 0;
+  const mileageScaleDescription = __getMileageScaleDescription(currentCoach.fiscal_power);
 
   const html = `
 <!DOCTYPE html>
@@ -2973,7 +2989,7 @@ function exportExpenseHTML() {
           <div class="info-list">
             <div class="info-row"><span class="label">Véhicule</span><span class="value">${currentCoach.vehicle || "Non renseigné"}</span></div>
             <div class="info-row"><span class="label">Puissance fiscale</span><span class="value">${currentCoach.fiscal_power || "Non renseignée"} CV</span></div>
-            <div class="info-row"><span class="label">Barème appliqué</span><span class="value">Barème légal voiture (${__getMileageScaleBand(currentCoach.fiscal_power) || currentCoach.fiscal_power || "non renseignée"} CV)</span></div>
+            <div class="info-row"><span class="label">Barème appliqué</span><span class="value">${mileageScaleDescription}${totalMileageKm > 0 ? ` — taux moyen constaté sur cette note : ${__formatNumberFr(averageMileageRate)} €/km` : ''}</span></div>
             <div class="info-row"><span class="label">Mois concerné</span><span class="value">${month}/${year}</span></div>
           </div>
         </section>
