@@ -96,7 +96,9 @@ judo-coach-tracker/
 │   └── logo-jcc.png      # Club logo
 ├── supabase/
 │   ├── config.toml       # Supabase project configuration
-│   └── migrations/       # Database migrations
+│   ├── migrations/       # Timestamped database migrations applied in order
+│   └── sql/
+│       └── admin/        # Optional SQL maintenance helpers for admin users
 └── package.json          # NPM dependencies
 ```
 
@@ -248,8 +250,9 @@ The migrations set up, in order:
 | `20260309150000_create_frozen_timesheets.sql` | `frozen_timesheets` table + RLS policies |
 | `20260310000000_add_coach_invite_support.sql` | `claim_coach_profile()` function — lets a coach atomically claim a profile with `owner_uid = NULL` on first login |
 | `20260310120000_fix_coaches_rls_for_invite_flow.sql` | Replaces `coaches` table RLS policies so admins can INSERT profiles with `owner_uid = NULL` (required for the invitation flow) |
-| `20260311101500_make_claim_coach_profile_case_insensitive.sql` | Updates `claim_coach_profile()` so invited coach profiles are matched case-insensitively by e-mail |
 | `20260311084000_drop_legacy_frozen_timesheet_tables.sql` | Removes duplicate legacy frozen-timesheet tables after copying any rows into `frozen_timesheets` |
+| `20260311101500_make_claim_coach_profile_case_insensitive.sql` | Updates `claim_coach_profile()` so invited coach profiles are matched case-insensitively by e-mail |
+| `20260311113000_drop_legacy_admins_and_timesheet_freezes.sql` | Removes the legacy `admins` and `timesheet_freezes` tables after preserving any useful frozen-timesheet rows |
 
 #### Marking a user as admin
 
@@ -264,6 +267,11 @@ The `is_admin()` function reads the `is_admin` flag from the user's `app_metadat
     -H "Content-Type: application/json" \
     -d '{"app_metadata": {"is_admin": true}}'
   ```
+
+Optional SQL maintenance helpers are stored in:
+
+- [supabase/sql/admin/set-admin-user.sql](supabase/sql/admin/set-admin-user.sql)
+- [supabase/sql/admin/create-or-promote-admin-user.sql](supabase/sql/admin/create-or-promote-admin-user.sql)
 
 > **Troubleshooting — "Erreur lors du gel : Could not find the table 'public.frozen_timesheets' in the schema cache"**
 >
