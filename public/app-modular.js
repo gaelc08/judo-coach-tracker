@@ -2572,6 +2572,10 @@ function exportExpenseHTML() {
   }
 
   const logoUrl = new URL('logo-jcc.png', window.location.href).href;
+  const coachDisplayName = __getCoachDisplayName(currentCoach) || currentCoach.name;
+  const totalMileageAmount = rows.reduce((sum, row) => sum + (row.mileageAmount || 0), 0);
+  const totalTollAmount = rows.reduce((sum, row) => sum + (row.tollAmount || 0), 0);
+  const totalHotelAmount = rows.reduce((sum, row) => sum + (row.hotelAmount || 0), 0);
 
   const html = `
 <!DOCTYPE html>
@@ -2586,178 +2590,420 @@ function exportExpenseHTML() {
   }
 
   @media print {
-    @page { margin: 1.5cm; }
-    body { margin: 0; }
+    @page { margin: 1.2cm; }
+    body { margin: 0; background: white; }
     .no-print { display: none; }
+    .page-shell {
+      box-shadow: none;
+      border: none;
+      margin: 0;
+      max-width: none;
+    }
   }
   
   body { 
-    font-family: Arial, sans-serif; 
-    margin: 20px;
-    color: #333;
-    max-width: 100%;
-    overflow-x: hidden;
+    margin: 0;
+    padding: 24px;
+    background: #eef3f9;
+    color: #243447;
+    font-family: Inter, Arial, sans-serif;
   }
-  
+
+  .page-shell {
+    max-width: 1180px;
+    margin: 0 auto;
+    background: #ffffff;
+    border: 1px solid #d8e2ef;
+    border-radius: 20px;
+    box-shadow: 0 18px 45px rgba(15, 52, 96, 0.12);
+    overflow: hidden;
+  }
+
+  .page-inner {
+    padding: 28px 30px 32px;
+  }
+
+  .print-button {
+    margin: 0 0 18px;
+    padding: 11px 18px;
+    background: linear-gradient(135deg, #0f3460, #145da0);
+    color: white;
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 700;
+    box-shadow: 0 10px 24px rgba(20, 93, 160, 0.25);
+  }
+
   .header { 
     display: flex; 
-    align-items: center;
-    border-bottom: 3px solid #004080;
-    padding-bottom: 15px;
-    margin-bottom: 20px;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    border-bottom: 2px solid #d8e2ef;
+    padding-bottom: 18px;
+    margin-bottom: 22px;
   }
   
-  .header-logo { 
-    margin-right: 20px; 
+  .header-brand {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+  
+  .header-logo {
+    width: 78px;
+    height: 78px;
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    border-radius: 18px;
+    background: #f5f8fc;
+    border: 1px solid #d8e2ef;
   }
   
   .header-logo img { 
-    height: 80px; 
+    max-width: 58px;
+    max-height: 58px;
   }
   
-  .header-text { 
-    color: #004080; 
-  }
-  
-  .header-text h1 { 
-    margin: 0 0 5px 0;
-    font-size: 1.5rem;
-    color: #004080;
+  .header-text h1 {
+    margin: 0 0 6px;
+    font-size: 1.55rem;
+    color: #0f3460;
   }
   
   .header-text p { 
     margin: 2px 0;
-    font-size: 0.9rem;
+    color: #526274;
+    font-size: 0.92rem;
   }
-  
-  h2 { 
-    color: #0066cc;
-    margin-top: 20px;
+
+  .document-badge {
+    text-align: right;
+    min-width: 220px;
   }
-  
-  .info-section {
-    background: #f4f8ff;
-    padding: 15px;
-    border-radius: 5px;
-    margin: 15px 0;
+
+  .document-badge .label {
+    display: inline-block;
+    padding: 7px 12px;
+    border-radius: 999px;
+    background: #eaf2ff;
+    color: #145da0;
+    font-weight: 700;
+    font-size: 0.8rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
   }
-  
-  .info-section p {
-    margin: 5px 0;
+
+  .document-badge h2 {
+    margin: 10px 0 4px;
+    font-size: 1.35rem;
+    color: #0f3460;
+  }
+
+  .document-badge p {
+    margin: 0;
+    color: #66788a;
+    font-size: 0.92rem;
+  }
+
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+
+  .info-card,
+  .summary-card,
+  .note {
+    border: 1px solid #d8e2ef;
+    border-radius: 16px;
+    background: #f9fbfe;
+  }
+
+  .info-card {
+    padding: 16px 18px;
+  }
+
+  .info-card h3,
+  .summary-section h3,
+  .details-section h3 {
+    margin: 0 0 12px;
+    color: #0f3460;
+    font-size: 1rem;
+  }
+
+  .info-list {
+    display: grid;
+    gap: 8px;
+  }
+
+  .info-row {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 10px;
+    font-size: 0.94rem;
+  }
+
+  .info-row .label {
+    color: #66788a;
+    font-weight: 600;
+  }
+
+  .info-row .value {
+    color: #243447;
+    font-weight: 600;
+  }
+
+  .summary-section {
+    margin-bottom: 18px;
+  }
+
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .summary-card {
+    padding: 16px 18px;
+    background: linear-gradient(180deg, #fbfdff 0%, #f1f6fc 100%);
+  }
+
+  .summary-card .label {
+    display: block;
+    color: #66788a;
+    font-size: 0.84rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 8px;
+  }
+
+  .summary-card .value {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #0f3460;
+  }
+
+  .summary-card.total {
+    background: linear-gradient(135deg, #0f3460, #145da0);
+    border-color: transparent;
+  }
+
+  .summary-card.total .label,
+  .summary-card.total .value {
+    color: #ffffff;
+  }
+
+  .details-section {
+    margin-top: 8px;
   }
 
   .table-wrap {
     width: 100%;
-    max-width: 100%;
     overflow-x: auto;
+    border: 1px solid #d8e2ef;
+    border-radius: 16px;
   }
   
   table { 
-    border-collapse: collapse; 
+    border-collapse: separate;
+    border-spacing: 0;
     width: 100%; 
-    margin-top: 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     table-layout: fixed;
+    background: #ffffff;
   }
   
   th, td { 
-    border: 1px solid #ddd; 
-    padding: 10px; 
-    font-size: 0.9rem;
+    border-bottom: 1px solid #e4ebf3;
+    padding: 12px 10px; 
+    font-size: 0.88rem;
     text-align: left;
     overflow-wrap: anywhere;
     word-break: break-word;
     vertical-align: top;
   }
   
-  th { 
-    background: #004080; 
+  thead th { 
+    background: #0f3460; 
     color: #fff;
-    font-weight: bold;
+    font-weight: 700;
+    position: sticky;
+    top: 0;
+  }
+
+  tbody tr:nth-child(even) { 
+    background: #f9fbfe; 
   }
   
-  tr:nth-child(even) { 
-    background: #f9f9f9; 
+  .amount,
+  .number {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
   }
-  
-  tr:hover:not(.total-row) {
-    background: #f4f8ff;
+
+  .justif-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .justif-links a {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: #eaf2ff;
+    color: #145da0;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 0.78rem;
+  }
+
+  .justif-empty {
+    color: #8a98a8;
   }
   
   .total-row td { 
-    font-weight: bold; 
-    background: #e0ecff;
-    font-size: 1rem;
+    font-weight: 800; 
+    background: #edf4ff;
+    color: #0f3460;
+    border-bottom: none;
   }
   
   .note {
-    margin-top: 30px;
-    padding: 15px;
-    background: #fffbf0;
-    border-left: 4px solid #ffa500;
-    font-size: 0.85rem;
-    line-height: 1.4;
+    margin-top: 18px;
+    padding: 16px 18px;
+    background: #fffaf0;
+    border-left: 5px solid #f59e0b;
+    font-size: 0.88rem;
+    line-height: 1.55;
   }
   
   .signature { 
-    margin-top: 60px; 
-    display: flex; 
-    justify-content: space-between;
+    margin-top: 48px; 
+    display: grid; 
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 28px;
     page-break-inside: avoid;
   }
   
   .signature > div {
-    width: 45%;
-    border-top: 1px solid #333;
-    padding-top: 10px;
+    min-height: 90px;
+    border-top: 2px solid #243447;
+    padding-top: 12px;
     text-align: center;
+    font-weight: 600;
   }
-  
-  .print-button {
-    margin: 20px 0;
-    padding: 10px 20px;
-    background: #004080;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 1rem;
-  }
-  
-  .print-button:hover {
-    background: #0066cc;
+
+  @media (max-width: 900px) {
+    body {
+      padding: 12px;
+    }
+
+    .page-inner {
+      padding: 18px;
+    }
+
+    .header,
+    .header-brand {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .document-badge {
+      text-align: left;
+      min-width: 0;
+    }
+
+    .info-grid,
+    .summary-grid,
+    .signature {
+      grid-template-columns: 1fr;
+    }
+
+    .info-row {
+      grid-template-columns: 1fr;
+      gap: 4px;
+    }
   }
 </style>
 </head>
 <body>
-  <button class="print-button no-print" onclick="window.print()">🖨️ Imprimer / Enregistrer en PDF</button>
+  <div class="page-shell">
+    <div class="page-inner">
+      <button class="print-button no-print" onclick="window.print()">🖨️ Imprimer / Enregistrer en PDF</button>
 
-  <div class="header">
-    <div class="header-logo">
-      <img src="${logoUrl}" alt="Judo Club Cattenom-Rodemack" />
-    </div>
-    <div class="header-text">
-      <h1>Judo Club de Cattenom-Rodemack</h1>
-      <p>Association RA1026</p>
-      <p>Dojo communautaire – 57570 Cattenom</p>
-      <p>📧 judoclubcattenom@gmail.com – 📞 06 62 62 53 13</p>
-    </div>
-  </div>
+      <div class="header">
+        <div class="header-brand">
+          <div class="header-logo">
+            <img src="${logoUrl}" alt="Judo Club Cattenom-Rodemack" />
+          </div>
+          <div class="header-text">
+            <h1>Judo Club de Cattenom-Rodemack</h1>
+            <p>Association RA1026</p>
+            <p>Dojo communautaire – 57570 Cattenom</p>
+            <p>📧 judoclubcattenom@gmail.com – 📞 06 62 62 53 13</p>
+          </div>
+        </div>
+        <div class="document-badge">
+          <span class="label">Document de remboursement</span>
+          <h2>Note de frais</h2>
+          <p>Période ${month}/${year}</p>
+        </div>
+      </div>
 
-  <h2>Note de frais</h2>
-  
-  <div class="info-section">
-    <p><strong>Période :</strong> ${month}/${year}</p>
-    <p><strong>Date d'édition :</strong> ${today}</p>
-    <p><strong>Nom et prénom :</strong> ${currentCoach.name}</p>
-    <p><strong>Adresse :</strong> ${currentCoach.address || "Non renseignée"}</p>
-    <p><strong>Poste :</strong> Entraîneur</p>
-    <p><strong>Véhicule :</strong> ${currentCoach.vehicle || "Non renseigné"}</p>
-    <p><strong>Puissance fiscale :</strong> ${currentCoach.fiscal_power || "Non renseignée"} CV</p>
-    <p><strong>Barème appliqué :</strong> barème légal voiture (${__getMileageScaleBand(currentCoach.fiscal_power) || currentCoach.fiscal_power || "non renseignée"} CV)</p>
-  </div>
+      <div class="info-grid">
+        <section class="info-card">
+          <h3>Informations du demandeur</h3>
+          <div class="info-list">
+            <div class="info-row"><span class="label">Nom et prénom</span><span class="value">${coachDisplayName || "Non renseigné"}</span></div>
+            <div class="info-row"><span class="label">Adresse</span><span class="value">${currentCoach.address || "Non renseignée"}</span></div>
+            <div class="info-row"><span class="label">Poste</span><span class="value">Entraîneur</span></div>
+            <div class="info-row"><span class="label">Date d'édition</span><span class="value">${today}</span></div>
+          </div>
+        </section>
 
-  <div class="table-wrap">
+        <section class="info-card">
+          <h3>Informations véhicule</h3>
+          <div class="info-list">
+            <div class="info-row"><span class="label">Véhicule</span><span class="value">${currentCoach.vehicle || "Non renseigné"}</span></div>
+            <div class="info-row"><span class="label">Puissance fiscale</span><span class="value">${currentCoach.fiscal_power || "Non renseignée"} CV</span></div>
+            <div class="info-row"><span class="label">Barème appliqué</span><span class="value">Barème légal voiture (${__getMileageScaleBand(currentCoach.fiscal_power) || currentCoach.fiscal_power || "non renseignée"} CV)</span></div>
+            <div class="info-row"><span class="label">Mois concerné</span><span class="value">${month}/${year}</span></div>
+          </div>
+        </section>
+      </div>
+
+      <section class="summary-section">
+        <h3>Synthèse des remboursements</h3>
+        <div class="summary-grid">
+          <div class="summary-card">
+            <span class="label">Kilométrage</span>
+            <span class="value">${totalMileageAmount.toFixed(2).replace('.', ',')} €</span>
+          </div>
+          <div class="summary-card">
+            <span class="label">Péages</span>
+            <span class="value">${totalTollAmount.toFixed(2).replace('.', ',')} €</span>
+          </div>
+          <div class="summary-card">
+            <span class="label">Hôtel</span>
+            <span class="value">${totalHotelAmount.toFixed(2).replace('.', ',')} €</span>
+          </div>
+          <div class="summary-card total">
+            <span class="label">Total à rembourser</span>
+            <span class="value">${total.toFixed(2).replace('.', ',')} €</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="details-section">
+        <h3>Détail des dépenses</h3>
+        <div class="table-wrap">
   <table>
     <thead>
       <tr>
@@ -2782,45 +3028,51 @@ ${rows
         <td>${r.description || "Déplacement judo"}</td>
         <td>${r.departurePlace || "-"}</td>
         <td>${r.arrivalPlace || "-"}</td>
-        <td style="text-align:right">${r.km}</td>
-        <td style="text-align:right">${r.mileageAmount
+        <td class="number">${r.km}</td>
+        <td class="amount">${r.mileageAmount
           .toFixed(2)
           .replace(".", ",")} €</td>
-        <td style="text-align:right">${r.tollAmount.toFixed(2).replace(".", ",")} €</td>
-        <td style="text-align:right">${r.hotelAmount.toFixed(2).replace(".", ",")} €</td>
+        <td class="amount">${r.tollAmount.toFixed(2).replace(".", ",")} €</td>
+        <td class="amount">${r.hotelAmount.toFixed(2).replace(".", ",")} €</td>
         <td>${[
           r.justificationUrl ? `<a href="${r.justificationUrl}" target="_blank" rel="noopener noreferrer">Péage</a>` : '',
           r.hotelJustificationUrl ? `<a href="${r.hotelJustificationUrl}" target="_blank" rel="noopener noreferrer">Hôtel</a>` : ''
-        ].filter(Boolean).join(' / ') || '-'}</td>
-        <td style="text-align:right">${r.amount
+        ].filter(Boolean).length ? `<div class="justif-links">${[
+          r.justificationUrl ? `<a href="${r.justificationUrl}" target="_blank" rel="noopener noreferrer">Péage</a>` : '',
+          r.hotelJustificationUrl ? `<a href="${r.hotelJustificationUrl}" target="_blank" rel="noopener noreferrer">Hôtel</a>` : ''
+        ].filter(Boolean).join('')}</div>` : '<span class="justif-empty">-</span>'}</td>
+        <td class="amount">${r.amount
           .toFixed(2)
           .replace(".", ",")} €</td>
       </tr>`
   )
   .join("")}
       <tr class="total-row">
-        <td colspan="9" style="text-align:right">TOTAL TTC</td>
-        <td style="text-align:right">${total
+        <td colspan="9" class="amount">TOTAL TTC</td>
+        <td class="amount">${total
           .toFixed(2)
           .replace(".", ",")} €</td>
       </tr>
     </tbody>
   </table>
-  </div>
+        </div>
+      </section>
 
-  <div class="note">
-    <strong>ℹ️ Note :</strong><br>
-    Le remboursement kilométrique est calculé selon le barème légal applicable aux voitures, en fonction du kilométrage cumulé sur l'année civile et de la puissance fiscale du véhicule. Les péages et frais d'hôtel sont ajoutés sur leur montant réel saisi, avec leurs justificatifs lorsqu'ils sont fournis.
-  </div>
+      <div class="note">
+        <strong>ℹ️ Note :</strong><br>
+        Le remboursement kilométrique est calculé selon le barème légal applicable aux voitures, en fonction du kilométrage cumulé sur l'année civile et de la puissance fiscale du véhicule. Les péages et frais d'hôtel sont ajoutés sur leur montant réel saisi, avec leurs justificatifs lorsqu'ils sont fournis.
+      </div>
 
-  <div class="signature">
-    <div>
-      <strong>Signature du salarié</strong><br><br><br>
-      ${currentCoach.name}
-    </div>
-    <div>
-      <strong>Signature de l'employeur</strong><br><br><br>
-      Président du Judo Club
+      <div class="signature">
+        <div>
+          <strong>Signature du salarié</strong><br><br><br>
+          ${coachDisplayName || currentCoach.name}
+        </div>
+        <div>
+          <strong>Signature de l'employeur</strong><br><br><br>
+          Président du Judo Club
+        </div>
+      </div>
     </div>
   </div>
 </body>
