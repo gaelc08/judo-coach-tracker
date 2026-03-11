@@ -1135,12 +1135,14 @@ function setupAuthListeners() {
       const isAdmin = await isCurrentUserAdminDB();
       if (isAdmin) {
         document.getElementById("addCoachBtn").style.display = "inline-block";
+        document.getElementById("addVolunteerBtn").style.display = "inline-block";
         document.getElementById("editCoachBtn").style.display = "inline-block";
         document.getElementById("inviteAdminBtn").style.display = "inline-block";
         document.getElementById("freezeBtn").style.display = "inline-block";
         document.getElementById("importGroup").style.display = "flex";
       } else {
         document.getElementById("addCoachBtn").style.display = "none";
+        document.getElementById("addVolunteerBtn").style.display = "none";
         document.getElementById("editCoachBtn").style.display = "none";
         document.getElementById("inviteAdminBtn").style.display = "none";
         document.getElementById("freezeBtn").style.display = "none";
