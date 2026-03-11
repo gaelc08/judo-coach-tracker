@@ -339,7 +339,7 @@ function __maskEmail(email) {
 
 function __normalizeEmail(email) {
   const value = String(email || '').trim().toLowerCase();
-  return value || "";
+  return value || null;
 }
 
 function __decodeJwtPayload(token) {
