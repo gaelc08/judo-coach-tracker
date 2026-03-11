@@ -271,8 +271,15 @@ const __authNoHangLock = async (...args) => {
 };
 
 // Detect invite flow from URL before createClient's detectSessionInUrl consumes the hash.
-// Supabase append `type=invite` to the URL fragment when the user follows an invitation link.
-let __inviteFlowActive = /[#&]type=invite(&|$)/.test(window.location.hash);
+// Supabase appends `type=invite` to the URL fragment when the user follows an invitation link.
+let __inviteFlowActive = (() => {
+  try {
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    return hashParams.get('type') === 'invite';
+  } catch {
+    return false;
+  }
+})();
 if (__inviteFlowActive) {
   console.log('DEBUG invite flow detected from URL hash');
 }
@@ -1435,7 +1442,7 @@ async function saveCoach() {
   const isAdmin = await isCurrentUserAdminDB();
   console.log('DEBUG isAdmin:', isAdmin);
   if (!isAdmin) {
-    alert('Seul l\'administrateur peut effectuer cette action.');
+    alert("Seul l'administrateur peut effectuer cette action.");
     return;
   }
 
