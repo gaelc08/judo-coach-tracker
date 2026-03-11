@@ -8,7 +8,7 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-11-expense-report-4';
+const __BUILD_ID = '2026-03-11-volunteer-1';
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 let __deferredInstallPrompt = null;
@@ -454,6 +454,30 @@ function __getCurrentUserDisplayName(user, preferredCoach = null) {
   if (metadataName) return metadataName;
 
   return String(user.email || '').trim();
+}
+
+function __getProfileType(profileOrType) {
+  const raw = typeof profileOrType === 'string'
+    ? profileOrType
+    : profileOrType?.profile_type;
+  return String(raw || 'coach').trim().toLowerCase() === 'benevole' ? 'benevole' : 'coach';
+}
+
+function __isVolunteerProfile(profileOrType) {
+  return __getProfileType(profileOrType) === 'benevole';
+}
+
+function __getProfileLabel(profileOrType, { capitalized = false, plural = false } = {}) {
+  const type = __getProfileType(profileOrType);
+  let label = plural
+    ? (type === 'benevole' ? 'bénévoles' : 'entraîneurs')
+    : (type === 'benevole' ? 'bénévole' : 'entraîneur');
+
+  if (capitalized) {
+    label = label.charAt(0).toUpperCase() + label.slice(1);
+  }
+
+  return label;
 }
 
 const __MILEAGE_SCALE = {
@@ -1316,7 +1340,7 @@ function updateFreezeUI() {
 
 async function toggleFreezeMonth() {
   if (!currentCoach || !currentMonth) {
-    alert("Veuillez sélectionner un entraîneur et un mois.");
+    alert("Veuillez sélectionner un profil et un mois.");
     return;
   }
   const isAdmin = await isCurrentUserAdminDB();
@@ -1408,19 +1432,35 @@ function setupEventListeners() {
     editMode = false;
     editingCoachId = null;
     clearCoachForm();
+    document.getElementById("coachProfileType").value = "coach";
+    updateCoachFormProfileUI("coach");
     document.getElementById("coachOwnerUid").value = "";
     document.getElementById("inviteCoach").style.display = "none";
+    document.getElementById("deleteCoach").style.display = "none";
+    document.getElementById("coachModal").classList.add("active");
+  };
+
+  document.getElementById("addVolunteerBtn").onclick = () => {
+    editMode = false;
+    editingCoachId = null;
+    clearCoachForm();
+    document.getElementById("coachProfileType").value = "benevole";
+    updateCoachFormProfileUI("benevole");
+    document.getElementById("coachOwnerUid").value = "";
+    document.getElementById("inviteCoach").style.display = "none";
+    document.getElementById("deleteCoach").style.display = "none";
     document.getElementById("coachModal").classList.add("active");
   };
 
   document.getElementById("editCoachBtn").onclick = () => {
     if (!currentCoach) {
-      alert("Veuillez sélectionner un entraîneur.");
+      alert("Veuillez sélectionner un profil.");
       return;
     }
     editMode = true;
     editingCoachId = currentCoach.id;
 
+    document.getElementById("coachProfileType").value = __getProfileType(currentCoach);
     document.getElementById("coachName").value = currentCoach.name;
     document.getElementById("coachFirstName").value = currentCoach.first_name || "";
     document.getElementById("coachEmail").value = currentCoach.email || "";
@@ -1433,6 +1473,7 @@ function setupEventListeners() {
     // Show the invite button when the coach profile has an email (re-send invite at any time)
     const inviteBtn = document.getElementById("inviteCoach");
     inviteBtn.style.display = currentCoach.email ? "inline-block" : "none";
+    updateCoachFormProfileUI(currentCoach);
     document.getElementById("coachModal").classList.add("active");
     document.getElementById("deleteCoach").style.display = "inline-block";
   };
@@ -1441,10 +1482,13 @@ function setupEventListeners() {
   document.getElementById("inviteCoach").onclick = async () => {
     const email = __normalizeEmail(document.getElementById("coachEmail").value);
     if (!email) {
-      alert("Veuillez renseigner l'adresse e-mail de l'entraîneur.");
+      alert("Veuillez renseigner l'adresse e-mail du profil.");
       return;
     }
     await inviteCoach(email);
+  };
+  document.getElementById("coachProfileType").onchange = (e) => {
+    updateCoachFormProfileUI(e.target.value);
   };
   document.getElementById("inviteAdminBtn").onclick = async () => {
     const rawEmail = globalThis.prompt("Adresse e-mail du nouvel administrateur :", "");
@@ -1465,6 +1509,7 @@ function setupEventListeners() {
     editingCoachId = null;
     document.getElementById("deleteCoach").style.display = "none";
     document.getElementById("inviteCoach").style.display = "none";
+    updateCoachFormProfileUI("coach");
   };
 
   document.getElementById("deleteCoach").onclick = deleteCoach;
@@ -1476,6 +1521,7 @@ function setupEventListeners() {
       editMode = false;
       editingCoachId = null;
       document.getElementById("inviteCoach").style.display = "none";
+      updateCoachFormProfileUI("coach");
     }
   };
 
@@ -1501,6 +1547,7 @@ function setupEventListeners() {
 
   document.getElementById("coachSelect").onchange = (e) => {
     currentCoach = coaches.find((c) => c.id === e.target.value) || null;
+    updateCurrentProfileUI();
     updateCalendar();
     updateSummary();
   };
@@ -1552,6 +1599,7 @@ function setupEventListeners() {
 
 // ===== Coach management =====
 function clearCoachForm() {
+  document.getElementById("coachProfileType").value = "coach";
   document.getElementById("coachName").value = "";
   document.getElementById("coachFirstName").value = "";
   document.getElementById("coachEmail").value = "";
@@ -1560,6 +1608,7 @@ function clearCoachForm() {
   document.getElementById("coachFiscalPower").value = "";
   document.getElementById("coachRate").value = "";
   document.getElementById("dailyAllowance").value = "";
+  updateCoachFormProfileUI("coach");
 }
 
 function loadCoaches() {
@@ -1579,7 +1628,7 @@ function loadCoaches() {
   coaches.forEach((coach) => {
     const option = document.createElement("option");
     option.value = coach.id;
-    option.textContent = `${(coach.first_name ? coach.first_name + ' ' : '') + coach.name}`;
+    option.textContent = `${(coach.first_name ? coach.first_name + ' ' : '') + coach.name} (${__getProfileLabel(coach)})`;
     select.appendChild(option);
   });
 
@@ -1600,6 +1649,8 @@ function loadCoaches() {
       }
     }
   }
+
+  updateCurrentProfileUI();
 }
 
 // ===== Coach greeting =====
@@ -1633,26 +1684,29 @@ async function saveCoach() {
   console.log('DEBUG ADMIN OK - FORM');
   
   const name = document.getElementById('coachName').value.trim();
+  const profileType = __getProfileType(document.getElementById('coachProfileType').value);
+  const isVolunteer = profileType === 'benevole';
   const firstName = document.getElementById('coachFirstName').value.trim();
   const email = __normalizeEmail(document.getElementById('coachEmail').value);
   const address = document.getElementById('coachAddress').value.trim();
   const vehicle = document.getElementById('coachVehicle').value.trim();
   const fiscalPower = __parseFiscalPower(document.getElementById('coachFiscalPower').value);
-  const rate = parseFloat(document.getElementById('coachRate').value) || 0;
-  const allowance = parseFloat(document.getElementById('dailyAllowance').value) || 0;
+  const rate = isVolunteer ? 0 : (parseFloat(document.getElementById('coachRate').value) || 0);
+  const allowance = isVolunteer ? 0 : (parseFloat(document.getElementById('dailyAllowance').value) || 0);
   const kmRate = __getLegacyKmRateFromFiscalPower(fiscalPower);
   const ownerUidInput = document.getElementById('coachOwnerUid');
   const ownerUid = ownerUidInput ? ownerUidInput.value.trim() : currentUser.id;
   
-  console.log('DEBUG FORM:', {name, rate, allowance, kmRate, ownerUid});
+  console.log('DEBUG FORM:', {name, profileType, rate, allowance, kmRate, ownerUid});
   
-  if (!name || isNaN(rate) || isNaN(allowance) || !fiscalPower) {
-    alert('Veuillez renseigner le nom, la puissance fiscale du véhicule et les tarifs (taux horaire, indemnité journalière).');
+  if (!name || (!isVolunteer && (isNaN(rate) || isNaN(allowance) || !fiscalPower))) {
+    alert("Veuillez renseigner le nom et, pour un entraîneur, la puissance fiscale du véhicule ainsi que les tarifs (taux horaire, indemnité journalière).");
     return;
   }
   
 const coachData = {
   name, 
+  profile_type: profileType,
   first_name: firstName,      // first_name
   email, 
   address, 
@@ -1754,8 +1808,9 @@ const coachData = {
 
     // Offer to send an invitation email when a new coach was created without a UUID
     if (wasNewCoach && !ownerUid && email) {
+      const profileLabel = __getProfileLabel(profileType);
       const sendInvite = confirm(
-        `Profil créé avec succès.\n\nVoulez-vous envoyer une invitation par e-mail à ${email} ?\n\nL'entraîneur recevra un lien pour choisir son mot de passe et se connecter.`
+        `Profil créé avec succès.\n\nVoulez-vous envoyer une invitation par e-mail à ${email} ?\n\nLe ${profileLabel} recevra un lien pour choisir son mot de passe et se connecter.`
       );
       if (sendInvite) {
         await inviteCoach(email);
@@ -1777,12 +1832,12 @@ const coachData = {
 async function deleteCoach() {
   const isAdmin = await isCurrentUserAdminDB();
   if (!currentUser || !isAdmin) {
-    alert("Seul l'administrateur peut supprimer des profils d'entraîneur.");
+    alert("Seul l'administrateur peut supprimer des profils.");
     return;
   }
   if (!editingCoachId) return;
 
-  if (!confirm("Êtes-vous sûr(e) de vouloir supprimer cet entraîneur ? Toutes les données associées seront également supprimées.")) {
+  if (!confirm("Êtes-vous sûr(e) de vouloir supprimer ce profil ? Toutes les données associées seront également supprimées.")) {
     return;
   }
 
@@ -1865,7 +1920,7 @@ async function inviteCoach(email) {
     return false;
   }
   if (!normalizedEmail) {
-    alert("Veuillez renseigner l'adresse e-mail de l'entraîneur.");
+    alert("Veuillez renseigner l'adresse e-mail du profil.");
     return false;
   }
 
@@ -1958,7 +2013,7 @@ async function inviteCoach(email) {
       return false;
     }
 
-    alert(`Invitation envoyée à ${normalizedEmail}.\nL'entraîneur recevra un e-mail pour créer son mot de passe.`);
+  alert(`Invitation envoyée à ${normalizedEmail}.\nLa personne recevra un e-mail pour créer son mot de passe.`);
     return true;
   } catch (e) {
     const inviteDebugError = {
@@ -2170,7 +2225,7 @@ async function __uploadExpenseJustification(file, prefix) {
 // ===== Day modal =====
 function openDayModal(dateStr) {
   if (!currentCoach) {
-    alert("Veuillez sélectionner un entraîneur.");
+    alert("Veuillez sélectionner un profil.");
     return;
   }
 
@@ -2241,12 +2296,14 @@ function openDayModal(dateStr) {
   document.getElementById("travelGroup").style.display = dayData.competition
     ? "block"
     : "none";
+  updateCurrentProfileUI();
 
   document.getElementById("dayModal").classList.add("active");
 }
 
 async function saveDay() {
   if (!currentCoach || !currentUser) return;
+  const isVolunteer = __isVolunteerProfile(currentCoach);
 
   const isAdmin = await isCurrentUserAdminDB();
   if (!isAdmin && isCurrentMonthFrozen()) {
@@ -2255,8 +2312,9 @@ async function saveDay() {
     return;
   }
 
-  const hours =
-    parseFloat(document.getElementById("trainingHours").value) || 0;
+  const hours = isVolunteer
+    ? 0
+    : (parseFloat(document.getElementById("trainingHours").value) || 0);
   const competition = document.getElementById("competitionDay").checked;
   const km = parseFloat(document.getElementById("kilometers").value) || 0;
   const description =
@@ -2409,6 +2467,8 @@ async function deleteDay() {
 
 // ===== Summary & exports =====
 function updateSummary() {
+  updateCurrentProfileUI();
+
   if (!currentCoach || !currentMonth) {
     document.getElementById("totalHours").textContent = "0";
     document.getElementById("hourlyRate").textContent = "€0.00";
@@ -2425,6 +2485,7 @@ function updateSummary() {
   }
 
   const [year, month] = currentMonth.split("-");
+  const isVolunteer = __isVolunteerProfile(currentCoach);
   let totalHours = 0;
   let compDays = 0;
   let tollPayment = 0;
@@ -2444,8 +2505,8 @@ function updateSummary() {
     }
   });
 
-  const trainingPayment = totalHours * currentCoach.hourly_rate;
-  const compPayment = compDays * currentCoach.daily_allowance;
+  const trainingPayment = isVolunteer ? 0 : totalHours * currentCoach.hourly_rate;
+  const compPayment = isVolunteer ? 0 : compDays * currentCoach.daily_allowance;
   const kmPayment = mileageBreakdown.totalAmount;
   const totalPayment = trainingPayment + compPayment + kmPayment + tollPayment + hotelPayment + purchasePayment;
 
@@ -2474,7 +2535,12 @@ function updateSummary() {
 
 function exportToCSV() {
   if (!currentCoach || !currentMonth) {
-    alert("Veuillez sélectionner un entraîneur et un mois.");
+    alert("Veuillez sélectionner un profil et un mois.");
+    return;
+  }
+
+  if (__isVolunteerProfile(currentCoach)) {
+    alert("L'export salaire CSV n'est pas disponible pour un profil bénévole.");
     return;
   }
 
@@ -2551,6 +2617,41 @@ function __getMonthlyExpenseReceiptIssues(coachId, year, month) {
   return issues;
 }
 
+function updateCoachFormProfileUI(profileType = null) {
+  const resolvedType = __getProfileType(profileType || document.getElementById("coachProfileType")?.value);
+  const isVolunteer = resolvedType === 'benevole';
+  const title = document.getElementById("coachModalTitle");
+  const rateGroup = document.getElementById("coachRateGroup");
+  const allowanceGroup = document.getElementById("dailyAllowanceGroup");
+
+  if (title) title.textContent = isVolunteer ? "Bénévole" : "Entraîneur";
+  if (rateGroup) rateGroup.style.display = isVolunteer ? "none" : "";
+  if (allowanceGroup) allowanceGroup.style.display = isVolunteer ? "none" : "";
+}
+
+function updateCurrentProfileUI() {
+  const isVolunteer = __isVolunteerProfile(currentCoach);
+  [
+    "summaryHoursItem",
+    "summaryRateItem",
+    "summaryTrainingPaymentItem",
+    "summaryCompDaysItem",
+    "summaryCompPaymentItem",
+  ].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = isVolunteer ? "none" : "";
+  });
+
+  const totalLabel = document.getElementById("totalPaymentLabel");
+  if (totalLabel) totalLabel.textContent = isVolunteer ? "Total remboursable" : "Paiement total";
+
+  const exportBtn = document.getElementById("exportBtn");
+  if (exportBtn) exportBtn.style.display = isVolunteer ? "none" : "";
+
+  const trainingHoursGroup = document.getElementById("trainingHoursGroup");
+  if (trainingHoursGroup) trainingHoursGroup.style.display = isVolunteer ? "none" : "";
+}
+
 function __showMileagePreviewModal(html, fileName) {
   let modal = document.getElementById('mileagePreviewModal');
   if (!modal) {
@@ -2608,7 +2709,7 @@ function __showMileagePreviewModal(html, fileName) {
 
 function exportExpenseHTML() {
   if (!currentCoach || !currentMonth) {
-    alert("Veuillez sélectionner un entraîneur et un mois.");
+    alert("Veuillez sélectionner un profil et un mois.");
     return;
   }
   const [year, month] = currentMonth.split("-");
@@ -2657,6 +2758,8 @@ function exportExpenseHTML() {
 
   const logoUrl = new URL('logo-jcc.png', window.location.href).href;
   const coachDisplayName = __getCoachDisplayName(currentCoach) || currentCoach.name;
+  const profileLabel = __getProfileLabel(currentCoach, { capitalized: true });
+  const signatureLabel = __isVolunteerProfile(currentCoach) ? 'Signature du bénévole' : 'Signature du salarié';
   const totalMileageAmount = rows.reduce((sum, row) => sum + (row.mileageAmount || 0), 0);
   const totalTollAmount = rows.reduce((sum, row) => sum + (row.tollAmount || 0), 0);
   const totalHotelAmount = rows.reduce((sum, row) => sum + (row.hotelAmount || 0), 0);
@@ -3050,7 +3153,7 @@ function exportExpenseHTML() {
           <div class="info-list">
             <div class="info-row"><span class="label">Nom et prénom</span><span class="value">${coachDisplayName || "Non renseigné"}</span></div>
             <div class="info-row"><span class="label">Adresse</span><span class="value">${currentCoach.address || "Non renseignée"}</span></div>
-            <div class="info-row"><span class="label">Poste</span><span class="value">Entraîneur</span></div>
+            <div class="info-row"><span class="label">Poste</span><span class="value">${profileLabel}</span></div>
             <div class="info-row"><span class="label">Date d'édition</span><span class="value">${today}</span></div>
           </div>
         </section>
@@ -3160,7 +3263,7 @@ ${rows
 
       <div class="signature">
         <div>
-          <strong>Signature du salarié</strong><br><br><br>
+          <strong>${signatureLabel}</strong><br><br><br>
           ${coachDisplayName || currentCoach.name}
         </div>
         <div>
@@ -3197,13 +3300,13 @@ window.exportExpenseHTML = exportExpenseHTML;
 // ===== Import JSON =====
 async function importCoachData(data) {
   if (!currentCoach || !currentUser) {
-    alert("Veuillez sélectionner un entraîneur et vous connecter avant d'importer.");
+    alert("Veuillez sélectionner un profil et vous connecter avant d'importer.");
     return;
   }
 
   if (data.entraineur && data.entraineur !== currentCoach.name) {
     const ok = confirm(
-      `Le coach du fichier JSON est "${data.entraineur}", le coach sélectionné est "${currentCoach.name}". Continuer ?`
+      `Le profil du fichier JSON est "${data.entraineur}", le profil sélectionné est "${currentCoach.name}". Continuer ?`
     );
     if (!ok) return;
   }
@@ -3270,7 +3373,7 @@ async function importCoachData(data) {
 // ===== Export backup JSON =====
 function exportBackupJSON() {
   if (!currentCoach) {
-    alert("Veuillez sélectionner un entraîneur.");
+    alert("Veuillez sélectionner un profil.");
     return;
   }
 

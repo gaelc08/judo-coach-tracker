@@ -59,7 +59,7 @@
       <div id="coachGreeting" class="coach-greeting" style="display:none"></div>
       <div class="toolbar card">
         <label id="coachSelectorGroup" class="toolbar-label">
-          <span>Entraîneur</span>
+          <span>Profil</span>
           <select id="coachSelect">
             <option value="">-- Sélectionner --</option>
           </select>
@@ -72,6 +72,7 @@
 
         <div class="toolbar-actions">
           <button id="addCoachBtn" class="admin-only btn-secondary" style="display:none">+ Entraîneur</button>
+          <button id="addVolunteerBtn" class="admin-only btn-secondary" style="display:none">+ Bénévole</button>
           <button id="editCoachBtn" class="admin-only btn-secondary" style="display:none">✏️ Modifier</button>
           <button id="inviteAdminBtn" class="admin-only btn-secondary" style="display:none">✉️ Inviter admin</button>
           <button id="freezeBtn" class="admin-only btn-secondary" style="display:none">🔒 Geler la fiche</button>
@@ -95,23 +96,23 @@
       <div class="summary card">
         <h2 class="summary-title">Récapitulatif mensuel</h2>
         <div class="summary-grid">
-          <div class="summary-item">
+          <div class="summary-item" id="summaryHoursItem">
             <span class="label">Heures d'entraînement</span>
             <span class="value" id="totalHours">0</span>
           </div>
-          <div class="summary-item">
+          <div class="summary-item" id="summaryRateItem">
             <span class="label">Taux horaire</span>
             <span class="value" id="hourlyRate">€0,00</span>
           </div>
-          <div class="summary-item">
+          <div class="summary-item" id="summaryTrainingPaymentItem">
             <span class="label">Paiement entraînement</span>
             <span class="value" id="trainingPayment">€0,00</span>
           </div>
-          <div class="summary-item">
+          <div class="summary-item" id="summaryCompDaysItem">
             <span class="label">Jours de compétition</span>
             <span class="value" id="compDays">0</span>
           </div>
-          <div class="summary-item">
+          <div class="summary-item" id="summaryCompPaymentItem">
             <span class="label">Paiement compétition</span>
             <span class="value" id="compPayment">€0,00</span>
           </div>
@@ -136,7 +137,7 @@
             <span class="value" id="purchasePayment">€0,00</span>
           </div>
           <div class="summary-item total">
-            <span class="label">Paiement total</span>
+            <span class="label" id="totalPaymentLabel">Paiement total</span>
             <span class="value" id="totalPayment">€0,00</span>
           </div>
         </div>
@@ -157,7 +158,13 @@
   <!-- Coach modal -->
   <div id="coachModal" class="modal">
     <div class="modal-content">
-      <h2>Entraîneur</h2>
+      <h2 id="coachModalTitle">Profil</h2>
+      <label>Type de profil
+        <select id="coachProfileType">
+          <option value="coach">Entraîneur</option>
+          <option value="benevole">Bénévole</option>
+        </select>
+      </label>
       <label>Nom
         <input id="coachName" type="text">
       </label>
@@ -181,13 +188,13 @@
       <label>Puissance fiscale (CV)
         <input id="coachFiscalPower" type="number">
       </label>
-      <label>Taux horaire (€)
+      <label id="coachRateGroup">Taux horaire (€)
         <input id="coachRate" type="number" step="0.1">
       </label>
-      <label>Indemnité journalière (€)
+      <label id="dailyAllowanceGroup">Indemnité journalière (€)
         <input id="dailyAllowance" type="number" step="0.1">
       </label>
-      <div class="field-group">
+      <div class="field-group" id="coachMileageHintGroup">
         <label>Remboursement kilométrique</label>
         <p class="field-hint">Calculé automatiquement selon le barème légal voiture, en fonction de la puissance fiscale et du kilométrage cumulé sur l'année civile.</p>
       </div>
@@ -206,7 +213,7 @@
     <div class="modal-content">
       <h2 id="dayTitle">Modifier jour</h2>
 
-      <label>Heures d'entraînement
+      <label id="trainingHoursGroup">Heures d'entraînement
         <input id="trainingHours" type="number" step="0.5" min="0">
       </label>
 
@@ -342,11 +349,12 @@
         <h3>🔧 Fonctions administrateur</h3>
         <ul>
           <li><strong>+ Entraîneur</strong> – ajoute un nouveau profil d'entraîneur avec ses tarifs.</li>
+          <li><strong>+ Bénévole</strong> – ajoute un profil bénévole pouvant saisir des frais et des déplacements sans éléments de paie.</li>
           <li><strong>✏️ Modifier</strong> – modifie le profil et les tarifs de l'entraîneur sélectionné.</li>
           <li><strong>🔒 Geler la fiche</strong> – verrouille ou déverrouille un mois pour empêcher les modifications.</li>
           <li><strong>📥 Importer JSON</strong> – permet de réinjecter une sauvegarde JSON dans la fiche affichée.</li>
           <li><strong>✉️ Inviter admin</strong> – envoie une invitation à un nouvel administrateur.</li>
-          <li>Les administrateurs peuvent consulter et exporter les données de n'importe quel entraîneur.</li>
+          <li>Les administrateurs peuvent consulter et exporter les données de n'importe quel profil.</li>
         </ul>
       </div>
 
@@ -390,6 +398,6 @@
     </div>
   </div>
 
-  <script type="module" src="app-modular.js?v=2026-03-11-expense-report-4"></script>
+  <script type="module" src="app-modular.js?v=2026-03-11-volunteer-1"></script>
 </body>
 </html>
