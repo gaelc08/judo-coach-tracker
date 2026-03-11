@@ -240,23 +240,33 @@
       <h2>❓ Aide – Comment utiliser l'application</h2>
 
       <div class="help-section">
-        <h3>👤 Connexion et inscription</h3>
+        <h3>👤 Première connexion et accès</h3>
         <ul>
-          <li>Saisissez votre adresse e-mail et votre mot de passe, puis cliquez sur <strong>Se connecter</strong>.</li>
-          <li>Si vous n'avez pas encore de compte, cliquez sur <strong>S'inscrire</strong> pour en créer un.</li>
-          <li>En cas d'oubli de mot de passe, cliquez sur <strong>Mot de passe oublié</strong> pour recevoir un lien de réinitialisation par e-mail.</li>
+          <li>Si vous avez reçu une invitation par e-mail, ouvrez le lien reçu puis créez votre mot de passe pour activer votre accès.</li>
+          <li>Ensuite, saisissez votre adresse e-mail et votre mot de passe, puis cliquez sur <strong>Se connecter</strong>.</li>
+          <li>En cas d'oubli, cliquez sur <strong>Mot de passe oublié</strong> pour recevoir un lien de réinitialisation par e-mail.</li>
+          <li>Une fois connecté, vous accédez directement à votre propre fiche mensuelle d'entraîneur.</li>
         </ul>
       </div>
 
       <div class="help-section">
-        <h3>📅 Saisir une journée</h3>
+        <h3>📅 Renseigner votre mois</h3>
         <ul>
-          <li>Sélectionnez votre nom dans la liste <strong>Entraîneur</strong> et choisissez le mois souhaité.</li>
+          <li>Choisissez le mois souhaité avec le champ <strong>Mois</strong>.</li>
           <li>Cliquez sur un jour dans le calendrier pour ouvrir la fenêtre de saisie.</li>
           <li>Indiquez le nombre d'<strong>heures d'entraînement</strong> (par tranches de 0,5 h).</li>
-          <li>Cochez <strong>Jour de compétition</strong> si vous avez participé à une compétition ce jour-là, puis renseignez les détails du trajet (km, lieu de départ, lieu d'arrivée, description, péage).</li>
+          <li>Cochez <strong>Jour de compétition</strong> si vous avez participé à une compétition ce jour-là, puis renseignez les détails du trajet : kilométrage, départ, arrivée, description et péage éventuel.</li>
           <li>Vous pouvez joindre un justificatif de péage (PDF, JPG ou PNG).</li>
-          <li>Cliquez sur <strong>Sauvegarder</strong> pour enregistrer l'entrée, ou sur <strong>Supprimer</strong> pour effacer les données du jour.</li>
+          <li>Cliquez sur <strong>Sauvegarder</strong> pour enregistrer la journée, ou sur <strong>Supprimer</strong> pour effacer les données du jour.</li>
+        </ul>
+      </div>
+
+      <div class="help-section">
+        <h3>🔒 Fiche gelée</h3>
+        <ul>
+          <li>Si un bandeau <strong>Cette fiche est gelée</strong> apparaît, cela signifie que le mois a été verrouillé par l'administration.</li>
+          <li>Dans ce cas, vous pouvez consulter les données du mois, mais vous ne pouvez plus les modifier.</li>
+          <li>Si une correction est nécessaire, contactez un administrateur du club.</li>
         </ul>
       </div>
 
@@ -273,7 +283,7 @@
 
       <div class="help-section">
         <h3>📊 Récapitulatif mensuel</h3>
-        <p>Le panneau sous le calendrier affiche automatiquement le total des heures, des jours de compétition, des kilomètres parcourus et le montant total à payer pour le mois sélectionné.</p>
+        <p>Le panneau sous le calendrier affiche automatiquement le total des heures, des jours de compétition, des kilomètres parcourus ainsi qu'une estimation du montant calculé pour le mois sélectionné.</p>
       </div>
 
       <div class="help-section">
@@ -281,12 +291,17 @@
         <ul>
           <li><strong>Exporter salaire (CSV)</strong> – génère un fichier tableur avec le détail des jours et le calcul des rémunérations.</li>
           <li><strong>Exporter note de frais km</strong> – génère un document HTML imprimable récapitulant les trajets de compétition (utilisez la fonction d'impression du navigateur pour le convertir en PDF).</li>
+          <li><strong>Exporter backup JSON</strong> – enregistre une sauvegarde de vos données du mois dans un fichier JSON.</li>
         </ul>
       </div>
 
       <div class="help-section">
-        <h3>📥 Import JSON</h3>
-        <p>Vous pouvez importer les données d'un mois précédent depuis un fichier JSON de sauvegarde via le bouton <strong>Importer JSON</strong>.</p>
+        <h3>💡 Bonnes pratiques</h3>
+        <ul>
+          <li>Saisissez vos journées régulièrement pour éviter les oublis en fin de mois.</li>
+          <li>Conservez vos justificatifs de péage et ajoutez-les directement sur les jours concernés.</li>
+          <li>Avant la fin du mois, vérifiez le récapitulatif et exportez vos documents si besoin.</li>
+        </ul>
       </div>
 
       <div class="help-section admin-help">
@@ -294,6 +309,9 @@
         <ul>
           <li><strong>+ Entraîneur</strong> – ajoute un nouveau profil d'entraîneur avec ses tarifs.</li>
           <li><strong>✏️ Modifier</strong> – modifie le profil et les tarifs de l'entraîneur sélectionné.</li>
+          <li><strong>🔒 Geler la fiche</strong> – verrouille ou déverrouille un mois pour empêcher les modifications.</li>
+          <li><strong>📥 Importer JSON</strong> – permet de réinjecter une sauvegarde JSON dans la fiche affichée.</li>
+          <li><strong>✉️ Inviter admin</strong> – envoie une invitation à un nouvel administrateur.</li>
           <li>Les administrateurs peuvent consulter et exporter les données de n'importe quel entraîneur.</li>
         </ul>
       </div>
