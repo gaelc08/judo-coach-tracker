@@ -8,3 +8,6 @@ yarn-debug.log*
 yarn-error.log*
 
 nohup.out
+
+# Supabase local CLI metadata
+supabase/.temp/
