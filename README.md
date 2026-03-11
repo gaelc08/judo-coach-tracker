@@ -207,7 +207,7 @@ const SUPABASE_ANON_KEY = '<your-anon-key>';
 Required Supabase resources:
 
 1. **Authentication** — enable email/password sign-in.
-2. **Database** — create the `coaches` and `time_data` tables (see [Data Models](#data-models)).
+2. **Database** — create the `users` and `time_data` tables (see [Data Models](#data-models)).
 3. **Storage** — create a public bucket named `justifications` for toll receipt uploads (see below).
 4. **Row-Level Security** — configure RLS policies so each coach can only access their own rows.
 
@@ -249,7 +249,7 @@ The migrations set up, in order:
 | `20250101000000_create_is_admin_function.sql` | `public.is_admin()` function used by RLS and the admin RPC check |
 | `20260309150000_create_frozen_timesheets.sql` | `frozen_timesheets` table + RLS policies |
 | `20260310000000_add_coach_invite_support.sql` | `claim_coach_profile()` function — lets a coach atomically claim a profile with `owner_uid = NULL` on first login |
-| `20260310120000_fix_coaches_rls_for_invite_flow.sql` | Replaces `coaches` table RLS policies so admins can INSERT profiles with `owner_uid = NULL` (required for the invitation flow) |
+| `20260310120000_fix_coaches_rls_for_invite_flow.sql` | Replaces the profile table RLS policies so admins can INSERT profiles with `owner_uid = NULL` (required for the invitation flow) |
 | `20260311084000_drop_legacy_frozen_timesheet_tables.sql` | Removes duplicate legacy frozen-timesheet tables after copying any rows into `frozen_timesheets` |
 | `20260311101500_make_claim_coach_profile_case_insensitive.sql` | Updates `claim_coach_profile()` so invited coach profiles are matched case-insensitively by e-mail |
 | `20260311113000_drop_legacy_admins_and_timesheet_freezes.sql` | Removes the legacy `admins` and `timesheet_freezes` tables after preserving any useful frozen-timesheet rows |
@@ -281,9 +281,9 @@ Optional SQL maintenance helpers are stored in:
 >
 > This error means the `justifications` bucket does not exist (or was deleted) in your Supabase project.  Run the `20240101000000_create_justifications_bucket.sql` migration to recreate it.
 
-> **Troubleshooting — Admin cannot create a new coach (save returns no data / RLS error)**
+> **Troubleshooting — Admin cannot create a new profile (save returns no data / RLS error)**
 >
-> The `coaches` table RLS INSERT policy may still require `owner_uid = auth.uid()`, which rejects inserts with `owner_uid = NULL`.  Apply `20260310120000_fix_coaches_rls_for_invite_flow.sql` to replace the policies with ones that allow admins to insert profiles with a null owner UID.
+> The profile table RLS INSERT policy may still require `owner_uid = auth.uid()`, which rejects inserts with `owner_uid = NULL`.  Apply `20260310120000_fix_coaches_rls_for_invite_flow.sql` to replace the policies with ones that allow admins to insert profiles with a null owner UID.
 
 #### Personalising the invitation e-mail (French template)
 
@@ -316,7 +316,7 @@ Invitation à rejoindre Judo Club de Cattenom-Rodemack
 ---
 
 
-### Supabase — `coaches` table
+### Supabase — `users` table
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -337,7 +337,7 @@ Invitation à rejoindre Judo Club de Cattenom-Rodemack
 | Column | Type | Description |
 |--------|------|-------------|
 | `id` | UUID (PK) | Auto-generated identifier |
-| `coach_id` | UUID (FK) | References `coaches.id` |
+| `coach_id` | UUID (FK) | References `users.id` |
 | `date` | DATE | Entry date (YYYY-MM-DD) |
 | `hours` | DECIMAL | Training hours for that day |
 | `competition` | BOOLEAN | Whether this was a competition day |
@@ -361,7 +361,7 @@ Tracks which coach/month combinations have been locked by an admin to prevent fu
 | Column | Type | Description |
 |--------|------|-------------|
 | `id` | UUID (PK) | Auto-generated identifier |
-| `coach_id` | UUID (FK) | References `coaches.id` (cascade deletes) |
+| `coach_id` | UUID (FK) | References `users.id` (cascade deletes) |
 | `month` | TEXT | Locked month in `YYYY-MM` format |
 | `frozen_at` | TIMESTAMPTZ | When the timesheet was frozen |
 | `frozen_by` | TEXT | Email of the admin who froze the timesheet |

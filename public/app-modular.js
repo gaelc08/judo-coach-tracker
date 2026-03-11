@@ -8,7 +8,7 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-11-email-check-1';
+const __BUILD_ID = '2026-03-11-users-table-1';
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 let __deferredInstallPrompt = null;
@@ -618,7 +618,7 @@ async function __coachWriteViaRest(coachData, { editingId = null } = {}) {
   }
 
   const isUpdate = !!editingId;
-  const baseUrl = `${supabaseUrl}/rest/v1/coaches`;
+  const baseUrl = `${supabaseUrl}/rest/v1/users`;
   const url = isUpdate
     ? `${baseUrl}?id=eq.${encodeURIComponent(editingId)}`
     : baseUrl;
@@ -1228,12 +1228,12 @@ async function loadAllDataFromSupabase({ isAdminOverride } = {}) {
   // Coaches
   coaches = [];
   if (isAdmin) {
-    const res = await __restSelect('coaches');
+    const res = await __restSelect('users');
     if (res.error) throw new Error(res.error.message);
     coaches = (res.data || []).map(d => ({ id: d.id, ...d }));
   } else {
     // For coach, prefer owner_uid = current user id (RLS-friendly)
-    let res = await __restSelect('coaches', { filters: [['owner_uid', 'eq', currentUser.id]] });
+    let res = await __restSelect('users', { filters: [['owner_uid', 'eq', currentUser.id]] });
     if (res.error) throw new Error(res.error.message);
     let rows = res.data || [];
 
@@ -1241,7 +1241,7 @@ async function loadAllDataFromSupabase({ isAdminOverride } = {}) {
     // This handles the invitation flow: admin pre-created a profile (owner_uid = null)
     // and the coach has now logged in for the first time after accepting the invite.
     if (rows.length === 0 && currentUser.email) {
-      const claimRes = await globalThis.fetch(`${supabaseUrl}/rest/v1/rpc/claim_coach_profile`, {
+      const claimRes = await globalThis.fetch(`${supabaseUrl}/rest/v1/rpc/claim_user_profile`, {
         method: 'POST',
         headers: {
           apikey: supabaseKey,
@@ -1252,13 +1252,13 @@ async function loadAllDataFromSupabase({ isAdminOverride } = {}) {
       });
       if (claimRes.ok) {
         // Successfully claimed (or no unclaimed profile found — either way, re-query by owner_uid)
-        res = await __restSelect('coaches', { filters: [['owner_uid', 'eq', currentUser.id]] });
+        res = await __restSelect('users', { filters: [['owner_uid', 'eq', currentUser.id]] });
         if (res.error) throw new Error(res.error.message);
         rows = res.data || [];
       } else {
         // Log the failure but do not block the user; they simply won't have a linked profile yet.
         const text = await claimRes.text().catch(() => '');
-        console.warn('DEBUG claim_coach_profile failed:', claimRes.status, text);
+        console.warn('DEBUG claim_user_profile failed:', claimRes.status, text);
       }
     }
 
@@ -1752,8 +1752,8 @@ const coachData = {
     );
 
     const dbPromise = (editMode && editingCoachId)
-      ? supabase.from('coaches').update([coachData]).eq('id', editingCoachId).select()
-      : supabase.from('coaches').insert([coachData]).select();
+      ? supabase.from('users').update([coachData]).eq('id', editingCoachId).select()
+      : supabase.from('users').insert([coachData]).select();
 
     try {
       res = await Promise.race([dbPromise, timeoutPromise]);
@@ -1885,7 +1885,7 @@ async function deleteCoach() {
     }
 
     // Delete the coach
-    const { error: error1 } = await supabase.from('coaches').delete().eq('id', editingCoachId);
+    const { error: error1 } = await supabase.from('users').delete().eq('id', editingCoachId);
     if (error1) throw error1;
 
     // Delete all timeData for this coach
