@@ -13,9 +13,10 @@ DO $$
 DECLARE
   legacy_table record;
   has_expected_columns boolean;
+  has_null_frozen_at boolean;
 BEGIN
   IF to_regclass('public.frozen_timesheets') IS NULL THEN
-    RAISE EXCEPTION 'public.frozen_timesheets must exist before dropping legacy frozen-timesheet tables';
+    RAISE EXCEPTION 'public.frozen_timesheets must exist before dropping legacy frozen_timesheets tables';
   END IF;
 
   FOR legacy_table IN
@@ -34,15 +35,39 @@ BEGIN
 
     IF has_expected_columns THEN
       EXECUTE format(
+        'SELECT EXISTS (
+           SELECT 1
+           FROM public.%I
+           WHERE frozen_at IS NULL
+         )',
+        legacy_table.tablename
+      )
+      INTO has_null_frozen_at;
+
+      IF has_null_frozen_at THEN
+        RAISE EXCEPTION USING
+          MESSAGE = format(
+            'Legacy table public.%I contains rows with NULL frozen_at; update or delete those rows before running this frozen_timesheets cleanup migration',
+            legacy_table.tablename
+          );
+      END IF;
+
+      EXECUTE format(
         'INSERT INTO public.frozen_timesheets (coach_id, month, frozen_at, frozen_by)
-         SELECT coach_id, month, COALESCE(frozen_at, now()), frozen_by
+         SELECT coach_id, month, frozen_at, frozen_by
          FROM public.%I
          ON CONFLICT (coach_id, month) DO NOTHING',
         legacy_table.tablename
       );
-    END IF;
 
-    EXECUTE format('DROP TABLE public.%I', legacy_table.tablename);
+      EXECUTE format('DROP TABLE public.%I', legacy_table.tablename);
+    ELSE
+      RAISE NOTICE USING
+        MESSAGE = format(
+          'Skipping public.%I because it does not have the expected frozen_timesheets columns',
+          legacy_table.tablename
+        );
+    END IF;
   END LOOP;
 END;
 $$;
