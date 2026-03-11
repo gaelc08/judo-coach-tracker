@@ -358,7 +358,7 @@ button, .btn-primary, .btn-secondary, .btn-danger {
 
 .toolbar-actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 8px;
   align-items: stretch;
   width: 100%;

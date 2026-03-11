@@ -948,11 +948,13 @@ function setupAuthListeners() {
       if (isAdmin) {
         document.getElementById("addCoachBtn").style.display = "inline-block";
         document.getElementById("editCoachBtn").style.display = "inline-block";
+        document.getElementById("inviteAdminBtn").style.display = "inline-block";
         document.getElementById("freezeBtn").style.display = "inline-block";
         document.getElementById("importGroup").style.display = "flex";
       } else {
         document.getElementById("addCoachBtn").style.display = "none";
         document.getElementById("editCoachBtn").style.display = "none";
+        document.getElementById("inviteAdminBtn").style.display = "none";
         document.getElementById("freezeBtn").style.display = "none";
         document.getElementById("importGroup").style.display = "none";
       }
@@ -1276,6 +1278,18 @@ function setupEventListeners() {
       return;
     }
     await inviteCoach(email);
+  };
+  document.getElementById("inviteAdminBtn").onclick = async () => {
+    const rawEmail = globalThis.prompt("Adresse e-mail du nouvel administrateur :", "");
+    if (rawEmail == null) return;
+
+    const email = __normalizeEmail(rawEmail);
+    if (!email) {
+      alert("Veuillez renseigner une adresse e-mail valide.");
+      return;
+    }
+
+    await inviteAdmin(email);
   };
   document.getElementById("cancelCoach").onclick = () => {
     document.getElementById("coachModal").classList.remove("active");
@@ -1805,6 +1819,81 @@ async function inviteCoach(email) {
       ? `\n\nVérifiez que la fonction Edge "invite-coach" est bien déployée sur Supabase.`
       : '';
     alert(`Erreur lors de l'envoi de l'invitation : ${e.message}${hint}`);
+    return false;
+  }
+}
+
+async function inviteAdmin(email) {
+  if (!currentUser) return false;
+
+  const normalizedEmail = __normalizeEmail(email);
+  const isAdmin = await isCurrentUserAdminDB();
+
+  if (!isAdmin) {
+    alert("Seul un administrateur peut envoyer des invitations admin.");
+    return false;
+  }
+
+  if (!normalizedEmail) {
+    alert("Veuillez renseigner une adresse e-mail valide.");
+    return false;
+  }
+
+  let accessToken = currentAccessToken;
+  try {
+    const { data: { session } } = await supabase.auth.refreshSession();
+    if (session?.access_token) {
+      accessToken = session.access_token;
+      currentAccessToken = accessToken;
+    }
+  } catch {
+    // keep current token best-effort
+  }
+
+  if (!accessToken) {
+    alert("Session expirée. Veuillez vous reconnecter.");
+    return false;
+  }
+
+  try {
+    const res = await globalThis.fetch(`${supabaseUrl}/functions/v1/invite-admin`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        apikey: supabaseKey,
+      },
+      body: JSON.stringify({
+        email: normalizedEmail,
+        redirectTo: window.location.origin + window.location.pathname,
+      }),
+    });
+
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = json.error || json.message || `Erreur HTTP ${res.status}`;
+      alert(`Échec de l'invitation admin : ${msg}`);
+      return false;
+    }
+
+    if (json.alreadyExisted) {
+      alert(
+        `Droits admin accordés à ${normalizedEmail}.\n\n` +
+        `Cet utilisateur existait déjà, donc aucun nouvel e-mail d'invitation n'a été envoyé.`
+      );
+      return true;
+    }
+
+    alert(
+      `Invitation admin envoyée à ${normalizedEmail}.\n` +
+      `Le nouvel administrateur recevra un e-mail pour créer son mot de passe.`
+    );
+    return true;
+  } catch (e) {
+    const hint = e instanceof TypeError
+      ? `\n\nVérifiez que la fonction Edge "invite-admin" est bien déployée sur Supabase.`
+      : '';
+    alert(`Erreur lors de l'envoi de l'invitation admin : ${e.message}${hint}`);
     return false;
   }
 }
