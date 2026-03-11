@@ -248,6 +248,7 @@ The migrations set up, in order:
 | `20260309150000_create_frozen_timesheets.sql` | `frozen_timesheets` table + RLS policies |
 | `20260310000000_add_coach_invite_support.sql` | `claim_coach_profile()` function — lets a coach atomically claim a profile with `owner_uid = NULL` on first login |
 | `20260310120000_fix_coaches_rls_for_invite_flow.sql` | Replaces `coaches` table RLS policies so admins can INSERT profiles with `owner_uid = NULL` (required for the invitation flow) |
+| `20260311084000_drop_legacy_frozen_timesheet_tables.sql` | Removes duplicate legacy frozen-timesheet tables after copying any rows into `frozen_timesheets` |
 
 #### Marking a user as admin
 
@@ -265,7 +266,7 @@ The `is_admin()` function reads the `is_admin` flag from the user's `app_metadat
 
 > **Troubleshooting — "Erreur lors du gel : Could not find the table 'public.frozen_timesheets' in the schema cache"**
 >
-> This error means the `frozen_timesheets` table does not exist in your Supabase project.  Apply the migrations above (all three files) to create it.  Make sure to run `20250101000000_create_is_admin_function.sql` **before** `20260309150000_create_frozen_timesheets.sql` since the table's RLS policies depend on `public.is_admin()`.
+> This error means the `frozen_timesheets` table does not exist in your Supabase project.  Apply the migrations above to create it.  Make sure to run `20250101000000_create_is_admin_function.sql` **before** `20260309150000_create_frozen_timesheets.sql` since the table's RLS policies depend on `public.is_admin()`.  If your project already has an older duplicate frozen-timesheet table, also apply `20260311084000_drop_legacy_frozen_timesheet_tables.sql` so `frozen_timesheets` remains the only table in use.
 
 > **Troubleshooting — "Bucket not found" error when viewing a receipt**
 >
