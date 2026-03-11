@@ -8,7 +8,7 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-11-onboarding-fr-1';
+const __BUILD_ID = '2026-03-11-admin-fallback-1';
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 let __deferredInstallPrompt = null;
@@ -679,6 +679,13 @@ document.addEventListener("DOMContentLoaded", () => {
 let __adminCache = { userId: null, value: null, atMs: 0 };
 let __adminInFlight = null;
 
+function __isAdminViaLocalClaims() {
+  const tokenAdmin = __hasAdminClaim(currentAccessToken);
+  const currentUserAdmin = currentUser?.app_metadata?.is_admin === true || currentUser?.app_metadata?.is_admin === 'true';
+  const sessionUserAdmin = currentSession?.user?.app_metadata?.is_admin === true || currentSession?.user?.app_metadata?.is_admin === 'true';
+  return !!(tokenAdmin || currentUserAdmin || sessionUserAdmin);
+}
+
 async function __isAdminViaRest() {
   if (!currentUser) return false;
   if (!currentAccessToken) return false;
@@ -725,6 +732,8 @@ async function isCurrentUserAdminDB() {
     return false;
   }
 
+  const localAdmin = __isAdminViaLocalClaims();
+
   const ttlMs = 5 * 60 * 1000;
   if (__adminCache.userId === currentUser.id && typeof __adminCache.value === 'boolean' && (Date.now() - __adminCache.atMs) < ttlMs) {
     return __adminCache.value;
@@ -739,7 +748,11 @@ async function isCurrentUserAdminDB() {
   }
 
   __adminInFlight = (async () => {
-    const value = await __isAdminViaRest();
+    let value = await __isAdminViaRest();
+    if (!value && localAdmin) {
+      console.warn('DEBUG is_admin REST returned false, using local admin claim fallback');
+      value = true;
+    }
     __adminCache = { userId: currentUser.id, value, atMs: Date.now() };
     return value;
   })();
@@ -750,6 +763,11 @@ async function isCurrentUserAdminDB() {
     return value;
   } catch (e) {
     console.warn('DEBUG is_admin (REST) failed:', e);
+    if (localAdmin) {
+      console.warn('DEBUG is_admin using local admin claim fallback:', localAdmin);
+      __adminCache = { userId: currentUser.id, value: true, atMs: Date.now() };
+      return true;
+    }
     if (__adminCache.userId === currentUser.id && typeof __adminCache.value === 'boolean') {
       console.warn('DEBUG is_admin using cached value:', __adminCache.value);
       return __adminCache.value;
@@ -872,6 +890,8 @@ function setupAuthListeners() {
     console.log('DEBUG onAuthStateChange:', event, session);
     currentSession = session || null;
     currentAccessToken = session?.access_token || null;
+    __adminCache = { userId: session?.user?.id || null, value: null, atMs: 0 };
+    __adminInFlight = null;
     window.__lastSession = currentSession;
     if (currentAccessToken) {
       console.log('DEBUG access token present:', String(currentAccessToken).slice(0, 12) + '...');
