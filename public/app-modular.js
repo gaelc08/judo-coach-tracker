@@ -8,7 +8,7 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-11-pdf-2cols-1';
+const __BUILD_ID = '2026-03-11-cea-export-1';
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 let __deferredInstallPrompt = null;
@@ -1561,7 +1561,7 @@ function setupEventListeners() {
     document.getElementById("dayModal").classList.remove("active");
   };
 
-  document.getElementById("exportBtn").onclick = exportToCSV;
+  document.getElementById("exportBtn").onclick = exportDeclarationXLS;
   document.getElementById("backupBtn").onclick = exportBackupJSON;
 
   document.getElementById("importBtn").onclick = () => {
@@ -2567,47 +2567,197 @@ function updateSummary() {
   ).textContent = `€${totalPayment.toFixed(2)}`;
 }
 
-function exportToCSV() {
+function __escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function numberDisplay(value, digits = 0) {
+  return Number(value || 0).toFixed(digits).replace('.', ',');
+}
+
+function currencyDisplay(value) {
+  return `${numberDisplay(value, 2)} €`;
+}
+
+function exportDeclarationXLS() {
   if (!currentCoach || !currentMonth) {
     alert("Veuillez sélectionner un profil et un mois.");
     return;
   }
 
   if (__isVolunteerProfile(currentCoach)) {
-    alert("L'export salaire CSV n'est pas disponible pour un profil bénévole.");
+    alert("L'export de déclaration CEA URSSAF n'est pas disponible pour un profil bénévole.");
     return;
   }
 
   const [year, month] = currentMonth.split("-");
-  const mileageBreakdown = __getMonthlyMileageBreakdown(currentCoach, currentMonth);
-  let csv =
-    "Date,Training Hours,Competition,Competition Description,Kilometers,Tolls,Hotel,Purchase,Km Reimbursement,Total Payment\n";
-
-  Object.keys(timeData)
+  const rows = Object.keys(timeData)
     .filter((key) => key.startsWith(`${currentCoach.id}-${year}-${month}`))
     .sort()
-    .forEach((key) => {
+    .map((key) => {
       const date = key.split("-").slice(-3).join("-");
       const data = timeData[key];
-      const mileageAmount = mileageBreakdown.byKey[key]?.amount || 0;
-      const payment =
-        data.hours * currentCoach.hourly_rate +
-        (data.competition ? currentCoach.daily_allowance : 0) +
-        mileageAmount +
-        (data.peage || 0) +
-        (data.hotel || 0) +
-        (data.achat || 0);
-      csv +=
-        `${date},${data.hours},${data.competition ? "Yes" : "No"},` +
-        `"${data.description || ""}",${data.km},${(data.peage || 0).toFixed(2)},${(data.hotel || 0).toFixed(2)},${(data.achat || 0).toFixed(2)},€${mileageAmount.toFixed(2)},€${payment.toFixed(2)}\n`;
+      const hours = Number(data.hours) || 0;
+      const hourlyRate = Number(currentCoach.hourly_rate) || 0;
+      const trainingAmount = hours * hourlyRate;
+      const competitionAllowance = data.competition
+        ? (Number(currentCoach.daily_allowance) || 0)
+        : 0;
+      const declaredTotal = trainingAmount + competitionAllowance;
+
+      return {
+        date,
+        description: data.description || (data.competition ? "Jour de compétition" : "Entraînement"),
+        hours,
+        hourlyRate,
+        trainingAmount,
+        competition: !!data.competition,
+        competitionAllowance,
+        declaredTotal,
+      };
     });
 
-  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${currentCoach.name}_${currentMonth}_coaching.csv`;
-  a.click();
+  if (!rows.length) {
+    alert("Aucune donnée à déclarer pour ce mois.");
+    return;
+  }
+
+  const totalHours = rows.reduce((sum, row) => sum + row.hours, 0);
+  const competitionDays = rows.reduce((sum, row) => sum + (row.competition ? 1 : 0), 0);
+  const totalTrainingAmount = rows.reduce((sum, row) => sum + row.trainingAmount, 0);
+  const totalCompetitionAllowance = rows.reduce((sum, row) => sum + row.competitionAllowance, 0);
+  const grandTotal = rows.reduce((sum, row) => sum + row.declaredTotal, 0);
+  const coachDisplayName = __getCoachDisplayName(currentCoach) || currentCoach.name;
+  const exportDate = new Date().toLocaleDateString('fr-FR');
+
+  const html = `<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:x="urn:schemas-microsoft-com:office:excel"
+      xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="UTF-8">
+<!--[if gte mso 9]>
+<xml>
+  <x:ExcelWorkbook>
+    <x:ExcelWorksheets>
+      <x:ExcelWorksheet>
+        <x:Name>Déclaration CEA</x:Name>
+        <x:WorksheetOptions>
+          <x:DisplayGridlines/>
+          <x:FitToPage/>
+          <x:PageSetup>
+            <x:Layout x:Orientation="Portrait"/>
+          </x:PageSetup>
+        </x:WorksheetOptions>
+      </x:ExcelWorksheet>
+    </x:ExcelWorksheets>
+  </x:ExcelWorkbook>
+</xml>
+<![endif]-->
+<style>
+  body { font-family: Calibri, Arial, sans-serif; margin: 18px; color: #1f2937; }
+  .title { font-size: 20pt; font-weight: 700; color: #0f3460; margin-bottom: 4px; }
+  .subtitle { font-size: 11pt; color: #526274; margin-bottom: 14px; }
+  .section-title { font-size: 12pt; font-weight: 700; color: #0f3460; margin: 14px 0 8px; }
+  table { border-collapse: collapse; width: 100%; margin-bottom: 12px; }
+  .meta td { border: 1px solid #cfd8e3; padding: 7px 9px; font-size: 10pt; }
+  .meta .label { background: #eef4fb; font-weight: 700; width: 24%; color: #0f3460; }
+  .summary th, .summary td, .details th, .details td { border: 1px solid #cfd8e3; padding: 7px 8px; font-size: 10pt; }
+  .summary th, .details th { background: #0f3460; color: #fff; text-align: left; font-weight: 700; }
+  .summary td.amount, .details td.amount, .details td.number { text-align: right; }
+  .details tr:nth-child(even) td { background: #f8fbff; }
+  .total-row td { background: #e9f1fb; font-weight: 700; }
+  .note { margin-top: 10px; padding: 10px 12px; border: 1px solid #d6e0ec; background: #f8fbff; font-size: 10pt; }
+</style>
+</head>
+<body>
+  <div class="title">Déclaration CEA URSSAF</div>
+  <div class="subtitle">Judo Club de Cattenom-Rodemack — période ${__escapeHtml(month)}/${__escapeHtml(year)}</div>
+
+  <table class="meta">
+    <tr>
+      <td class="label">Intervenant</td>
+      <td>${__escapeHtml(coachDisplayName || 'Non renseigné')}</td>
+      <td class="label">Mois déclaré</td>
+      <td>${__escapeHtml(month)}/${__escapeHtml(year)}</td>
+    </tr>
+    <tr>
+      <td class="label">Adresse</td>
+      <td>${__escapeHtml(currentCoach.address || 'Non renseignée')}</td>
+      <td class="label">Taux horaire</td>
+      <td>${currencyDisplay(currentCoach.hourly_rate)}</td>
+    </tr>
+    <tr>
+      <td class="label">Indemnité forfaitaire compétition</td>
+      <td>${currencyDisplay(currentCoach.daily_allowance)}</td>
+      <td class="label">Date d'édition</td>
+      <td>${__escapeHtml(exportDate)}</td>
+    </tr>
+  </table>
+
+  <div class="section-title">Synthèse à déclarer</div>
+  <table class="summary">
+    <tr>
+      <th>Heures prestées</th>
+      <th>Jours de compétition</th>
+      <th>Montant heures</th>
+      <th>Indemnités forfaitaires</th>
+      <th>Total déclaration</th>
+    </tr>
+    <tr>
+      <td class="number">${numberDisplay(totalHours, 1)}</td>
+      <td class="number">${competitionDays}</td>
+      <td class="amount">${currencyDisplay(totalTrainingAmount)}</td>
+      <td class="amount">${currencyDisplay(totalCompetitionAllowance)}</td>
+      <td class="amount">${currencyDisplay(grandTotal)}</td>
+    </tr>
+  </table>
+
+  <div class="section-title">Détail de la déclaration</div>
+  <table class="details">
+    <tr>
+      <th>Date</th>
+      <th>Libellé</th>
+      <th>Heures prestées</th>
+      <th>Taux horaire</th>
+      <th>Montant heures</th>
+      <th>Jour compétition</th>
+      <th>Indemnité forfaitaire</th>
+      <th>Total déclaré</th>
+    </tr>
+    ${rows.map((row) => `
+    <tr>
+      <td>${__escapeHtml(row.date)}</td>
+      <td>${__escapeHtml(row.description)}</td>
+      <td class="number">${numberDisplay(row.hours, 1)}</td>
+      <td class="amount">${currencyDisplay(row.hourlyRate)}</td>
+      <td class="amount">${currencyDisplay(row.trainingAmount)}</td>
+      <td>${row.competition ? 'Oui' : 'Non'}</td>
+      <td class="amount">${currencyDisplay(row.competitionAllowance)}</td>
+      <td class="amount">${currencyDisplay(row.declaredTotal)}</td>
+    </tr>`).join('')}
+    <tr class="total-row">
+      <td colspan="2">TOTAL</td>
+      <td class="number">${numberDisplay(totalHours, 1)}</td>
+      <td></td>
+      <td class="amount">${currencyDisplay(totalTrainingAmount)}</td>
+      <td class="number">${competitionDays}</td>
+      <td class="amount">${currencyDisplay(totalCompetitionAllowance)}</td>
+      <td class="amount">${currencyDisplay(grandTotal)}</td>
+    </tr>
+  </table>
+
+  <div class="note">Ce fichier est destiné à la préparation de la déclaration mensuelle au service CEA de l'URSSAF. Il peut être ouvert dans Excel ou LibreOffice puis imprimé en PDF.</div>
+</body>
+</html>`;
+
+  const blob = new Blob(["\uFEFF" + html], { type: "application/vnd.ms-excel;charset=utf-8;" });
+  __downloadBlob(blob, `declaration_cea_urssaf_${currentCoach.name}_${currentMonth}.xls`);
 }
 
 function __isStandaloneApp() {
@@ -3533,7 +3683,8 @@ function exportBackupJSON() {
 }
 
 // Optionally expose some functions globally if needed
-window.exportToCSV = exportToCSV;
+window.exportToCSV = exportDeclarationXLS;
+window.exportDeclarationXLS = exportDeclarationXLS;
 window.exportBackupJSON = exportBackupJSON;
 window.saveCoach = saveCoach;
 window.deleteCoach = deleteCoach;
