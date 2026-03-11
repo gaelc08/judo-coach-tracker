@@ -2,6 +2,10 @@
 
 A web application for tracking judo coach training hours, competition days, mileage, and generating expense reports for **Judo Club de Cattenom-Rodemack**.
 
+Technical documentation:
+
+- [Technical Architecture](docs/technical-architecture.md)
+
 ## Table of Contents
 
 - [Overview](#overview)
@@ -23,6 +27,7 @@ A web application for tracking judo coach training hours, competition days, mile
   - [For Coaches](#for-coaches)
   - [For Administrators](#for-administrators)
 - [Export Formats](#export-formats)
+- [Technical Architecture](docs/technical-architecture.md)
 
 ---
 
