@@ -8,7 +8,7 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-11-declaration-xlsx-1';
+const __BUILD_ID = '2026-03-11-validation-feedback-1';
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 let __deferredInstallPrompt = null;
@@ -2154,6 +2154,28 @@ async function updateCalendar() {
   updateFreezeUI();
 }
 
+function __formatMonthLabel(monthValue) {
+  const normalized = __normalizeMonth(monthValue);
+  const [year, month] = String(normalized || '').split('-');
+  if (!year || !month) return normalized;
+  return `${month}/${year}`;
+}
+
+async function handleDayClick(dateStr) {
+  if (!currentCoach) {
+    alert("Veuillez sélectionner un profil.");
+    return;
+  }
+
+  const isAdmin = await isCurrentUserAdminDB();
+  if (!isAdmin && isCurrentMonthFrozen()) {
+    alert(`Impossible de modifier ${dateStr} : le mois ${__formatMonthLabel(currentMonth)} est gelé.`);
+    return;
+  }
+
+  openDayModal(dateStr);
+}
+
 function createDayElement(day, dateStr) {
   const dayDiv = document.createElement("div");
   dayDiv.className = "calendar-day";
@@ -2209,7 +2231,11 @@ function createDayElement(day, dateStr) {
     dayDiv.appendChild(hours);
   }
 
-  dayDiv.addEventListener("click", () => openDayModal(dateStr));
+  dayDiv.addEventListener("click", () => {
+    handleDayClick(dateStr).catch((e) => {
+      alert("Impossible d'ouvrir cette journée : " + e.message);
+    });
+  });
 
   return dayDiv;
 }
@@ -2297,6 +2323,8 @@ function openDayModal(dateStr) {
   document.getElementById("travelGroup").style.display = dayData.competition
     ? "block"
     : "none";
+  document.getElementById("saveDay").disabled = false;
+  document.getElementById("deleteDay").disabled = false;
   updateCurrentProfileUI();
 
   document.getElementById("dayModal").classList.add("active");
@@ -2308,7 +2336,7 @@ async function saveDay() {
 
   const isAdmin = await isCurrentUserAdminDB();
   if (!isAdmin && isCurrentMonthFrozen()) {
-    alert("Cette fiche est gelée. Les modifications ne sont pas autorisées.");
+    alert(`Impossible d'enregistrer : le mois ${__formatMonthLabel(currentMonth)} est gelé.`);
     document.getElementById("dayModal").classList.remove("active");
     return;
   }
@@ -2481,7 +2509,7 @@ async function deleteDay() {
 
   const isAdmin = await isCurrentUserAdminDB();
   if (!isAdmin && isCurrentMonthFrozen()) {
-    alert("Cette fiche est gelée. Les modifications ne sont pas autorisées.");
+    alert(`Impossible de supprimer : le mois ${__formatMonthLabel(currentMonth)} est gelé.`);
     document.getElementById("dayModal").classList.remove("active");
     return;
   }

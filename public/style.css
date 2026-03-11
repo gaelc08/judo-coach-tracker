@@ -816,6 +816,16 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   line-height: 1.4;
 }
 
+.required-marker {
+  color: var(--judo-red);
+  font-weight: 800;
+  margin-right: 2px;
+}
+
+.required-note {
+  margin-top: 10px;
+}
+
 .modal-actions {
   display: flex;
   gap: 10px;
@@ -827,6 +837,12 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   flex: 1;
   min-width: 100px;
   padding: 11px 16px;
+}
+
+.modal-actions button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .modal-actions .btn-primary {

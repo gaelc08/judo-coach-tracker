@@ -13,7 +13,7 @@
     <link rel="icon" href="logo-jcc.png">
     <link rel="apple-touch-icon" href="logo-jcc.png">
     <title>Judo Club de Cattenom-Rodemack – Gestion des intervenants et frais</title>
-    <link rel="stylesheet" href="style.css?v=2026-03-11-declaration-xlsx-1">
+    <link rel="stylesheet" href="style.css?v=2026-03-11-validation-feedback-1">
   </head>
 <body>
 
@@ -165,7 +165,7 @@
           <option value="benevole">Bénévole</option>
         </select>
       </label>
-      <label>Nom
+      <label><span class="required-marker">*</span> Nom
         <input id="coachName" type="text">
       </label>
       <label>Prénom
@@ -185,19 +185,20 @@
       <label>Véhicule (marque &amp; modèle)
         <input id="coachVehicle" type="text">
       </label>
-      <label>Puissance fiscale (CV)
+      <label><span class="required-marker">*</span> Puissance fiscale (CV)
         <input id="coachFiscalPower" type="number">
       </label>
-      <label id="coachRateGroup">Taux horaire (€)
+      <label id="coachRateGroup"><span class="required-marker">*</span> Taux horaire (€)
         <input id="coachRate" type="number" step="0.1">
       </label>
-      <label id="dailyAllowanceGroup">Indemnité journalière (€)
+      <label id="dailyAllowanceGroup"><span class="required-marker">*</span> Indemnité journalière (€)
         <input id="dailyAllowance" type="number" step="0.1">
       </label>
       <div class="field-group" id="coachMileageHintGroup">
         <label>Remboursement kilométrique</label>
         <p class="field-hint">Calculé automatiquement selon le barème légal voiture, en fonction de la puissance fiscale et du kilométrage cumulé sur l'année civile.</p>
       </div>
+      <p class="field-hint required-note"><span class="required-marker">*</span> champ obligatoire pour l'enregistrement du profil entraîneur</p>
 
       <div class="modal-actions">
         <button id="saveCoach" class="btn-primary">Sauvegarder</button>
@@ -214,7 +215,7 @@
       <h2 id="dayTitle">Modifier jour</h2>
 
       <label id="trainingHoursGroup">Heures d'entraînement
-        <input id="trainingHours" type="number" step="0.5" min="0">
+        <input id="trainingHours" type="number" step="0.25" min="0">
       </label>
 
       <label>
@@ -238,7 +239,7 @@
         <label>Péage (€)
           <input id="peage" type="number" step="0.01" min="0">
         </label>
-        <label>Justificatif de péage
+        <label><span class="required-marker">*</span> Justificatif de péage
           <input id="peageJustification" type="file" accept=".pdf,.jpg,.png">
         </label>
         <div id="existingPeageJustification" style="display:none">
@@ -247,7 +248,7 @@
         <label>Hôtel (€)
           <input id="hotel" type="number" step="0.01" min="0">
         </label>
-        <label>Justificatif d'hôtel
+        <label><span class="required-marker">*</span> Justificatif d'hôtel
           <input id="hotelJustification" type="file" accept=".pdf,.jpg,.png">
         </label>
         <div id="existingHotelJustification" style="display:none">
@@ -258,9 +259,10 @@
       <label>Achat pour le club (€)
         <input id="achat" type="number" step="0.01" min="0">
       </label>
-      <label>Justificatif d'achat
+      <label><span class="required-marker">*</span> Justificatif d'achat
         <input id="achatJustification" type="file" accept=".pdf,.jpg,.png">
       </label>
+      <p class="field-hint required-note"><span class="required-marker">*</span> justificatif obligatoire si un montant de péage, d'hôtel ou d'achat est saisi</p>
       <div id="existingAchatJustification" style="display:none">
         <a id="achatJustificationLink" href="#" target="_blank" rel="noopener noreferrer">📎 Voir le justificatif d'achat</a>
       </div>
@@ -293,7 +295,7 @@
         <ul>
           <li>Choisissez le mois souhaité avec le champ <strong>Mois</strong>.</li>
           <li>Cliquez sur un jour dans le calendrier pour ouvrir la fenêtre de saisie.</li>
-          <li>Indiquez le nombre d'<strong>heures d'entraînement</strong> (par tranches de 0,5 h).</li>
+          <li>Indiquez le nombre d'<strong>heures d'entraînement</strong> (par tranches de 0,25 h).</li>
           <li>Cochez <strong>Jour de compétition</strong> si vous avez participé à une compétition ce jour-là, puis renseignez les détails du trajet : kilométrage, départ, arrivée, description, péage éventuel et frais d'hôtel si nécessaire.</li>
           <li>Vous pouvez aussi saisir un <strong>achat pour le club</strong> (matériel, fournitures, etc.) sur la journée concernée.</li>
           <li>Les justificatifs de <strong>péage</strong>, <strong>hôtel</strong> et <strong>achat</strong> peuvent être joints en PDF, JPG ou PNG. Ils sont obligatoires pour exporter la note de frais si un montant correspondant est saisi.</li>
@@ -398,6 +400,6 @@
     </div>
   </div>
 
-  <script type="module" src="app-modular.js?v=2026-03-11-declaration-xlsx-1"></script>
+  <script type="module" src="app-modular.js?v=2026-03-11-validation-feedback-1"></script>
 </body>
 </html>
