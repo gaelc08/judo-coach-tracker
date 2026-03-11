@@ -1379,6 +1379,16 @@ function clearCoachForm() {
 
 function loadCoaches() {
   const select = document.getElementById("coachSelect");
+  const hasCoaches = Array.isArray(coaches) && coaches.length > 0;
+  const hasSingleCoach = hasCoaches && coaches.length === 1;
+  const ownCoach =
+    currentUser && hasCoaches
+      ? coaches.find((coach) => coach.owner_uid === currentUser.id)
+      : null;
+  const fallbackCoach = ownCoach || (hasCoaches ? coaches[0] : null);
+  const shouldAutoSelectDisabledCoach = select.disabled && fallbackCoach;
+  const shouldAutoSelectCoach =
+    !currentCoach && (hasSingleCoach || shouldAutoSelectDisabledCoach);
   select.innerHTML = '<option value="">-- Sélectionner --</option>';
 
   coaches.forEach((coach) => {
@@ -1388,8 +1398,8 @@ function loadCoaches() {
     select.appendChild(option);
   });
 
-  if (!currentCoach && coaches.length > 0 && (coaches.length === 1 || select.disabled)) {
-    currentCoach = coaches[0];
+  if (shouldAutoSelectCoach) {
+    currentCoach = fallbackCoach;
     select.value = currentCoach.id;
   }
 
@@ -1399,7 +1409,7 @@ function loadCoaches() {
       currentCoach = found;
       select.value = currentCoach.id;
     } else {
-      currentCoach = select.disabled && coaches.length > 0 ? coaches[0] : null;
+      currentCoach = select.disabled ? fallbackCoach : null;
       if (currentCoach) {
         select.value = currentCoach.id;
       }
