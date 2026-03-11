@@ -15,6 +15,7 @@ A web application for tracking judo coach training hours, competition days, mile
     - [Deploying Edge Functions](#deploying-the-supabase-edge-functions)
 - [Configuration](#configuration)
   - [Supabase Setup](#supabase-setup)
+  - [French Invite Email Template](#personalising-the-invitation-e-mail-french-template)
 - [Data Models](#data-models)
 - [Application Pages](#application-pages)
   - [Coach Application](#coach-application)
@@ -274,9 +275,36 @@ The `is_admin()` function reads the `is_admin` flag from the user's `app_metadat
 >
 > The `coaches` table RLS INSERT policy may still require `owner_uid = auth.uid()`, which rejects inserts with `owner_uid = NULL`.  Apply `20260310120000_fix_coaches_rls_for_invite_flow.sql` to replace the policies with ones that allow admins to insert profiles with a null owner UID.
 
+#### Personalising the invitation e-mail (French template)
+
+The invitation e-mail sent to coaches is generated entirely by Supabase and cannot be changed through application code.  To set the **French** invitation e-mail template, configure it directly in the Supabase dashboard:
+
+1. Open the [Supabase dashboard](https://app.supabase.com) → your project → **Authentication** → **Email Templates**.
+2. Select the **Invite user** template.
+3. Replace the subject and body with the French text below (adapt as needed):
+
+**Subject:**
+```
+Invitation à rejoindre Judo Club de Cattenom-Rodemack
+```
+
+**Body (HTML):**
+```html
+<h2>Bienvenue dans l'équipe !</h2>
+<p>Bonjour,</p>
+<p>Vous avez été invité(e) à rejoindre l'application de suivi des entraîneurs du <strong>Judo Club de Cattenom-Rodemack</strong>.</p>
+<p>Cliquez sur le bouton ci-dessous pour créer votre mot de passe et accéder à l'application :</p>
+<p><a href="{{ .ConfirmationURL }}" style="background:#c0392b;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Créer mon mot de passe</a></p>
+<p>Si vous n'attendiez pas cette invitation, ignorez ce message.</p>
+<p>Cordialement,<br>L'équipe du Judo Club de Cattenom-Rodemack</p>
+```
+
+4. Click **Save**.
+
+> **Note:** the `{{ .ConfirmationURL }}` placeholder is automatically replaced by Supabase with the correct invite link that redirects to your application.  The app detects this link and shows a dedicated "Créer votre mot de passe" screen immediately upon arrival, so coaches are never confused by the generic login form.
+
 ---
 
-## Data Models
 
 ### Supabase — `coaches` table
 
