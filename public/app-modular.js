@@ -1388,7 +1388,7 @@ function loadCoaches() {
     select.appendChild(option);
   });
 
-  if (!currentCoach && coaches.length === 1) {
+  if (!currentCoach && coaches.length > 0 && (coaches.length === 1 || select.disabled)) {
     currentCoach = coaches[0];
     select.value = currentCoach.id;
   }
@@ -1399,7 +1399,10 @@ function loadCoaches() {
       currentCoach = found;
       select.value = currentCoach.id;
     } else {
-      currentCoach = null;
+      currentCoach = select.disabled && coaches.length > 0 ? coaches[0] : null;
+      if (currentCoach) {
+        select.value = currentCoach.id;
+      }
     }
   }
 }
