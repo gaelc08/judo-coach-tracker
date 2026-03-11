@@ -8,7 +8,7 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-10-invite-jwt-4';
+const __BUILD_ID = '2026-03-11-onboarding-fr-1';
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 let __deferredInstallPrompt = null;
@@ -269,6 +269,20 @@ const __authNoHangLock = async (...args) => {
     return undefined;
   }
 };
+
+// Detect invite flow from URL before createClient's detectSessionInUrl consumes the hash.
+// Supabase appends `type=invite` to the URL fragment when the user follows an invitation link.
+let __inviteFlowActive = (() => {
+  try {
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    return hashParams.get('type') === 'invite';
+  } catch {
+    return false;
+  }
+})();
+if (__inviteFlowActive) {
+  console.log('DEBUG invite flow detected from URL hash');
+}
 
 const supabase = createClient(supabaseUrl, supabaseKey, {
   global: {
@@ -774,14 +788,14 @@ function setupAuthListeners() {
     const email = emailInput.value.trim();
     const pass = passwordInput.value.trim();
     if (!email || !pass) {
-      alert("Enter email and password");
+      alert("Veuillez saisir votre adresse e-mail et votre mot de passe.");
       return;
     }
     try {
       const { data, error } = await supabase.auth.signUp({ email, password: pass });
       console.log('DEBUG signUp result:', { data, error });
       if (error) throw error;
-      statusSpan.textContent = "Account created & logged in.";
+      statusSpan.textContent = "Compte créé et connecté.";
     } catch (e) {
       console.error('DEBUG register error:', e);
       alert(e.message);
@@ -793,7 +807,7 @@ function setupAuthListeners() {
     const email = emailInput.value.trim();
     const pass = passwordInput.value.trim();
     if (!email || !pass) {
-      alert("Enter email and password");
+      alert("Veuillez saisir votre adresse e-mail et votre mot de passe.");
       return;
     }
     try {
@@ -835,7 +849,7 @@ function setupAuthListeners() {
   resetPasswordBtn.addEventListener("click", async () => {
     const email = emailInput.value.trim();
     if (!email) {
-      alert("Enter your email address first.");
+      alert("Veuillez saisir votre adresse e-mail.");
       return;
     }
     try {
@@ -843,7 +857,7 @@ function setupAuthListeners() {
         redirectTo: window.location.origin + window.location.pathname
       });
       if (error) throw error;
-      alert("Password reset email sent. Check your inbox.");
+      alert("E-mail de réinitialisation envoyé. Vérifiez votre boîte de réception.");
     } catch (e) {
       alert(e.message);
     }
@@ -859,6 +873,35 @@ function setupAuthListeners() {
       console.log('DEBUG access token details:', __describeJwt(currentAccessToken));
     } else {
       console.log('DEBUG access token missing');
+    }
+
+    // Handle invite flow: prompt the coach to create their password before entering the app.
+    if (event === 'SIGNED_IN' && __inviteFlowActive && session?.user) {
+      document.getElementById("invitePasswordModal").classList.add("active");
+      // Use onclick assignment so repeated firings replace the handler cleanly.
+      document.getElementById("inviteSetPasswordBtn").onclick = async () => {
+        const newPass = document.getElementById("inviteNewPasswordInput").value;
+        const confirmPass = document.getElementById("inviteConfirmPasswordInput").value;
+        if (!newPass) { alert("Veuillez saisir un mot de passe."); return; }
+        if (newPass.length < 8) { alert("Le mot de passe doit contenir au moins 8 caractères."); return; }
+        if (newPass !== confirmPass) { alert("Les mots de passe ne correspondent pas."); return; }
+        // Reset flag BEFORE updateUser so the USER_UPDATED event falls through to normal app flow.
+        __inviteFlowActive = false;
+        document.getElementById("invitePasswordModal").classList.remove("active");
+        const { error } = await supabase.auth.updateUser({ password: newPass });
+        if (error) {
+          // Restore state so the user can retry.
+          __inviteFlowActive = true;
+          document.getElementById("invitePasswordModal").classList.add("active");
+          document.getElementById("inviteNewPasswordInput").value = "";
+          document.getElementById("inviteConfirmPasswordInput").value = "";
+          alert(error.message);
+        } else {
+          document.getElementById("inviteNewPasswordInput").value = "";
+          document.getElementById("inviteConfirmPasswordInput").value = "";
+        }
+      };
+      return;
     }
 
     // Handle password recovery: show reset form instead of the main app
@@ -909,10 +952,11 @@ function setupAuthListeners() {
         document.getElementById("importGroup").style.display = "none";
       }
 
-      // Coach selector UX: coaches should not have to pick themselves.
+      // Coach selector: admins can switch between coaches; non-admin coaches only see themselves.
       if (select) {
         select.disabled = !isAdmin;
       }
+      updateCoachGreeting(user, null, isAdmin);
 
       // Reload data, but don't wipe the UI first; if a background auth lock stalls,
       // we prefer to keep the last known data visible.
@@ -937,6 +981,9 @@ function setupAuthListeners() {
         if (select) loadCoaches();
       }
 
+      // Update greeting with actual coach profile once data has been loaded.
+      updateCoachGreeting(user, !isAdmin && coaches.length > 0 ? coaches[0] : null, isAdmin);
+
       if (!__eventListenersSetup) {
         setupEventListeners();
         __eventListenersSetup = true;
@@ -959,6 +1006,8 @@ function setupAuthListeners() {
       // Show auth container, hide app
       document.getElementById("authContainer").style.display = "flex";
       document.getElementById("appContainer").style.display = "none";
+      // Reset greeting and coach selector visibility.
+      updateCoachGreeting(null, null, true);
     }
   });
 }
@@ -1191,7 +1240,7 @@ function setupEventListeners() {
 
   document.getElementById("editCoachBtn").onclick = () => {
     if (!currentCoach) {
-      alert("Select a coach first.");
+      alert("Veuillez sélectionner un entraîneur.");
       return;
     }
     editMode = true;
@@ -1296,7 +1345,7 @@ function setupEventListeners() {
     const fileInput = document.getElementById("importFile");
     const file = fileInput.files[0];
     if (!file) {
-      alert("Please choose a JSON file first.");
+      alert("Veuillez choisir un fichier JSON.");
       return;
     }
     const reader = new FileReader();
@@ -1305,7 +1354,7 @@ function setupEventListeners() {
         const data = JSON.parse(e.target.result);
         await importCoachData(data);
       } catch (err) {
-        alert("Invalid JSON file.");
+        alert("Fichier JSON invalide.");
       }
     };
     reader.readAsText(file);
@@ -1330,7 +1379,7 @@ function clearCoachForm() {
 
 function loadCoaches() {
   const select = document.getElementById("coachSelect");
-  select.innerHTML = '<option value="">-- Select Coach --</option>';
+  select.innerHTML = '<option value="">-- Sélectionner --</option>';
 
   coaches.forEach((coach) => {
     const option = document.createElement("option");
@@ -1355,10 +1404,37 @@ function loadCoaches() {
   }
 }
 
+// ===== Coach greeting (non-admin) =====
+function updateCoachGreeting(user, coach, isAdmin) {
+  const greetingEl = document.getElementById("coachGreeting");
+  const selectorGroup = document.getElementById("coachSelectorGroup");
+
+  if (!greetingEl) return;
+
+  if (isAdmin) {
+    greetingEl.style.display = "none";
+    greetingEl.textContent = "";
+    if (selectorGroup) selectorGroup.style.display = "";
+  } else {
+    let displayName = "";
+    if (coach) {
+      const firstName = coach.first_name || "";
+      const lastName = coach.name || "";
+      displayName = [firstName, lastName].filter(Boolean).join(" ");
+    }
+    if (!displayName && user?.email) {
+      displayName = user.email;
+    }
+    greetingEl.textContent = displayName ? `Bonjour, ${displayName} !` : "Bonjour !";
+    greetingEl.style.display = "block";
+    if (selectorGroup) selectorGroup.style.display = "none";
+  }
+}
+
 async function saveCoach() {
   console.log('DEBUG saveCoach START');
   if (!currentUser) {
-    alert('No logged user');
+    alert('Aucun utilisateur connecté.');
     return;
   }
   console.log('DEBUG currentUser ID:', currentUser.id);
@@ -1366,7 +1442,7 @@ async function saveCoach() {
   const isAdmin = await isCurrentUserAdminDB();
   console.log('DEBUG isAdmin:', isAdmin);
   if (!isAdmin) {
-    alert('Only admin');
+    alert("Seul l'administrateur peut effectuer cette action.");
     return;
   }
 
@@ -1503,7 +1579,7 @@ const coachData = {
     }
   } catch (e) {
     console.error('DEBUG SAVE ERROR:', e);
-    alert('Save error: ' + e.message);
+    alert('Erreur lors de la sauvegarde : ' + e.message);
     // Always reset modal/UI on exception
     document.getElementById('coachModal').classList.remove('active');
     clearCoachForm();
@@ -1517,12 +1593,12 @@ const coachData = {
 async function deleteCoach() {
   const isAdmin = await isCurrentUserAdminDB();
   if (!currentUser || !isAdmin) {
-    alert("Only admin can delete coach profiles.");
+    alert("Seul l'administrateur peut supprimer des profils d'entraîneur.");
     return;
   }
   if (!editingCoachId) return;
 
-  if (!confirm("Are you sure you want to delete this coach? This will also delete all associated time data.")) {
+  if (!confirm("Êtes-vous sûr(e) de vouloir supprimer cet entraîneur ? Toutes les données associées seront également supprimées.")) {
     return;
   }
 
@@ -1547,7 +1623,7 @@ async function deleteCoach() {
     editingCoachId = null;
     updateSummary();
   } catch (e) {
-    alert("Error deleting coach: " + e.message);
+    alert("Erreur lors de la suppression : " + e.message);
   }
 }
 
@@ -1786,7 +1862,7 @@ function createDayElement(day, dateStr) {
 // ===== Day modal =====
 function openDayModal(dateStr) {
   if (!currentCoach) {
-    alert("Please select a coach first");
+    alert("Veuillez sélectionner un entraîneur.");
     return;
   }
 
@@ -2016,7 +2092,7 @@ function updateSummary() {
 
 function exportToCSV() {
   if (!currentCoach || !currentMonth) {
-    alert("Please select a coach and month");
+    alert("Veuillez sélectionner un entraîneur et un mois.");
     return;
   }
 
@@ -2122,7 +2198,7 @@ function __showMileagePreviewModal(html, fileName) {
 
 function exportMileageHTML() {
   if (!currentCoach || !currentMonth) {
-    alert("Please select a coach and month");
+    alert("Veuillez sélectionner un entraîneur et un mois.");
     return;
   }
   const [year, month] = currentMonth.split("-");
@@ -2144,7 +2220,7 @@ function exportMileageHTML() {
     });
 
   if (total === 0) {
-    alert("No mileage recorded for this month.");
+    alert("Aucun kilométrage saisi pour ce mois.");
     return;
   }
 
@@ -2418,13 +2494,13 @@ window.exportMileageHTML = exportMileageHTML;
 // ===== Import JSON =====
 async function importCoachData(data) {
   if (!currentCoach || !currentUser) {
-    alert("Select a coach and log in before importing.");
+    alert("Veuillez sélectionner un entraîneur et vous connecter avant d'importer.");
     return;
   }
 
   if (data.entraineur && data.entraineur !== currentCoach.name) {
     const ok = confirm(
-      `JSON coach is "${data.entraineur}", selected coach is "${currentCoach.name}". Continue?`
+      `Le coach du fichier JSON est "${data.entraineur}", le coach sélectionné est "${currentCoach.name}". Continuer ?`
     );
     if (!ok) return;
   }
@@ -2477,7 +2553,7 @@ async function importCoachData(data) {
   await loadAllDataFromSupabase();
   updateCalendar();
   updateSummary();
-  alert("Import completed.");
+  alert("Import terminé.");
 }
 
 // ===== Export backup JSON =====

@@ -56,8 +56,9 @@
     </header>
 
     <div class="app-body">
+      <div id="coachGreeting" class="coach-greeting" style="display:none"></div>
       <div class="toolbar card">
-        <label class="toolbar-label">
+        <label id="coachSelectorGroup" class="toolbar-label">
           <span>Entraîneur</span>
           <select id="coachSelect">
             <option value="">-- Sélectionner --</option>
@@ -319,6 +320,23 @@
     </div>
   </div>
 
-  <script type="module" src="app-modular.js?v=2026-03-10-invite-jwt-3"></script>
+  <!-- Invite onboarding modal (shown when arriving via an invitation link) -->
+  <div id="invitePasswordModal" class="modal">
+    <div class="modal-content">
+      <h2>🎉 Bienvenue !</h2>
+      <p>Pour finaliser votre inscription, veuillez créer votre mot de passe.</p>
+      <label>Mot de passe
+        <input id="inviteNewPasswordInput" type="password" placeholder="Mot de passe (min. 8 caractères)">
+      </label>
+      <label>Confirmer le mot de passe
+        <input id="inviteConfirmPasswordInput" type="password" placeholder="Confirmer le mot de passe">
+      </label>
+      <div class="modal-actions">
+        <button id="inviteSetPasswordBtn" class="btn-primary">Créer mon mot de passe</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app-modular.js?v=2026-03-11-onboarding-fr-1"></script>
 </body>
 </html>
