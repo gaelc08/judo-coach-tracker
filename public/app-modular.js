@@ -8,7 +8,7 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-11-freeze-click-fix-1';
+const __BUILD_ID = '2026-03-11-freeze-cleanup-1';
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 let __deferredInstallPrompt = null;
@@ -803,7 +803,7 @@ async function fetchSchoolHolidays(year) {
     const startDate = `${year - 1}-09-01`;
     const endDate = `${year + 1}-08-31`;
     const params = new URLSearchParams({
-      where: `location="Zone B" AND start_date>="${startDate}" AND end_date<="${endDate}"`,
+      where: `zones="Zone B" AND start_date<="${endDate}" AND end_date>="${startDate}"`,
       limit: "50",
       timezone: "Europe/Paris"
     });
@@ -811,11 +811,18 @@ async function fetchSchoolHolidays(year) {
     const res = await globalThis.fetch(url, { signal: AbortSignal.timeout(5000) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
+    const seen = new Set();
     const holidays = (json.results || []).map(r => ({
       start: r.start_date ? r.start_date.slice(0, 10) : "",
       end: r.end_date ? r.end_date.slice(0, 10) : "",
       name: r.description || r.population || "Vacances scolaires"
-    })).filter(h => h.start && h.end);
+    })).filter((h) => {
+      if (!h.start || !h.end) return false;
+      const key = `${h.start}|${h.end}|${h.name}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).sort((a, b) => a.start.localeCompare(b.start));
     if (holidays.length === 0) throw new Error("API returned empty holidays, using fallback data");
     __schoolHolidaysCache[year] = holidays;
     return holidays;
