@@ -8,7 +8,7 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-11-cea-export-1';
+const __BUILD_ID = '2026-03-11-declaration-xlsx-1';
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 let __deferredInstallPrompt = null;
@@ -2567,15 +2567,6 @@ function updateSummary() {
   ).textContent = `€${totalPayment.toFixed(2)}`;
 }
 
-function __escapeHtml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
 function numberDisplay(value, digits = 0) {
   return Number(value || 0).toFixed(digits).replace('.', ',');
 }
@@ -2584,14 +2575,32 @@ function currencyDisplay(value) {
   return `${numberDisplay(value, 2)} €`;
 }
 
-function exportDeclarationXLS() {
+async function __loadExcelJs() {
+  if (!window.__excelJsModulePromise) {
+    window.__excelJsModulePromise = import('https://esm.sh/exceljs@4.4.0');
+  }
+
+  const module = await window.__excelJsModulePromise;
+  return module?.default || module;
+}
+
+async function __blobToDataUrl(blob) {
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error || new Error('Impossible de lire le logo.'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function exportDeclarationXLS() {
   if (!currentCoach || !currentMonth) {
     alert("Veuillez sélectionner un profil et un mois.");
     return;
   }
 
   if (__isVolunteerProfile(currentCoach)) {
-    alert("L'export de déclaration CEA URSSAF n'est pas disponible pour un profil bénévole.");
+    alert("L'export de déclaration salaire n'est pas disponible pour un profil bénévole.");
     return;
   }
 
@@ -2635,129 +2644,202 @@ function exportDeclarationXLS() {
   const coachDisplayName = __getCoachDisplayName(currentCoach) || currentCoach.name;
   const exportDate = new Date().toLocaleDateString('fr-FR');
 
-  const html = `<!DOCTYPE html>
-<html xmlns:o="urn:schemas-microsoft-com:office:office"
-      xmlns:x="urn:schemas-microsoft-com:office:excel"
-      xmlns="http://www.w3.org/TR/REC-html40">
-<head>
-<meta charset="UTF-8">
-<!--[if gte mso 9]>
-<xml>
-  <x:ExcelWorkbook>
-    <x:ExcelWorksheets>
-      <x:ExcelWorksheet>
-        <x:Name>Déclaration CEA</x:Name>
-        <x:WorksheetOptions>
-          <x:DisplayGridlines/>
-          <x:FitToPage/>
-          <x:PageSetup>
-            <x:Layout x:Orientation="Portrait"/>
-          </x:PageSetup>
-        </x:WorksheetOptions>
-      </x:ExcelWorksheet>
-    </x:ExcelWorksheets>
-  </x:ExcelWorkbook>
-</xml>
-<![endif]-->
-<style>
-  body { font-family: Calibri, Arial, sans-serif; margin: 18px; color: #1f2937; }
-  .title { font-size: 20pt; font-weight: 700; color: #0f3460; margin-bottom: 4px; }
-  .subtitle { font-size: 11pt; color: #526274; margin-bottom: 14px; }
-  .section-title { font-size: 12pt; font-weight: 700; color: #0f3460; margin: 14px 0 8px; }
-  table { border-collapse: collapse; width: 100%; margin-bottom: 12px; }
-  .meta td { border: 1px solid #cfd8e3; padding: 7px 9px; font-size: 10pt; }
-  .meta .label { background: #eef4fb; font-weight: 700; width: 24%; color: #0f3460; }
-  .summary th, .summary td, .details th, .details td { border: 1px solid #cfd8e3; padding: 7px 8px; font-size: 10pt; }
-  .summary th, .details th { background: #0f3460; color: #fff; text-align: left; font-weight: 700; }
-  .summary td.amount, .details td.amount, .details td.number { text-align: right; }
-  .details tr:nth-child(even) td { background: #f8fbff; }
-  .total-row td { background: #e9f1fb; font-weight: 700; }
-  .note { margin-top: 10px; padding: 10px 12px; border: 1px solid #d6e0ec; background: #f8fbff; font-size: 10pt; }
-</style>
-</head>
-<body>
-  <div class="title">Déclaration CEA URSSAF</div>
-  <div class="subtitle">Judo Club de Cattenom-Rodemack — période ${__escapeHtml(month)}/${__escapeHtml(year)}</div>
+  const ExcelJS = await __loadExcelJs();
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'Judo Club de Cattenom-Rodemack';
+  workbook.created = new Date();
 
-  <table class="meta">
-    <tr>
-      <td class="label">Intervenant</td>
-      <td>${__escapeHtml(coachDisplayName || 'Non renseigné')}</td>
-      <td class="label">Mois déclaré</td>
-      <td>${__escapeHtml(month)}/${__escapeHtml(year)}</td>
-    </tr>
-    <tr>
-      <td class="label">Adresse</td>
-      <td>${__escapeHtml(currentCoach.address || 'Non renseignée')}</td>
-      <td class="label">Taux horaire</td>
-      <td>${currencyDisplay(currentCoach.hourly_rate)}</td>
-    </tr>
-    <tr>
-      <td class="label">Indemnité forfaitaire compétition</td>
-      <td>${currencyDisplay(currentCoach.daily_allowance)}</td>
-      <td class="label">Date d'édition</td>
-      <td>${__escapeHtml(exportDate)}</td>
-    </tr>
-  </table>
+  const worksheet = workbook.addWorksheet('Déclaration salaire', {
+    properties: { defaultRowHeight: 22 },
+    pageSetup: {
+      paperSize: 9,
+      orientation: 'portrait',
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+      margins: {
+        left: 0.3,
+        right: 0.3,
+        top: 0.45,
+        bottom: 0.45,
+        header: 0.2,
+        footer: 0.2,
+      },
+    },
+    views: [{ showGridLines: false }],
+  });
 
-  <div class="section-title">Synthèse à déclarer</div>
-  <table class="summary">
-    <tr>
-      <th>Heures prestées</th>
-      <th>Jours de compétition</th>
-      <th>Montant heures</th>
-      <th>Indemnités forfaitaires</th>
-      <th>Total déclaration</th>
-    </tr>
-    <tr>
-      <td class="number">${numberDisplay(totalHours, 1)}</td>
-      <td class="number">${competitionDays}</td>
-      <td class="amount">${currencyDisplay(totalTrainingAmount)}</td>
-      <td class="amount">${currencyDisplay(totalCompetitionAllowance)}</td>
-      <td class="amount">${currencyDisplay(grandTotal)}</td>
-    </tr>
-  </table>
+  worksheet.columns = [
+    { width: 14 },
+    { width: 28 },
+    { width: 12 },
+    { width: 12 },
+    { width: 14 },
+    { width: 14 },
+    { width: 16 },
+    { width: 14 },
+  ];
 
-  <div class="section-title">Détail de la déclaration</div>
-  <table class="details">
-    <tr>
-      <th>Date</th>
-      <th>Libellé</th>
-      <th>Heures prestées</th>
-      <th>Taux horaire</th>
-      <th>Montant heures</th>
-      <th>Jour compétition</th>
-      <th>Indemnité forfaitaire</th>
-      <th>Total déclaré</th>
-    </tr>
-    ${rows.map((row) => `
-    <tr>
-      <td>${__escapeHtml(row.date)}</td>
-      <td>${__escapeHtml(row.description)}</td>
-      <td class="number">${numberDisplay(row.hours, 1)}</td>
-      <td class="amount">${currencyDisplay(row.hourlyRate)}</td>
-      <td class="amount">${currencyDisplay(row.trainingAmount)}</td>
-      <td>${row.competition ? 'Oui' : 'Non'}</td>
-      <td class="amount">${currencyDisplay(row.competitionAllowance)}</td>
-      <td class="amount">${currencyDisplay(row.declaredTotal)}</td>
-    </tr>`).join('')}
-    <tr class="total-row">
-      <td colspan="2">TOTAL</td>
-      <td class="number">${numberDisplay(totalHours, 1)}</td>
-      <td></td>
-      <td class="amount">${currencyDisplay(totalTrainingAmount)}</td>
-      <td class="number">${competitionDays}</td>
-      <td class="amount">${currencyDisplay(totalCompetitionAllowance)}</td>
-      <td class="amount">${currencyDisplay(grandTotal)}</td>
-    </tr>
-  </table>
+  const navyFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F3460' } };
+  const lightFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAF2FF' } };
+  const totalFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE9F1FB' } };
+  const border = {
+    top: { style: 'thin', color: { argb: 'FFC7D2E0' } },
+    left: { style: 'thin', color: { argb: 'FFC7D2E0' } },
+    bottom: { style: 'thin', color: { argb: 'FFC7D2E0' } },
+    right: { style: 'thin', color: { argb: 'FFC7D2E0' } },
+  };
 
-  <div class="note">Ce fichier est destiné à la préparation de la déclaration mensuelle au service CEA de l'URSSAF. Il peut être ouvert dans Excel ou LibreOffice puis imprimé en PDF.</div>
-</body>
-</html>`;
+  try {
+    const logoResponse = await fetch(new URL('logo-jcc.png', window.location.href));
+    if (logoResponse.ok) {
+      const logoBase64 = await __blobToDataUrl(await logoResponse.blob());
+      const imageId = workbook.addImage({
+        base64: logoBase64,
+        extension: 'png',
+      });
+      worksheet.addImage(imageId, {
+        tl: { col: 0.15, row: 0.15 },
+        ext: { width: 58, height: 58 },
+      });
+    }
+  } catch (e) {
+    console.warn('Impossible de charger le logo pour l’export XLSX:', e);
+  }
 
-  const blob = new Blob(["\uFEFF" + html], { type: "application/vnd.ms-excel;charset=utf-8;" });
-  __downloadBlob(blob, `declaration_cea_urssaf_${currentCoach.name}_${currentMonth}.xls`);
+  worksheet.mergeCells('C1:H1');
+  worksheet.getCell('C1').value = 'Déclaration salaire';
+  worksheet.getCell('C1').font = { name: 'Calibri', size: 18, bold: true, color: { argb: 'FF0F3460' } };
+
+  worksheet.mergeCells('C2:H2');
+  worksheet.getCell('C2').value = `Judo Club de Cattenom-Rodemack — période ${month}/${year}`;
+  worksheet.getCell('C2').font = { name: 'Calibri', size: 11, color: { argb: 'FF526274' } };
+
+  const metaRows = [
+    ['Intervenant', coachDisplayName || 'Non renseigné', 'Mois déclaré', `${month}/${year}`],
+    ['Adresse', currentCoach.address || 'Non renseignée', 'Taux horaire', Number(currentCoach.hourly_rate) || 0],
+    ['Indemnité forfaitaire compétition', Number(currentCoach.daily_allowance) || 0, 'Date d’édition', exportDate],
+  ];
+
+  metaRows.forEach((values, index) => {
+    const rowNumber = 5 + index;
+    const row = worksheet.getRow(rowNumber);
+    row.values = values;
+    [1, 3].forEach((col) => {
+      const cell = row.getCell(col);
+      cell.fill = lightFill;
+      cell.font = { bold: true, color: { argb: 'FF0F3460' } };
+      cell.border = border;
+    });
+    [2, 4].forEach((col) => {
+      const cell = row.getCell(col);
+      cell.border = border;
+      if (rowNumber === 6 && col === 4) {
+        cell.numFmt = '#,##0.00 €';
+      }
+      if (rowNumber === 7 && col === 2) {
+        cell.numFmt = '#,##0.00 €';
+      }
+    });
+  });
+
+  worksheet.mergeCells('A9:H9');
+  const summaryTitle = worksheet.getCell('A9');
+  summaryTitle.value = 'Synthèse à déclarer';
+  summaryTitle.font = { bold: true, size: 12, color: { argb: 'FF0F3460' } };
+
+  const summaryHeader = worksheet.getRow(10);
+  summaryHeader.values = ['Heures prestées', 'Jours de compétition', 'Montant heures', 'Indemnités forfaitaires', 'Total déclaration'];
+  summaryHeader.eachCell((cell, colNumber) => {
+    if (colNumber <= 5) {
+      cell.fill = navyFill;
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.border = border;
+      cell.alignment = { horizontal: 'center' };
+    }
+  });
+
+  const summaryValues = worksheet.getRow(11);
+  summaryValues.values = [totalHours, competitionDays, totalTrainingAmount, totalCompetitionAllowance, grandTotal];
+  summaryValues.eachCell((cell, colNumber) => {
+    if (colNumber <= 5) {
+      cell.border = border;
+      cell.alignment = { horizontal: colNumber <= 2 ? 'center' : 'right' };
+      if (colNumber >= 3) cell.numFmt = '#,##0.00 €';
+      if (colNumber === 1) cell.numFmt = '0.0';
+    }
+  });
+
+  worksheet.mergeCells('A13:H13');
+  const detailsTitle = worksheet.getCell('A13');
+  detailsTitle.value = 'Détail de la déclaration';
+  detailsTitle.font = { bold: true, size: 12, color: { argb: 'FF0F3460' } };
+
+  const detailsHeader = worksheet.getRow(14);
+  detailsHeader.values = ['Date', 'Libellé', 'Heures prestées', 'Taux horaire', 'Montant heures', 'Jour compétition', 'Indemnité forfaitaire', 'Total déclaré'];
+  detailsHeader.eachCell((cell) => {
+    cell.fill = navyFill;
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.border = border;
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  });
+
+  let detailRowNumber = 15;
+  rows.forEach((rowData, index) => {
+    const row = worksheet.getRow(detailRowNumber);
+    row.values = [
+      rowData.date,
+      rowData.description,
+      rowData.hours,
+      rowData.hourlyRate,
+      rowData.trainingAmount,
+      rowData.competition ? 'Oui' : 'Non',
+      rowData.competitionAllowance,
+      rowData.declaredTotal,
+    ];
+
+    row.eachCell((cell, colNumber) => {
+      cell.border = border;
+      cell.alignment = {
+        vertical: 'middle',
+        horizontal: [3, 4, 5, 7, 8].includes(colNumber) ? 'right' : (colNumber === 6 ? 'center' : 'left'),
+        wrapText: colNumber === 2,
+      };
+      if (index % 2 === 1) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FBFF' } };
+      if (colNumber === 3) cell.numFmt = '0.0';
+      if ([4, 5, 7, 8].includes(colNumber)) cell.numFmt = '#,##0.00 €';
+    });
+
+    detailRowNumber += 1;
+  });
+
+  const totalRow = worksheet.getRow(detailRowNumber);
+  totalRow.values = ['TOTAL', '', totalHours, '', totalTrainingAmount, competitionDays, totalCompetitionAllowance, grandTotal];
+  totalRow.eachCell((cell, colNumber) => {
+    cell.border = border;
+    cell.fill = totalFill;
+    cell.font = { bold: true };
+    cell.alignment = {
+      vertical: 'middle',
+      horizontal: [3, 5, 6, 7, 8].includes(colNumber) ? 'right' : 'left',
+    };
+    if (colNumber === 3) cell.numFmt = '0.0';
+    if ([5, 7, 8].includes(colNumber)) cell.numFmt = '#,##0.00 €';
+  });
+
+  worksheet.mergeCells(`A${detailRowNumber + 2}:H${detailRowNumber + 3}`);
+  const noteCell = worksheet.getCell(`A${detailRowNumber + 2}`);
+  noteCell.value = 'Ce fichier correspond à la déclaration salaire du mois. Il peut être ouvert dans Excel sans avertissement de format puis imprimé en PDF si nécessaire.';
+  noteCell.alignment = { wrapText: true, vertical: 'top' };
+  noteCell.border = border;
+  noteCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FBFF' } };
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const safeName = String(currentCoach.name || 'intervenant').replace(/[^a-z0-9_\-]/gi, '_');
+  const blob = new Blob([buffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  __downloadBlob(blob, `declaration_salaire_${safeName}_${currentMonth}.xlsx`);
 }
 
 function __isStandaloneApp() {
