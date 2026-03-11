@@ -1,5 +1,5 @@
-const CACHE_VERSION = 'judo-coach-pwa-v8';
-const APP_BUILD_ID = '2026-03-11-legal-mileage-scale-1';
+const CACHE_VERSION = 'judo-coach-pwa-v9';
+const APP_BUILD_ID = '2026-03-11-expense-report-1';
 const BASE_PATH = new URL('./', self.location.href).pathname;
 const INDEX_URL = `${BASE_PATH}index.html`;
 const OFFLINE_URL = `${BASE_PATH}offline.html`;

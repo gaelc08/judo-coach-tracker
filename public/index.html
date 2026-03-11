@@ -123,6 +123,14 @@
             <span class="label">Remboursement km</span>
             <span class="value" id="kmPayment">€0,00</span>
           </div>
+          <div class="summary-item">
+            <span class="label">Remboursement péages</span>
+            <span class="value" id="tollPayment">€0,00</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Remboursement hôtel</span>
+            <span class="value" id="hotelPayment">€0,00</span>
+          </div>
           <div class="summary-item total">
             <span class="label">Paiement total</span>
             <span class="value" id="totalPayment">€0,00</span>
@@ -132,7 +140,7 @@
 
       <div class="actions card">
         <button id="exportBtn" class="btn-primary">📊 Exporter salaire (CSV)</button>
-        <button id="mileageBtn" class="btn-secondary">🚗 Exporter note de frais km</button>
+        <button id="mileageBtn" class="btn-secondary">🧾 Exporter note de frais</button>
         <button id="backupBtn" class="btn-secondary">💾 Exporter backup JSON</button>
         <div id="importGroup" class="import-group" style="display:none">
           <input id="importFile" type="file" accept=".json">
@@ -222,8 +230,17 @@
         <label>Justificatif de péage
           <input id="peageJustification" type="file" accept=".pdf,.jpg,.png">
         </label>
-        <div id="existingJustification" style="display:none">
-          <a id="justificationLink" href="#" target="_blank" rel="noopener noreferrer">📎 Voir le justificatif existant</a>
+        <div id="existingPeageJustification" style="display:none">
+          <a id="peageJustificationLink" href="#" target="_blank" rel="noopener noreferrer">📎 Voir le justificatif de péage</a>
+        </div>
+        <label>Hôtel (€)
+          <input id="hotel" type="number" step="0.01" min="0">
+        </label>
+        <label>Justificatif d'hôtel
+          <input id="hotelJustification" type="file" accept=".pdf,.jpg,.png">
+        </label>
+        <div id="existingHotelJustification" style="display:none">
+          <a id="hotelJustificationLink" href="#" target="_blank" rel="noopener noreferrer">📎 Voir le justificatif d'hôtel</a>
         </div>
       </div>
 
@@ -256,8 +273,8 @@
           <li>Choisissez le mois souhaité avec le champ <strong>Mois</strong>.</li>
           <li>Cliquez sur un jour dans le calendrier pour ouvrir la fenêtre de saisie.</li>
           <li>Indiquez le nombre d'<strong>heures d'entraînement</strong> (par tranches de 0,5 h).</li>
-          <li>Cochez <strong>Jour de compétition</strong> si vous avez participé à une compétition ce jour-là, puis renseignez les détails du trajet : kilométrage, départ, arrivée, description et péage éventuel.</li>
-          <li>Vous pouvez joindre un justificatif de péage (PDF, JPG ou PNG).</li>
+          <li>Cochez <strong>Jour de compétition</strong> si vous avez participé à une compétition ce jour-là, puis renseignez les détails du trajet : kilométrage, départ, arrivée, description, péage éventuel et frais d'hôtel si nécessaire.</li>
+          <li>Vous pouvez joindre un justificatif de péage et un justificatif d'hôtel (PDF, JPG ou PNG).</li>
           <li>Cliquez sur <strong>Sauvegarder</strong> pour enregistrer la journée, ou sur <strong>Supprimer</strong> pour effacer les données du jour.</li>
         </ul>
       </div>
@@ -292,7 +309,7 @@
         <h3>📤 Exports</h3>
         <ul>
           <li><strong>Exporter salaire (CSV)</strong> – génère un fichier tableur avec le détail des jours et le calcul des rémunérations.</li>
-          <li><strong>Exporter note de frais km</strong> – génère un document HTML imprimable récapitulant les trajets de compétition (utilisez la fonction d'impression du navigateur pour le convertir en PDF).</li>
+          <li><strong>Exporter note de frais</strong> – génère un document HTML imprimable récapitulant les remboursements kilométriques, les péages et les frais d'hôtel du mois (utilisez la fonction d'impression du navigateur pour le convertir en PDF).</li>
           <li><strong>Exporter backup JSON</strong> – enregistre une sauvegarde de vos données du mois dans un fichier JSON.</li>
         </ul>
       </div>
@@ -301,7 +318,7 @@
         <h3>💡 Bonnes pratiques</h3>
         <ul>
           <li>Saisissez vos journées régulièrement pour éviter les oublis en fin de mois.</li>
-          <li>Conservez vos justificatifs de péage et ajoutez-les directement sur les jours concernés.</li>
+          <li>Conservez vos justificatifs de péage et d'hôtel et ajoutez-les directement sur les jours concernés.</li>
           <li>Avant la fin du mois, vérifiez le récapitulatif et exportez vos documents si besoin.</li>
         </ul>
       </div>
