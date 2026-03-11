@@ -8,7 +8,7 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-11-expense-layout-1';
+const __BUILD_ID = '2026-03-11-purchase-color-1';
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 let __deferredInstallPrompt = null;
@@ -1309,16 +1309,6 @@ async function loadAllDataFromSupabase({ isAdminOverride } = {}) {
     };
   });
 
-
-  // Filtre local par coach sélectionné (utile surtout pour l'admin)
-  if (currentCoach) {
-    Object.keys(timeData).forEach((key) => {
-      if (timeData[key].coachId !== currentCoach.id) {
-        delete timeData[key];
-      }
-    });
-  }
-
   // Load frozen timesheets
   frozenMonths = new Set();
   const frozenRes = await __restSelect('frozen_timesheets');
@@ -2342,7 +2332,40 @@ async function saveDay() {
   const achatFile = document.getElementById("achatJustification").files[0];
 
   const key = `${currentCoach.id}-${selectedDay}`;
-  const existing = timeData[key];
+  let existing = timeData[key];
+
+  if (!existing) {
+    const { data: existingRow, error: existingError } = await supabase
+      .from('time_data')
+      .select('*')
+      .eq('coach_id', currentCoach.id)
+      .eq('date', selectedDay)
+      .maybeSingle();
+
+    if (existingError) throw existingError;
+
+    if (existingRow) {
+      existing = {
+        hours: existingRow.hours || 0,
+        competition: !!existingRow.competition,
+        km: existingRow.km || 0,
+        description: existingRow.description || "",
+        departurePlace: existingRow.departure_place || "",
+        arrivalPlace: existingRow.arrival_place || "",
+        peage: existingRow.peage || 0,
+        justificationUrl: existingRow.justification_url || "",
+        hotel: existingRow.hotel || 0,
+        hotelJustificationUrl: existingRow.hotel_justification_url || "",
+        achat: existingRow.achat || 0,
+        achatJustificationUrl: existingRow.achat_justification_url || "",
+        coachId: existingRow.coach_id || currentCoach.id,
+        ownerUid: existingRow.owner_uid || null,
+        ownerEmail: existingRow.owner_email || null,
+        id: existingRow.id
+      };
+      timeData[key] = existing;
+    }
+  }
 
   let justificationUrl = existing ? existing.justificationUrl || "" : "";
   let hotelJustificationUrl = existing ? existing.hotelJustificationUrl || "" : "";

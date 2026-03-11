@@ -440,7 +440,7 @@ button, .btn-primary, .btn-secondary, .btn-danger {
 }
 
 .legend-dot.has-purchase {
-  background: #eadcff;
+  background: #d9b8ff;
   border-color: #8e44ad;
 }
 
@@ -539,7 +539,7 @@ button, .btn-primary, .btn-secondary, .btn-danger {
 
 /* Purchase days */
 .calendar-day.has-purchase {
-  background: #f3e8ff;
+  background: #e4c7ff;
   border-color: #8e44ad;
   font-weight: 700;
 }
@@ -559,7 +559,7 @@ button, .btn-primary, .btn-secondary, .btn-danger {
 
 .calendar-day.weekend.school-holiday.has-purchase,
 .calendar-day.weekend.holiday.has-purchase {
-  background: #f3e8ff;
+  background: #e4c7ff;
   border-color: #8e44ad;
 }
 
@@ -1183,7 +1183,7 @@ button, .btn-primary, .btn-secondary, .btn-danger {
 }
 
 .has-purchase-dot {
-  background: #f3e8ff;
+  background: #d9b8ff;
   border-color: #8e44ad;
 }
 
