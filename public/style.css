@@ -439,6 +439,11 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   border-color: #42a5f5;
 }
 
+.legend-dot.has-purchase {
+  background: #eadcff;
+  border-color: #8e44ad;
+}
+
 /* ===== Calendar ===== */
 .calendar {
   display: grid;
@@ -532,6 +537,13 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   font-weight: 600;
 }
 
+/* Purchase days */
+.calendar-day.has-purchase {
+  background: #f3e8ff;
+  border-color: #8e44ad;
+  font-weight: 700;
+}
+
 /* Competition/training days override combined weekend+holiday selectors (higher specificity) */
 .calendar-day.weekend.school-holiday.has-data,
 .calendar-day.weekend.holiday.has-data {
@@ -543,6 +555,12 @@ button, .btn-primary, .btn-secondary, .btn-danger {
 .calendar-day.weekend.holiday.has-competition {
   background: #e3f2fd;
   border-color: #42a5f5;
+}
+
+.calendar-day.weekend.school-holiday.has-purchase,
+.calendar-day.weekend.holiday.has-purchase {
+  background: #f3e8ff;
+  border-color: #8e44ad;
 }
 
 .day-number {
@@ -1162,6 +1180,11 @@ button, .btn-primary, .btn-secondary, .btn-danger {
 .has-competition-dot {
   background: #e3f2fd;
   border-color: #42a5f5;
+}
+
+.has-purchase-dot {
+  background: #f3e8ff;
+  border-color: #8e44ad;
 }
 
 .admin-help {

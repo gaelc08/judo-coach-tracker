@@ -8,7 +8,7 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-11-user-role-sync-1';
+const __BUILD_ID = '2026-03-11-expense-layout-1';
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 let __deferredInstallPrompt = null;
@@ -2190,7 +2190,9 @@ function createDayElement(day, dateStr) {
   const dayData = timeData[key];
 
   if (dayData) {
-    if (dayData.competition) {
+    if ((dayData.achat || 0) > 0) {
+      dayDiv.classList.add("has-purchase");
+    } else if (dayData.competition) {
       dayDiv.classList.add("has-competition");
     } else if (dayData.hours > 0) {
       dayDiv.classList.add("has-data");
@@ -2789,7 +2791,7 @@ function exportExpenseHTML() {
   }
 
   @media print {
-    @page { margin: 1.2cm; }
+    @page { size: A4 landscape; margin: 7mm; }
     body { margin: 0; background: white; }
     .no-print { display: none; }
     .page-shell {
@@ -2797,122 +2799,126 @@ function exportExpenseHTML() {
       border: none;
       margin: 0;
       max-width: none;
+      border-radius: 0;
+    }
+    .page-inner {
+      padding: 0;
     }
   }
   
   body { 
     margin: 0;
-    padding: 24px;
+    padding: 10px;
     background: #eef3f9;
     color: #243447;
     font-family: Inter, Arial, sans-serif;
   }
 
   .page-shell {
-    max-width: 1180px;
+    max-width: 1120px;
     margin: 0 auto;
     background: #ffffff;
     border: 1px solid #d8e2ef;
-    border-radius: 20px;
-    box-shadow: 0 18px 45px rgba(15, 52, 96, 0.12);
+    border-radius: 14px;
+    box-shadow: 0 10px 28px rgba(15, 52, 96, 0.10);
     overflow: hidden;
   }
 
   .page-inner {
-    padding: 28px 30px 32px;
+    padding: 14px 16px 16px;
   }
 
   .print-button {
-    margin: 0 0 18px;
-    padding: 11px 18px;
+    margin: 0 0 10px;
+    padding: 8px 14px;
     background: linear-gradient(135deg, #0f3460, #145da0);
     color: white;
     border: none;
     border-radius: 999px;
     cursor: pointer;
-    font-size: 0.95rem;
+    font-size: 0.82rem;
     font-weight: 700;
-    box-shadow: 0 10px 24px rgba(20, 93, 160, 0.25);
+    box-shadow: 0 6px 16px rgba(20, 93, 160, 0.22);
   }
 
   .header { 
     display: flex; 
     align-items: flex-start;
     justify-content: space-between;
-    gap: 18px;
+    gap: 12px;
     border-bottom: 2px solid #d8e2ef;
-    padding-bottom: 18px;
-    margin-bottom: 22px;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
   }
   
   .header-brand {
     display: flex;
     align-items: center;
-    gap: 18px;
+    gap: 12px;
   }
   
   .header-logo {
-    width: 78px;
-    height: 78px;
+    width: 54px;
+    height: 54px;
     flex: 0 0 auto;
     display: grid;
     place-items: center;
-    border-radius: 18px;
+    border-radius: 12px;
     background: #f5f8fc;
     border: 1px solid #d8e2ef;
   }
   
   .header-logo img { 
-    max-width: 58px;
-    max-height: 58px;
+    max-width: 40px;
+    max-height: 40px;
   }
   
   .header-text h1 {
-    margin: 0 0 6px;
-    font-size: 1.55rem;
+    margin: 0 0 4px;
+    font-size: 1.1rem;
     color: #0f3460;
   }
   
   .header-text p { 
-    margin: 2px 0;
+    margin: 1px 0;
     color: #526274;
-    font-size: 0.92rem;
+    font-size: 0.72rem;
   }
 
   .document-badge {
     text-align: right;
-    min-width: 220px;
+    min-width: 180px;
   }
 
   .document-badge .label {
     display: inline-block;
-    padding: 7px 12px;
+    padding: 5px 10px;
     border-radius: 999px;
     background: #eaf2ff;
     color: #145da0;
     font-weight: 700;
-    font-size: 0.8rem;
+    font-size: 0.68rem;
     letter-spacing: 0.03em;
     text-transform: uppercase;
   }
 
   .document-badge h2 {
-    margin: 10px 0 4px;
-    font-size: 1.35rem;
+    margin: 6px 0 2px;
+    font-size: 1rem;
     color: #0f3460;
   }
 
   .document-badge p {
     margin: 0;
     color: #66788a;
-    font-size: 0.92rem;
+    font-size: 0.75rem;
   }
 
   .info-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
-    margin-bottom: 18px;
+    gap: 10px;
+    margin-bottom: 10px;
   }
 
   .info-card,
@@ -2924,27 +2930,27 @@ function exportExpenseHTML() {
   }
 
   .info-card {
-    padding: 16px 18px;
+    padding: 10px 12px;
   }
 
   .info-card h3,
   .summary-section h3,
   .details-section h3 {
-    margin: 0 0 12px;
+    margin: 0 0 8px;
     color: #0f3460;
-    font-size: 1rem;
+    font-size: 0.86rem;
   }
 
   .info-list {
     display: grid;
-    gap: 8px;
+    gap: 5px;
   }
 
   .info-row {
     display: grid;
-    grid-template-columns: 160px 1fr;
-    gap: 10px;
-    font-size: 0.94rem;
+    grid-template-columns: 120px 1fr;
+    gap: 6px;
+    font-size: 0.74rem;
   }
 
   .info-row .label {
@@ -2958,32 +2964,32 @@ function exportExpenseHTML() {
   }
 
   .summary-section {
-    margin-bottom: 18px;
+    margin-bottom: 10px;
   }
 
   .summary-grid {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 12px;
+    gap: 8px;
   }
 
   .summary-card {
-    padding: 16px 18px;
+    padding: 9px 10px;
     background: linear-gradient(180deg, #fbfdff 0%, #f1f6fc 100%);
   }
 
   .summary-card .label {
     display: block;
     color: #66788a;
-    font-size: 0.84rem;
+    font-size: 0.65rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.03em;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
   }
 
   .summary-card .value {
-    font-size: 1.25rem;
+    font-size: 0.94rem;
     font-weight: 800;
     color: #0f3460;
   }
@@ -2999,14 +3005,14 @@ function exportExpenseHTML() {
   }
 
   .details-section {
-    margin-top: 8px;
+    margin-top: 4px;
   }
 
   .table-wrap {
     width: 100%;
     overflow-x: auto;
     border: 1px solid #d8e2ef;
-    border-radius: 16px;
+    border-radius: 12px;
   }
   
   table { 
@@ -3019,12 +3025,13 @@ function exportExpenseHTML() {
   
   th, td { 
     border-bottom: 1px solid #e4ebf3;
-    padding: 12px 10px; 
-    font-size: 0.88rem;
+    padding: 5px 6px; 
+    font-size: 0.66rem;
     text-align: left;
     overflow-wrap: anywhere;
     word-break: break-word;
     vertical-align: top;
+    line-height: 1.2;
   }
   
   thead th { 
@@ -3048,19 +3055,19 @@ function exportExpenseHTML() {
   .justif-links {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 4px;
   }
 
   .justif-links a {
     display: inline-flex;
     align-items: center;
-    padding: 4px 8px;
+    padding: 2px 5px;
     border-radius: 999px;
     background: #eaf2ff;
     color: #145da0;
     text-decoration: none;
     font-weight: 700;
-    font-size: 0.78rem;
+    font-size: 0.6rem;
   }
 
   .justif-empty {
@@ -3075,29 +3082,42 @@ function exportExpenseHTML() {
   }
   
   .note {
-    margin-top: 18px;
-    padding: 16px 18px;
+    margin-top: 8px;
+    padding: 8px 10px;
     background: #fffaf0;
     border-left: 5px solid #f59e0b;
-    font-size: 0.88rem;
-    line-height: 1.55;
+    font-size: 0.68rem;
+    line-height: 1.35;
   }
   
   .signature { 
-    margin-top: 48px; 
+    margin-top: 12px; 
     display: grid; 
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 28px;
+    gap: 16px;
     page-break-inside: avoid;
   }
   
   .signature > div {
-    min-height: 90px;
+    min-height: 46px;
     border-top: 2px solid #243447;
-    padding-top: 12px;
+    padding-top: 6px;
     text-align: center;
     font-weight: 600;
+    font-size: 0.7rem;
   }
+
+  th:nth-child(1), td:nth-child(1) { width: 7%; }
+  th:nth-child(2), td:nth-child(2) { width: 17%; }
+  th:nth-child(3), td:nth-child(3) { width: 10%; }
+  th:nth-child(4), td:nth-child(4) { width: 10%; }
+  th:nth-child(5), td:nth-child(5) { width: 7%; }
+  th:nth-child(6), td:nth-child(6) { width: 9%; }
+  th:nth-child(7), td:nth-child(7) { width: 7%; }
+  th:nth-child(8), td:nth-child(8) { width: 7%; }
+  th:nth-child(9), td:nth-child(9) { width: 7%; }
+  th:nth-child(10), td:nth-child(10) { width: 10%; }
+  th:nth-child(11), td:nth-child(11) { width: 9%; }
 
   @media (max-width: 900px) {
     body {
@@ -3211,16 +3231,16 @@ function exportExpenseHTML() {
     <thead>
       <tr>
         <th>Date</th>
-        <th>Motif du trajet</th>
-        <th>Lieu de départ</th>
-        <th>Lieu d'arrivée</th>
-        <th>Distance (km)</th>
-        <th>Remb. km (€)</th>
-        <th>Péage (€)</th>
-        <th>Hôtel (€)</th>
-        <th>Achat (€)</th>
+        <th>Motif</th>
+        <th>Départ</th>
+        <th>Arrivée</th>
+        <th>Km</th>
+        <th>Km €</th>
+        <th>Péage</th>
+        <th>Hôtel</th>
+        <th>Achat</th>
         <th>Justificatifs</th>
-        <th>Total (€)</th>
+        <th>Total</th>
       </tr>
     </thead>
     <tbody>
