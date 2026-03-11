@@ -2159,7 +2159,7 @@ function createDayElement(day, dateStr) {
   }
 
   const isSchoolHoliday = schoolHolidays.some(
-    (holiday) => dateStr >= holiday.start && dateStr <= holiday.end
+    (holiday) => dateStr >= holiday.start && dateStr < holiday.end
   );
   if (isSchoolHoliday && !publicHolidays[dateStr]) {
     dayDiv.classList.add("school-holiday");
