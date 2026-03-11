@@ -337,6 +337,11 @@ function __maskEmail(email) {
   return `${maskedLocal}@${domain}`;
 }
 
+function __normalizeEmail(email) {
+  const value = String(email || '').trim().toLowerCase();
+  return value || null;
+}
+
 function __decodeJwtPayload(token) {
   const parts = String(token || '').split('.');
   if (parts.length < 2) return null;
@@ -1265,7 +1270,7 @@ function setupEventListeners() {
 
   document.getElementById("saveCoach").onclick = saveCoach;
   document.getElementById("inviteCoach").onclick = async () => {
-    const email = document.getElementById("coachEmail").value.trim();
+    const email = __normalizeEmail(document.getElementById("coachEmail").value);
     if (!email) {
       alert("Veuillez renseigner l'adresse e-mail de l'entraîneur.");
       return;
@@ -1463,7 +1468,7 @@ async function saveCoach() {
   
   const name = document.getElementById('coachName').value.trim();
   const firstName = document.getElementById('coachFirstName').value.trim();
-  const email = document.getElementById('coachEmail').value.trim();
+  const email = __normalizeEmail(document.getElementById('coachEmail').value);
   const address = document.getElementById('coachAddress').value.trim();
   const vehicle = document.getElementById('coachVehicle').value.trim();
   const fiscalPower = document.getElementById('coachFiscalPower').value.trim();
@@ -1651,10 +1656,15 @@ async function deleteCoach() {
  */
 async function inviteCoach(email) {
   if (!currentUser) return false;
+  const normalizedEmail = __normalizeEmail(email);
 
   const isAdmin = await isCurrentUserAdminDB();
   if (!isAdmin) {
     alert("Seul un administrateur peut envoyer des invitations.");
+    return false;
+  }
+  if (!normalizedEmail) {
+    alert("Veuillez renseigner l'adresse e-mail de l'entraîneur.");
     return false;
   }
 
@@ -1665,7 +1675,7 @@ async function inviteCoach(email) {
   // default Supabase access token lifetime is 1 hour).
   let accessToken = currentAccessToken;
   const currentTokenHasAdminClaim = __hasAdminClaim(accessToken);
-  const inviteDebugStart = __collectInviteDebug({ inviteEmail: email, stage: 'beforeRefresh' });
+  const inviteDebugStart = __collectInviteDebug({ inviteEmail: normalizedEmail, stage: 'beforeRefresh' });
   window.__inviteDebugLast = inviteDebugStart;
   console.log('DEBUG inviteCoach start:', inviteDebugStart);
   try {
@@ -1691,7 +1701,7 @@ async function inviteCoach(email) {
   }
 
   if (!accessToken) {
-    const noTokenDebug = __collectInviteDebug({ inviteEmail: email, stage: 'noTokenAfterRefresh', token: accessToken });
+    const noTokenDebug = __collectInviteDebug({ inviteEmail: normalizedEmail, stage: 'noTokenAfterRefresh', token: accessToken });
     window.__inviteDebugLast = noTokenDebug;
     console.warn('DEBUG inviteCoach missing access token:', noTokenDebug);
     alert("Session expirée. Veuillez vous reconnecter.");
@@ -1699,7 +1709,7 @@ async function inviteCoach(email) {
   }
 
   try {
-    const inviteDebugRequest = __collectInviteDebug({ inviteEmail: email, stage: 'beforeRequest', token: accessToken });
+    const inviteDebugRequest = __collectInviteDebug({ inviteEmail: normalizedEmail, stage: 'beforeRequest', token: accessToken });
     window.__inviteDebugLast = inviteDebugRequest;
     console.log('DEBUG inviteCoach request context:', inviteDebugRequest);
     const res = await globalThis.fetch(`${supabaseUrl}/functions/v1/invite-coach`, {
@@ -1710,7 +1720,7 @@ async function inviteCoach(email) {
         'apikey': supabaseKey
       },
       body: JSON.stringify({
-        email,
+        email: normalizedEmail,
         redirectTo: window.location.origin + window.location.pathname
       })
     });
@@ -1747,11 +1757,11 @@ async function inviteCoach(email) {
       return false;
     }
 
-    alert(`Invitation envoyée à ${email}.\nL'entraîneur recevra un e-mail pour créer son mot de passe.`);
+    alert(`Invitation envoyée à ${normalizedEmail}.\nL'entraîneur recevra un e-mail pour créer son mot de passe.`);
     return true;
   } catch (e) {
     const inviteDebugError = {
-      ...__collectInviteDebug({ inviteEmail: email, stage: 'requestException', token: accessToken }),
+      ...__collectInviteDebug({ inviteEmail: normalizedEmail, stage: 'requestException', token: accessToken }),
       errorMessage: e?.message || String(e)
     };
     window.__inviteDebugLast = inviteDebugError;

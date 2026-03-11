@@ -248,6 +248,7 @@ The migrations set up, in order:
 | `20260309150000_create_frozen_timesheets.sql` | `frozen_timesheets` table + RLS policies |
 | `20260310000000_add_coach_invite_support.sql` | `claim_coach_profile()` function — lets a coach atomically claim a profile with `owner_uid = NULL` on first login |
 | `20260310120000_fix_coaches_rls_for_invite_flow.sql` | Replaces `coaches` table RLS policies so admins can INSERT profiles with `owner_uid = NULL` (required for the invitation flow) |
+| `20260311101500_make_claim_coach_profile_case_insensitive.sql` | Updates `claim_coach_profile()` so invited coach profiles are matched case-insensitively by e-mail |
 | `20260311084000_drop_legacy_frozen_timesheet_tables.sql` | Removes duplicate legacy frozen-timesheet tables after copying any rows into `frozen_timesheets` |
 
 #### Marking a user as admin
