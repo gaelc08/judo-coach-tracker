@@ -8,7 +8,7 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-11-validation-feedback-1';
+const __BUILD_ID = '2026-03-11-freeze-click-fix-1';
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 let __deferredInstallPrompt = null;
@@ -2161,13 +2161,20 @@ function __formatMonthLabel(monthValue) {
   return `${month}/${year}`;
 }
 
+function __isAdminForUi() {
+  if (__adminCache.userId === currentUser?.id && __adminCache.value === true) {
+    return true;
+  }
+  return __isAdminViaLocalClaims();
+}
+
 async function handleDayClick(dateStr) {
   if (!currentCoach) {
     alert("Veuillez sélectionner un profil.");
     return;
   }
 
-  const isAdmin = await isCurrentUserAdminDB();
+  const isAdmin = __isAdminForUi();
   if (!isAdmin && isCurrentMonthFrozen()) {
     alert(`Impossible de modifier ${dateStr} : le mois ${__formatMonthLabel(currentMonth)} est gelé.`);
     return;
@@ -2334,7 +2341,7 @@ async function saveDay() {
   if (!currentCoach || !currentUser) return;
   const isVolunteer = __isVolunteerProfile(currentCoach);
 
-  const isAdmin = await isCurrentUserAdminDB();
+  const isAdmin = __isAdminForUi();
   if (!isAdmin && isCurrentMonthFrozen()) {
     alert(`Impossible d'enregistrer : le mois ${__formatMonthLabel(currentMonth)} est gelé.`);
     document.getElementById("dayModal").classList.remove("active");
@@ -2507,7 +2514,7 @@ async function saveDay() {
 async function deleteDay() {
   if (!currentCoach || !currentUser) return;
 
-  const isAdmin = await isCurrentUserAdminDB();
+  const isAdmin = __isAdminForUi();
   if (!isAdmin && isCurrentMonthFrozen()) {
     alert(`Impossible de supprimer : le mois ${__formatMonthLabel(currentMonth)} est gelé.`);
     document.getElementById("dayModal").classList.remove("active");
