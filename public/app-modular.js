@@ -8,7 +8,7 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-11-volunteer-1';
+const __BUILD_ID = '2026-03-11-user-ui-1';
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 let __deferredInstallPrompt = null;
@@ -1135,14 +1135,12 @@ function setupAuthListeners() {
       const isAdmin = await isCurrentUserAdminDB();
       if (isAdmin) {
         document.getElementById("addCoachBtn").style.display = "inline-block";
-        document.getElementById("addVolunteerBtn").style.display = "inline-block";
         document.getElementById("editCoachBtn").style.display = "inline-block";
         document.getElementById("inviteAdminBtn").style.display = "inline-block";
         document.getElementById("freezeBtn").style.display = "inline-block";
         document.getElementById("importGroup").style.display = "flex";
       } else {
         document.getElementById("addCoachBtn").style.display = "none";
-        document.getElementById("addVolunteerBtn").style.display = "none";
         document.getElementById("editCoachBtn").style.display = "none";
         document.getElementById("inviteAdminBtn").style.display = "none";
         document.getElementById("freezeBtn").style.display = "none";
@@ -1436,18 +1434,6 @@ function setupEventListeners() {
     clearCoachForm();
     document.getElementById("coachProfileType").value = "coach";
     updateCoachFormProfileUI("coach");
-    document.getElementById("coachOwnerUid").value = "";
-    document.getElementById("inviteCoach").style.display = "none";
-    document.getElementById("deleteCoach").style.display = "none";
-    document.getElementById("coachModal").classList.add("active");
-  };
-
-  document.getElementById("addVolunteerBtn").onclick = () => {
-    editMode = false;
-    editingCoachId = null;
-    clearCoachForm();
-    document.getElementById("coachProfileType").value = "benevole";
-    updateCoachFormProfileUI("benevole");
     document.getElementById("coachOwnerUid").value = "";
     document.getElementById("inviteCoach").style.display = "none";
     document.getElementById("deleteCoach").style.display = "none";

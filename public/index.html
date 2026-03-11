@@ -71,8 +71,7 @@
         </label>
 
         <div class="toolbar-actions">
-          <button id="addCoachBtn" class="admin-only btn-secondary" style="display:none">+ Entraîneur</button>
-          <button id="addVolunteerBtn" class="admin-only btn-secondary" style="display:none">+ Bénévole</button>
+          <button id="addCoachBtn" class="admin-only btn-secondary" style="display:none">+ Ajout utilisateur</button>
           <button id="editCoachBtn" class="admin-only btn-secondary" style="display:none">✏️ Modifier</button>
           <button id="inviteAdminBtn" class="admin-only btn-secondary" style="display:none">✉️ Inviter admin</button>
           <button id="freezeBtn" class="admin-only btn-secondary" style="display:none">🔒 Geler la fiche</button>
@@ -174,7 +173,7 @@
       <label>Email
         <input id="coachEmail" type="email">
       </label>
-      <div class="field-group">
+      <div class="field-group" style="display:none">
         <label for="coachOwnerUid">UID Supabase (lien compte coach)</label>
         <input type="text" id="coachOwnerUid" placeholder="Laissez vide — rempli automatiquement à la 1re connexion">
         <p class="field-hint">Optionnel. Si vide, l'entraîneur sera automatiquement lié à son compte lors de sa première connexion après avoir accepté l'invitation.</p>
@@ -348,9 +347,8 @@
       <div class="help-section admin-help">
         <h3>🔧 Fonctions administrateur</h3>
         <ul>
-          <li><strong>+ Entraîneur</strong> – ajoute un nouveau profil d'entraîneur avec ses tarifs.</li>
-          <li><strong>+ Bénévole</strong> – ajoute un profil bénévole pouvant saisir des frais et des déplacements sans éléments de paie.</li>
-          <li><strong>✏️ Modifier</strong> – modifie le profil et les tarifs de l'entraîneur sélectionné.</li>
+          <li><strong>+ Ajout utilisateur</strong> – ajoute un nouveau profil puis permet de choisir le type <strong>Entraîneur</strong> ou <strong>Bénévole</strong> dans la fiche.</li>
+          <li><strong>✏️ Modifier</strong> – modifie le profil sélectionné et son type si nécessaire.</li>
           <li><strong>🔒 Geler la fiche</strong> – verrouille ou déverrouille un mois pour empêcher les modifications.</li>
           <li><strong>📥 Importer JSON</strong> – permet de réinjecter une sauvegarde JSON dans la fiche affichée.</li>
           <li><strong>✉️ Inviter admin</strong> – envoie une invitation à un nouvel administrateur.</li>
@@ -398,6 +396,6 @@
     </div>
   </div>
 
-  <script type="module" src="app-modular.js?v=2026-03-11-volunteer-1"></script>
+  <script type="module" src="app-modular.js?v=2026-03-11-user-ui-1"></script>
 </body>
 </html>
