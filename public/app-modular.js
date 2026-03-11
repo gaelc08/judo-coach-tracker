@@ -8,7 +8,7 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-11-admin-fallback-1';
+const __BUILD_ID = '2026-03-11-legal-mileage-scale-1';
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 let __deferredInstallPrompt = null;
@@ -426,6 +426,109 @@ window.__copyInviteDebugReport = __copyInviteDebugReport;
 function __normalizeMonth(value) {
   const s = String(value ?? '').trim();
   return /^\d{4}-\d{2}/.test(s) ? s.slice(0, 7) : s;
+}
+
+const __MILEAGE_SCALE = {
+  3: { upTo5000: 0.529, midRate: 0.316, midFixed: 1065, over20000: 0.37 },
+  4: { upTo5000: 0.606, midRate: 0.34, midFixed: 1330, over20000: 0.407 },
+  5: { upTo5000: 0.636, midRate: 0.357, midFixed: 1395, over20000: 0.427 },
+  6: { upTo5000: 0.665, midRate: 0.374, midFixed: 1457, over20000: 0.447 },
+  7: { upTo5000: 0.697, midRate: 0.394, midFixed: 1515, over20000: 0.47 },
+};
+
+function __parseFiscalPower(value) {
+  const parsed = Number.parseInt(String(value ?? '').trim(), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function __getMileageScaleBand(fiscalPower) {
+  const parsed = __parseFiscalPower(fiscalPower);
+  if (!parsed) return null;
+  if (parsed <= 3) return 3;
+  if (parsed >= 7) return 7;
+  return parsed;
+}
+
+function __getLegacyKmRateFromFiscalPower(fiscalPower) {
+  const band = __getMileageScaleBand(fiscalPower);
+  return band ? __MILEAGE_SCALE[band].upTo5000 : 0;
+}
+
+function __calculateAnnualMileageAmount(distanceKm, fiscalPower) {
+  const distance = Math.max(0, Number(distanceKm) || 0);
+  const band = __getMileageScaleBand(fiscalPower);
+  if (!distance || !band) return 0;
+
+  const scale = __MILEAGE_SCALE[band];
+  if (distance <= 5000) return distance * scale.upTo5000;
+  if (distance <= 20000) return distance * scale.midRate + scale.midFixed;
+  return distance * scale.over20000;
+}
+
+function __getMileageYearBreakdown(coach, year) {
+  const breakdown = {
+    byKey: {},
+    totalKm: 0,
+    usesLegalScale: Boolean(__getMileageScaleBand(coach?.fiscal_power)),
+  };
+
+  if (!coach?.id || !year) return breakdown;
+
+  const fiscalPower = __parseFiscalPower(coach.fiscal_power);
+  const fallbackKmRate = Number(coach.km_rate) || 0;
+  let cumulativeKm = 0;
+
+  Object.keys(timeData)
+    .filter((key) => key.startsWith(`${coach.id}-${year}-`))
+    .sort()
+    .forEach((key) => {
+      const data = timeData[key] || {};
+      const km = Math.max(0, Number(data.km) || 0);
+      const previousKm = cumulativeKm;
+      cumulativeKm += km;
+
+      const amount = fiscalPower
+        ? __calculateAnnualMileageAmount(cumulativeKm, fiscalPower) - __calculateAnnualMileageAmount(previousKm, fiscalPower)
+        : km * fallbackKmRate;
+
+      breakdown.byKey[key] = {
+        km,
+        amount,
+        cumulativeKmBefore: previousKm,
+        cumulativeKmAfter: cumulativeKm,
+        effectiveRate: km > 0 ? amount / km : 0,
+      };
+    });
+
+  breakdown.totalKm = cumulativeKm;
+  breakdown.usesLegalScale = Boolean(fiscalPower);
+  return breakdown;
+}
+
+function __getMonthlyMileageBreakdown(coach, monthValue) {
+  if (!coach || !monthValue) {
+    return { totalKm: 0, totalAmount: 0, byKey: {}, usesLegalScale: false };
+  }
+
+  const [year, month] = monthValue.split('-');
+  const yearBreakdown = __getMileageYearBreakdown(coach, year);
+  const byKey = {};
+  let totalKm = 0;
+  let totalAmount = 0;
+
+  Object.entries(yearBreakdown.byKey).forEach(([key, value]) => {
+    if (!key.startsWith(`${coach.id}-${year}-${month}`)) return;
+    byKey[key] = value;
+    totalKm += value.km;
+    totalAmount += value.amount;
+  });
+
+  return {
+    totalKm,
+    totalAmount,
+    byKey,
+    usesLegalScale: yearBreakdown.usesLegalScale,
+  };
 }
 
 async function __coachWriteViaRest(coachData, { editingId = null } = {}) {
@@ -1281,7 +1384,6 @@ function setupEventListeners() {
     document.getElementById("coachFiscalPower").value = currentCoach.fiscal_power || "";
     document.getElementById("coachRate").value = currentCoach.hourly_rate;
     document.getElementById("dailyAllowance").value = currentCoach.daily_allowance;
-    document.getElementById("kmRate").value = currentCoach.km_rate;
     document.getElementById("coachOwnerUid").value = currentCoach.owner_uid || "";
     // Show the invite button when the coach profile has an email (re-send invite at any time)
     const inviteBtn = document.getElementById("inviteCoach");
@@ -1413,7 +1515,6 @@ function clearCoachForm() {
   document.getElementById("coachFiscalPower").value = "";
   document.getElementById("coachRate").value = "";
   document.getElementById("dailyAllowance").value = "";
-  document.getElementById("kmRate").value = "0.35";
 }
 
 function loadCoaches() {
@@ -1505,17 +1606,17 @@ async function saveCoach() {
   const email = __normalizeEmail(document.getElementById('coachEmail').value);
   const address = document.getElementById('coachAddress').value.trim();
   const vehicle = document.getElementById('coachVehicle').value.trim();
-  const fiscalPower = document.getElementById('coachFiscalPower').value.trim();
+  const fiscalPower = __parseFiscalPower(document.getElementById('coachFiscalPower').value);
   const rate = parseFloat(document.getElementById('coachRate').value) || 0;
   const allowance = parseFloat(document.getElementById('dailyAllowance').value) || 0;
-  const kmRate = parseFloat(document.getElementById('kmRate').value) || 0.64;
+  const kmRate = __getLegacyKmRateFromFiscalPower(fiscalPower);
   const ownerUidInput = document.getElementById('coachOwnerUid');
   const ownerUid = ownerUidInput ? ownerUidInput.value.trim() : currentUser.id;
   
   console.log('DEBUG FORM:', {name, rate, allowance, kmRate, ownerUid});
   
-  if (!name || isNaN(rate) || isNaN(allowance) || isNaN(kmRate)) {
-    alert('Veuillez renseigner le nom et les tarifs (taux horaire, indemnité journalière, taux km).');
+  if (!name || isNaN(rate) || isNaN(allowance) || !fiscalPower) {
+    alert('Veuillez renseigner le nom, la puissance fiscale du véhicule et les tarifs (taux horaire, indemnité journalière).');
     return;
   }
   
@@ -2221,20 +2322,20 @@ function updateSummary() {
   const [year, month] = currentMonth.split("-");
   let totalHours = 0;
   let compDays = 0;
-  let totalKm = 0;
+  const mileageBreakdown = __getMonthlyMileageBreakdown(currentCoach, currentMonth);
+  const totalKm = mileageBreakdown.totalKm;
 
   Object.keys(timeData).forEach((key) => {
     if (key.startsWith(`${currentCoach.id}-${year}-${month}`)) {
       const data = timeData[key];
       totalHours += data.hours || 0;
       if (data.competition) compDays++;
-      totalKm += data.km || 0;
     }
   });
 
   const trainingPayment = totalHours * currentCoach.hourly_rate;
   const compPayment = compDays * currentCoach.daily_allowance;
-  const kmPayment = totalKm * currentCoach.km_rate;
+  const kmPayment = mileageBreakdown.totalAmount;
   const totalPayment = trainingPayment + compPayment + kmPayment;
 
   document.getElementById("totalHours").textContent = totalHours.toFixed(1);
@@ -2264,6 +2365,7 @@ function exportToCSV() {
   }
 
   const [year, month] = currentMonth.split("-");
+  const mileageBreakdown = __getMonthlyMileageBreakdown(currentCoach, currentMonth);
   let csv =
     "Date,Training Hours,Competition,Competition Description,Kilometers,Payment\n";
 
@@ -2273,10 +2375,11 @@ function exportToCSV() {
     .forEach((key) => {
       const date = key.split("-").slice(-3).join("-");
       const data = timeData[key];
+      const mileageAmount = mileageBreakdown.byKey[key]?.amount || 0;
       const payment =
         data.hours * currentCoach.hourly_rate +
         (data.competition ? currentCoach.daily_allowance : 0) +
-        data.km * currentCoach.km_rate;
+        mileageAmount;
       csv +=
         `${date},${data.hours},${data.competition ? "Yes" : "No"},` +
         `"${data.description || ""}",${data.km},€${payment.toFixed(2)}\n`;
@@ -2370,6 +2473,7 @@ function exportMileageHTML() {
   }
   const [year, month] = currentMonth.split("-");
   const today = new Date().toLocaleDateString("fr-FR");
+  const mileageBreakdown = __getMonthlyMileageBreakdown(currentCoach, currentMonth);
 
   const rows = [];
   let total = 0;
@@ -2381,9 +2485,10 @@ function exportMileageHTML() {
       const date = key.split("-").slice(-3).join("-");
       const data = timeData[key];
       if (!data.km || data.km <= 0) return;
-      const amount = data.km * currentCoach.km_rate;
+      const mileage = mileageBreakdown.byKey[key] || { amount: 0, effectiveRate: 0 };
+      const amount = mileage.amount;
       total += amount;
-      rows.push({ date, ...data, amount });
+      rows.push({ date, ...data, amount, effectiveRate: mileage.effectiveRate });
     });
 
   if (total === 0) {
@@ -2574,6 +2679,7 @@ function exportMileageHTML() {
     <p><strong>Poste :</strong> Entraîneur</p>
     <p><strong>Véhicule :</strong> ${currentCoach.vehicle || "Non renseigné"}</p>
     <p><strong>Puissance fiscale :</strong> ${currentCoach.fiscal_power || "Non renseignée"} CV</p>
+    <p><strong>Barème appliqué :</strong> barème légal voiture (${__getMileageScaleBand(currentCoach.fiscal_power) || currentCoach.fiscal_power || "non renseignée"} CV)</p>
   </div>
 
   <div class="table-wrap">
@@ -2585,7 +2691,7 @@ function exportMileageHTML() {
         <th>Lieu de départ</th>
         <th>Lieu d'arrivée</th>
         <th>Distance (km)</th>
-        <th>Indemnité/km (€)</th>
+        <th>Taux effectif (€ / km)</th>
         <th>Montant (€)</th>
       </tr>
     </thead>
@@ -2599,7 +2705,7 @@ ${rows
         <td>${r.departurePlace || "-"}</td>
         <td>${r.arrivalPlace || "-"}</td>
         <td style="text-align:right">${r.km}</td>
-        <td style="text-align:right">${currentCoach.km_rate
+        <td style="text-align:right">${r.effectiveRate
           .toFixed(2)
           .replace(".", ",")}</td>
         <td style="text-align:right">${r.amount

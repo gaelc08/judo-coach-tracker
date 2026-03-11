@@ -120,7 +120,7 @@
             <span class="value" id="totalKm">0</span>
           </div>
           <div class="summary-item">
-            <span class="label">Paiement km</span>
+            <span class="label">Remboursement km</span>
             <span class="value" id="kmPayment">€0,00</span>
           </div>
           <div class="summary-item total">
@@ -175,9 +175,10 @@
       <label>Indemnité journalière (€)
         <input id="dailyAllowance" type="number" step="0.1">
       </label>
-      <label>Taux km (€ / km)
-        <input id="kmRate" type="number" step="0.01" value="0.35">
-      </label>
+      <div class="field-group">
+        <label>Remboursement kilométrique</label>
+        <p class="field-hint">Calculé automatiquement selon le barème légal voiture, en fonction de la puissance fiscale et du kilométrage cumulé sur l'année civile.</p>
+      </div>
 
       <div class="modal-actions">
         <button id="saveCoach" class="btn-primary">Sauvegarder</button>
@@ -284,6 +285,7 @@
       <div class="help-section">
         <h3>📊 Récapitulatif mensuel</h3>
         <p>Le panneau sous le calendrier affiche automatiquement le total des heures, des jours de compétition, des kilomètres parcourus ainsi qu'une estimation du montant calculé pour le mois sélectionné.</p>
+        <p>Le remboursement kilométrique est calculé automatiquement selon le barème légal applicable aux voitures, en fonction de la puissance fiscale enregistrée et du cumul annuel des kilomètres.</p>
       </div>
 
       <div class="help-section">
