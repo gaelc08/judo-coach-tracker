@@ -1621,6 +1621,41 @@ async function deleteCoach() {
   }
 
   try {
+    let accessToken = currentAccessToken;
+    try {
+      const { data: { session } } = await supabase.auth.refreshSession();
+      if (session?.access_token) {
+        accessToken = session.access_token;
+        currentAccessToken = accessToken;
+      }
+    } catch {
+      // keep current token best-effort
+    }
+
+    const targetCoach = currentCoach && currentCoach.id === editingCoachId
+      ? currentCoach
+      : coaches.find((c) => c.id === editingCoachId) || null;
+
+    if (accessToken && (targetCoach?.owner_uid || targetCoach?.email)) {
+      const res = await globalThis.fetch(`${supabaseUrl}/functions/v1/delete-coach-user`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          apikey: supabaseKey
+        },
+        body: JSON.stringify({
+          userId: targetCoach?.owner_uid || null,
+          email: targetCoach?.email || null
+        })
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(`Suppression du compte Auth échouée : ${json.error || json.message || `HTTP ${res.status}`}`);
+      }
+    }
+
     // Delete the coach
     const { error: error1 } = await supabase.from('coaches').delete().eq('id', editingCoachId);
     if (error1) throw error1;
