@@ -8,7 +8,7 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-11-user-ui-1';
+const __BUILD_ID = '2026-03-11-email-check-1';
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 let __deferredInstallPrompt = null;
@@ -478,6 +478,17 @@ function __getProfileLabel(profileOrType, { capitalized = false, plural = false 
   }
 
   return label;
+}
+
+function __findExistingProfileByEmail(email, { excludeId = null } = {}) {
+  const normalizedEmail = __normalizeEmail(email);
+  if (!normalizedEmail) return null;
+
+  return coaches.find((coach) => {
+    if (!coach) return false;
+    if (excludeId && coach.id === excludeId) return false;
+    return __normalizeEmail(coach.email) === normalizedEmail;
+  }) || null;
 }
 
 const __MILEAGE_SCALE = {
@@ -1684,11 +1695,19 @@ async function saveCoach() {
   const kmRate = __getLegacyKmRateFromFiscalPower(fiscalPower);
   const ownerUidInput = document.getElementById('coachOwnerUid');
   const ownerUid = ownerUidInput ? ownerUidInput.value.trim() : currentUser.id;
+  const duplicateProfile = email
+    ? __findExistingProfileByEmail(email, { excludeId: editMode ? editingCoachId : null })
+    : null;
   
   console.log('DEBUG FORM:', {name, profileType, rate, allowance, kmRate, ownerUid});
   
   if (!name || (!isVolunteer && (isNaN(rate) || isNaN(allowance) || !fiscalPower))) {
     alert("Veuillez renseigner le nom et, pour un entraîneur, la puissance fiscale du véhicule ainsi que les tarifs (taux horaire, indemnité journalière).");
+    return;
+  }
+
+  if (duplicateProfile) {
+    alert(`Cette adresse e-mail est déjà utilisée par le profil ${__getCoachDisplayName(duplicateProfile) || duplicateProfile.name}.`);
     return;
   }
   
