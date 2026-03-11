@@ -8,7 +8,7 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-11-purchase-color-1';
+const __BUILD_ID = '2026-03-11-expense-portrait-1';
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 let __deferredInstallPrompt = null;
@@ -2814,14 +2814,15 @@ function exportExpenseHTML() {
   }
 
   @media print {
-    @page { size: A4 landscape; margin: 7mm; }
+    @page { size: A4 portrait; margin: 8mm; }
     body { margin: 0; background: white; }
     .no-print { display: none; }
     .page-shell {
       box-shadow: none;
       border: none;
       margin: 0;
-      max-width: none;
+      width: 194mm;
+      max-width: 194mm;
       border-radius: 0;
     }
     .page-inner {
@@ -2831,35 +2832,36 @@ function exportExpenseHTML() {
   
   body { 
     margin: 0;
-    padding: 10px;
+    padding: 8px;
     background: #eef3f9;
     color: #243447;
     font-family: Inter, Arial, sans-serif;
   }
 
   .page-shell {
-    max-width: 1120px;
+    width: 194mm;
+    max-width: 194mm;
     margin: 0 auto;
     background: #ffffff;
     border: 1px solid #d8e2ef;
-    border-radius: 14px;
-    box-shadow: 0 10px 28px rgba(15, 52, 96, 0.10);
+    border-radius: 10px;
+    box-shadow: 0 8px 20px rgba(15, 52, 96, 0.10);
     overflow: hidden;
   }
 
   .page-inner {
-    padding: 14px 16px 16px;
+    padding: 10px 11px 12px;
   }
 
   .print-button {
-    margin: 0 0 10px;
-    padding: 8px 14px;
+    margin: 0 0 8px;
+    padding: 7px 12px;
     background: linear-gradient(135deg, #0f3460, #145da0);
     color: white;
     border: none;
     border-radius: 999px;
     cursor: pointer;
-    font-size: 0.82rem;
+    font-size: 0.76rem;
     font-weight: 700;
     box-shadow: 0 6px 16px rgba(20, 93, 160, 0.22);
   }
@@ -2868,21 +2870,21 @@ function exportExpenseHTML() {
     display: flex; 
     align-items: flex-start;
     justify-content: space-between;
-    gap: 12px;
+    gap: 10px;
     border-bottom: 2px solid #d8e2ef;
-    padding-bottom: 10px;
-    margin-bottom: 10px;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
   }
   
   .header-brand {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
   }
   
   .header-logo {
-    width: 54px;
-    height: 54px;
+    width: 46px;
+    height: 46px;
     flex: 0 0 auto;
     display: grid;
     place-items: center;
@@ -2892,25 +2894,25 @@ function exportExpenseHTML() {
   }
   
   .header-logo img { 
-    max-width: 40px;
-    max-height: 40px;
+    max-width: 34px;
+    max-height: 34px;
   }
   
   .header-text h1 {
     margin: 0 0 4px;
-    font-size: 1.1rem;
+    font-size: 0.96rem;
     color: #0f3460;
   }
   
   .header-text p { 
     margin: 1px 0;
     color: #526274;
-    font-size: 0.72rem;
+    font-size: 0.66rem;
   }
 
   .document-badge {
     text-align: right;
-    min-width: 180px;
+    min-width: 150px;
   }
 
   .document-badge .label {
@@ -2920,28 +2922,28 @@ function exportExpenseHTML() {
     background: #eaf2ff;
     color: #145da0;
     font-weight: 700;
-    font-size: 0.68rem;
+    font-size: 0.62rem;
     letter-spacing: 0.03em;
     text-transform: uppercase;
   }
 
   .document-badge h2 {
     margin: 6px 0 2px;
-    font-size: 1rem;
+    font-size: 0.9rem;
     color: #0f3460;
   }
 
   .document-badge p {
     margin: 0;
     color: #66788a;
-    font-size: 0.75rem;
+    font-size: 0.68rem;
   }
 
   .info-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-    margin-bottom: 10px;
+    gap: 8px;
+    margin-bottom: 8px;
   }
 
   .info-card,
@@ -2953,27 +2955,27 @@ function exportExpenseHTML() {
   }
 
   .info-card {
-    padding: 10px 12px;
+    padding: 8px 9px;
   }
 
   .info-card h3,
   .summary-section h3,
   .details-section h3 {
-    margin: 0 0 8px;
+    margin: 0 0 6px;
     color: #0f3460;
-    font-size: 0.86rem;
+    font-size: 0.8rem;
   }
 
   .info-list {
     display: grid;
-    gap: 5px;
+    gap: 4px;
   }
 
   .info-row {
     display: grid;
-    grid-template-columns: 120px 1fr;
+    grid-template-columns: 102px 1fr;
     gap: 6px;
-    font-size: 0.74rem;
+    font-size: 0.68rem;
   }
 
   .info-row .label {
@@ -2987,24 +2989,24 @@ function exportExpenseHTML() {
   }
 
   .summary-section {
-    margin-bottom: 10px;
+    margin-bottom: 8px;
   }
 
   .summary-grid {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
   }
 
   .summary-card {
-    padding: 9px 10px;
+    padding: 7px 8px;
     background: linear-gradient(180deg, #fbfdff 0%, #f1f6fc 100%);
   }
 
   .summary-card .label {
     display: block;
     color: #66788a;
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.03em;
@@ -3012,9 +3014,13 @@ function exportExpenseHTML() {
   }
 
   .summary-card .value {
-    font-size: 0.94rem;
+    font-size: 0.84rem;
     font-weight: 800;
     color: #0f3460;
+  }
+
+  .summary-card.total {
+    grid-column: 1 / -1;
   }
 
   .summary-card.total {
@@ -3028,14 +3034,14 @@ function exportExpenseHTML() {
   }
 
   .details-section {
-    margin-top: 4px;
+    margin-top: 2px;
   }
 
   .table-wrap {
     width: 100%;
-    overflow-x: auto;
     border: 1px solid #d8e2ef;
-    border-radius: 12px;
+    border-radius: 10px;
+    overflow: hidden;
   }
   
   table { 
@@ -3048,13 +3054,13 @@ function exportExpenseHTML() {
   
   th, td { 
     border-bottom: 1px solid #e4ebf3;
-    padding: 5px 6px; 
-    font-size: 0.66rem;
+    padding: 4px 5px; 
+    font-size: 0.58rem;
     text-align: left;
     overflow-wrap: anywhere;
     word-break: break-word;
     vertical-align: top;
-    line-height: 1.2;
+    line-height: 1.18;
   }
   
   thead th { 
@@ -3075,22 +3081,38 @@ function exportExpenseHTML() {
     font-variant-numeric: tabular-nums;
   }
 
+  .expense-cell {
+    display: grid;
+    gap: 2px;
+  }
+
+  .expense-cell strong {
+    font-size: 0.6rem;
+    color: #243447;
+  }
+
+  .route-line,
+  .meta-line {
+    color: #66788a;
+    font-size: 0.55rem;
+  }
+
   .justif-links {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: 3px;
   }
 
   .justif-links a {
     display: inline-flex;
     align-items: center;
-    padding: 2px 5px;
+    padding: 1px 4px;
     border-radius: 999px;
     background: #eaf2ff;
     color: #145da0;
     text-decoration: none;
     font-weight: 700;
-    font-size: 0.6rem;
+    font-size: 0.52rem;
   }
 
   .justif-empty {
@@ -3105,42 +3127,39 @@ function exportExpenseHTML() {
   }
   
   .note {
-    margin-top: 8px;
-    padding: 8px 10px;
+    margin-top: 7px;
+    padding: 7px 8px;
     background: #fffaf0;
     border-left: 5px solid #f59e0b;
-    font-size: 0.68rem;
-    line-height: 1.35;
+    font-size: 0.61rem;
+    line-height: 1.28;
   }
   
   .signature { 
-    margin-top: 12px; 
+    margin-top: 9px; 
     display: grid; 
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
+    gap: 12px;
     page-break-inside: avoid;
   }
   
   .signature > div {
-    min-height: 46px;
+    min-height: 40px;
     border-top: 2px solid #243447;
-    padding-top: 6px;
+    padding-top: 5px;
     text-align: center;
     font-weight: 600;
-    font-size: 0.7rem;
+    font-size: 0.64rem;
   }
 
-  th:nth-child(1), td:nth-child(1) { width: 7%; }
-  th:nth-child(2), td:nth-child(2) { width: 17%; }
-  th:nth-child(3), td:nth-child(3) { width: 10%; }
+  th:nth-child(1), td:nth-child(1) { width: 10%; }
+  th:nth-child(2), td:nth-child(2) { width: 34%; }
+  th:nth-child(3), td:nth-child(3) { width: 7%; }
   th:nth-child(4), td:nth-child(4) { width: 10%; }
-  th:nth-child(5), td:nth-child(5) { width: 7%; }
-  th:nth-child(6), td:nth-child(6) { width: 9%; }
-  th:nth-child(7), td:nth-child(7) { width: 7%; }
-  th:nth-child(8), td:nth-child(8) { width: 7%; }
-  th:nth-child(9), td:nth-child(9) { width: 7%; }
-  th:nth-child(10), td:nth-child(10) { width: 10%; }
-  th:nth-child(11), td:nth-child(11) { width: 9%; }
+  th:nth-child(5), td:nth-child(5) { width: 8%; }
+  th:nth-child(6), td:nth-child(6) { width: 8%; }
+  th:nth-child(7), td:nth-child(7) { width: 8%; }
+  th:nth-child(8), td:nth-child(8) { width: 15%; }
 
   @media (max-width: 900px) {
     body {
@@ -3166,6 +3185,10 @@ function exportExpenseHTML() {
     .summary-grid,
     .signature {
       grid-template-columns: 1fr;
+    }
+
+    .summary-card.total {
+      grid-column: auto;
     }
 
     .info-row {
@@ -3254,15 +3277,12 @@ function exportExpenseHTML() {
     <thead>
       <tr>
         <th>Date</th>
-        <th>Motif</th>
-        <th>Départ</th>
-        <th>Arrivée</th>
+        <th>Dépense / trajet</th>
         <th>Km</th>
         <th>Km €</th>
         <th>Péage</th>
         <th>Hôtel</th>
         <th>Achat</th>
-        <th>Justificatifs</th>
         <th>Total</th>
       </tr>
     </thead>
@@ -3272,9 +3292,21 @@ ${rows
     (r) => `
       <tr>
         <td>${r.date}</td>
-        <td>${r.description || "Déplacement judo"}</td>
-        <td>${r.departurePlace || "-"}</td>
-        <td>${r.arrivalPlace || "-"}</td>
+        <td>
+          <div class="expense-cell">
+            <strong>${r.description || "Déplacement judo"}</strong>
+            <span class="route-line">${r.departurePlace || "-"} → ${r.arrivalPlace || "-"}</span>
+            ${[
+              r.justificationUrl ? `<a href="${r.justificationUrl}" target="_blank" rel="noopener noreferrer">Péage</a>` : '',
+              r.hotelJustificationUrl ? `<a href="${r.hotelJustificationUrl}" target="_blank" rel="noopener noreferrer">Hôtel</a>` : '',
+              r.achatJustificationUrl ? `<a href="${r.achatJustificationUrl}" target="_blank" rel="noopener noreferrer">Achat</a>` : ''
+            ].filter(Boolean).length ? `<div class="justif-links">${[
+              r.justificationUrl ? `<a href="${r.justificationUrl}" target="_blank" rel="noopener noreferrer">Péage</a>` : '',
+              r.hotelJustificationUrl ? `<a href="${r.hotelJustificationUrl}" target="_blank" rel="noopener noreferrer">Hôtel</a>` : '',
+              r.achatJustificationUrl ? `<a href="${r.achatJustificationUrl}" target="_blank" rel="noopener noreferrer">Achat</a>` : ''
+            ].filter(Boolean).join('')}</div>` : '<span class="meta-line">Aucun justificatif</span>'}
+          </div>
+        </td>
         <td class="number">${r.km}</td>
         <td class="amount">${r.mileageAmount
           .toFixed(2)
@@ -3282,15 +3314,6 @@ ${rows
         <td class="amount">${r.tollAmount.toFixed(2).replace(".", ",")} €</td>
         <td class="amount">${r.hotelAmount.toFixed(2).replace(".", ",")} €</td>
         <td class="amount">${r.purchaseAmount.toFixed(2).replace(".", ",")} €</td>
-        <td>${[
-          r.justificationUrl ? `<a href="${r.justificationUrl}" target="_blank" rel="noopener noreferrer">Péage</a>` : '',
-          r.hotelJustificationUrl ? `<a href="${r.hotelJustificationUrl}" target="_blank" rel="noopener noreferrer">Hôtel</a>` : '',
-          r.achatJustificationUrl ? `<a href="${r.achatJustificationUrl}" target="_blank" rel="noopener noreferrer">Achat</a>` : ''
-        ].filter(Boolean).length ? `<div class="justif-links">${[
-          r.justificationUrl ? `<a href="${r.justificationUrl}" target="_blank" rel="noopener noreferrer">Péage</a>` : '',
-          r.hotelJustificationUrl ? `<a href="${r.hotelJustificationUrl}" target="_blank" rel="noopener noreferrer">Hôtel</a>` : '',
-          r.achatJustificationUrl ? `<a href="${r.achatJustificationUrl}" target="_blank" rel="noopener noreferrer">Achat</a>` : ''
-        ].filter(Boolean).join('')}</div>` : '<span class="justif-empty">-</span>'}</td>
         <td class="amount">${r.amount
           .toFixed(2)
           .replace(".", ",")} €</td>
@@ -3298,7 +3321,7 @@ ${rows
   )
   .join("")}
       <tr class="total-row">
-        <td colspan="10" class="amount">TOTAL TTC</td>
+        <td colspan="7" class="amount">TOTAL TTC</td>
         <td class="amount">${total
           .toFixed(2)
           .replace(".", ",")} €</td>
