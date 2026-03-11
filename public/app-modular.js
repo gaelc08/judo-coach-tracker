@@ -8,7 +8,7 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-11-expense-pdf-layout-1';
+const __BUILD_ID = '2026-03-11-pdf-2cols-1';
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 let __deferredInstallPrompt = null;
@@ -2815,18 +2815,53 @@ function exportExpenseHTML() {
 
   @media print {
     @page { size: A4 portrait; margin: 8mm; }
-    body { margin: 0; background: white; }
+    html, body {
+      width: 194mm;
+      margin: 0;
+      background: white;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
     .no-print { display: none; }
     .page-shell {
       box-shadow: none;
       border: none;
       margin: 0;
-      width: 100%;
-      max-width: none;
+      width: 194mm;
+      max-width: 194mm;
       border-radius: 0;
     }
     .page-inner {
       padding: 0;
+    }
+    .header,
+    .header-brand {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: flex-start !important;
+      justify-content: space-between !important;
+    }
+    .document-badge {
+      text-align: right !important;
+      min-width: 180px !important;
+    }
+    .info-grid {
+      display: grid !important;
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+    .summary-grid {
+      display: grid !important;
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+    .summary-card.total {
+      grid-column: 1 / -1 !important;
+    }
+    .signature {
+      display: grid !important;
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+    .info-row {
+      grid-template-columns: 120px 1fr !important;
     }
   }
   
