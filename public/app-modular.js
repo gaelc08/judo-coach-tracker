@@ -8,7 +8,7 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-11-expense-a4-width-1';
+const __BUILD_ID = '2026-03-11-expense-pdf-layout-1';
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 let __deferredInstallPrompt = null;
@@ -3161,7 +3161,7 @@ function exportExpenseHTML() {
   th:nth-child(7), td:nth-child(7) { width: 9%; }
   th:nth-child(8), td:nth-child(8) { width: 13%; }
 
-  @media (max-width: 900px) {
+  @media screen and (max-width: 900px) {
     body {
       padding: 12px;
     }
