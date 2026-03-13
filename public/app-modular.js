@@ -750,24 +750,29 @@ async function __logAuditEvent(action, entityType, {
   targetEmail = null,
   metadata = {},
 } = {}) {
-  if (!currentUser) return null;
+    if (!currentUser || !currentAccessToken) return null;
 
-  try {
-    const { error } = await supabase.rpc('log_audit_event', {
-      p_action: String(action || '').trim(),
-      p_entity_type: String(entityType || '').trim(),
-      p_entity_id: entityId == null ? null : String(entityId),
-      p_target_user_id: targetUserId || null,
-      p_target_email: __normalizeEmail(targetEmail) || (targetEmail ? String(targetEmail) : null),
-      p_metadata: __toAuditJson(metadata || {}),
-    });
-    if (error) throw error;
-  } catch (e) {
-    console.warn('DEBUG audit log failed:', action, e);
-  }
-
-  return null;
-}
+    try {
+      const resp = await fetch(`${supabaseUrl}/rest/v1/rpc/log_audit_event`, {
+        method: 'POST',
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${currentAccessToken}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          p_action: String(action || '').trim(),
+          p_entity_type: String(entityType || '').trim(),
+          p_entity_id: entityId == null ? null : String(entityId),
+          p_target_user_id: targetUserId || null,
+          p_target_email: __normalizeEmail(targetEmail) || (targetEmail ? String(targetEmail) : null),
+          p_metadata: __toAuditJson(metadata || {}),
+        })
+      });
+      if (!resp.ok) {
+        throw new Error(`Failed to log audit event: ${resp.status}`);
+      }
 
 function __escapeHtml(value) {
   return String(value ?? '')
