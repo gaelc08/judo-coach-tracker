@@ -4041,6 +4041,226 @@ ${rows
   }
 }
 
+
+
+function exportTimesheetHTML() {
+  if (!currentCoach || !currentMonth) {
+    alert("Veuillez sélectionner un profil et un mois.");
+    return;
+  }
+  const [year, month] = currentMonth.split("-");
+  const today = new Date().toLocaleDateString("fr-FR");
+
+  const rows = [];
+  let totalHours = 0;
+
+  Object.keys(timeData)
+    .filter((key) => key.startsWith(`${currentCoach.id}-${year}-${month}`))
+    .sort()
+    .forEach((key) => {
+      const date = key.split("-").slice(-3).join("-");
+      const data = timeData[key];
+      if ((data.hours || 0) > 0) {
+        totalHours += data.hours;
+        rows.push({
+          date,
+          hours: data.hours,
+          dayData: data
+        });
+      }
+    });
+
+  if (totalHours === 0) {
+    alert("Aucune heure d'entraînement saisie pour ce mois.");
+    return;
+  }
+
+  const logoUrl = new URL('logo-jcc.png', window.location.href).href;
+  const coachDisplayName = __getCoachDisplayName(currentCoach) || currentCoach.name;
+  const profileLabel = __getProfileLabel(currentCoach, { capitalized: true });
+  const signatureLabel = __isVolunteerProfile(currentCoach) ? 'Signature du bénévole' : 'Signature du salarié';
+  const hourlyRate = currentCoach.rate || 0;
+  const totalAmount = totalHours * hourlyRate;
+
+  const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Relevé d'heures - ${currentCoach.name} - ${month}/${year}</title>
+<style>
+  * { box-sizing: border-box; }
+  @media print {
+    @page { size: A4 portrait; margin: 8mm; }
+    * { box-shadow: none !important; }
+    html, body {
+      width: 194mm; margin: 0; background: white;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    .no-print { display: none; }
+    .page-shell { box-shadow: none; border: none; margin: 0; width: 194mm; max-width: 194mm; border-radius: 0; }
+    .page-inner { padding: 0; }
+    .header, .header-brand { display: flex !important; flex-direction: row !important; align-items: flex-start !important; justify-content: space-between !important; }
+    .document-badge { text-align: right !important; min-width: 180px !important; }
+    .info-grid, .summary-grid, .signature { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+    .info-row { grid-template-columns: 120px 1fr !important; }
+    .summary-card.total { grid-column: 1 / -1 !important; }
+  }
+  body { margin: 0; padding: 10px; background: #eef3f9; color: #243447; font-family: Inter, Arial, sans-serif; }
+  .page-shell { width: 194mm; max-width: 194mm; margin: 0 auto; background: #ffffff; border: 1px solid #d8e2ef; border-radius: 12px; box-shadow: 0 10px 28px rgba(15, 52, 96, 0.10); overflow: hidden; }
+  .page-inner { padding: 14px 16px 16px; }
+  .print-button { margin: 0 0 10px; padding: 8px 14px; background: linear-gradient(135deg, #0f3460, #145da0); color: white; border: none; border-radius: 999px; cursor: pointer; font-size: 0.82rem; font-weight: 700; box-shadow: 0 6px 16px rgba(20, 93, 160, 0.22); }
+  .header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; border-bottom: 2px solid #d8e2ef; padding-bottom: 10px; margin-bottom: 10px; }
+  .header-brand { display: flex; align-items: center; gap: 12px; }
+  .header-logo { width: 54px; height: 54px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 12px; background: #f5f8fc; border: 1px solid #d8e2ef; }
+  .header-logo img { max-width: 40px; max-height: 40px; }
+  .header-text h1 { margin: 0 0 4px; font-size: 1.1rem; color: #0f3460; }
+  .header-text p { margin: 1px 0; color: #526274; font-size: 0.72rem; }
+  .document-badge { text-align: right; min-width: 180px; }
+  .document-badge .label { display: inline-block; padding: 5px 10px; border-radius: 999px; background: #eaf2ff; color: #145da0; font-weight: 700; font-size: 0.68rem; letter-spacing: 0.03em; text-transform: uppercase; }
+  .document-badge h2 { margin: 6px 0 2px; font-size: 1rem; color: #0f3460; }
+  .document-badge p { margin: 0; color: #66788a; font-size: 0.75rem; }
+  .info-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 10px; }
+  .info-card, .summary-card, .note { border: 1px solid #d8e2ef; border-radius: 16px; background: #f9fbfe; }
+  .info-card { padding: 10px 12px; }
+  .info-card h3, .summary-section h3, .details-section h3 { margin: 0 0 8px; color: #0f3460; font-size: 0.86rem; }
+  .info-list { display: grid; gap: 5px; }
+  .info-row { display: grid; grid-template-columns: 120px 1fr; gap: 6px; font-size: 0.74rem; }
+  .info-row .label { color: #66788a; font-weight: 600; }
+  .info-row .value { color: #243447; font-weight: 600; }
+  .summary-section { margin-bottom: 10px; }
+  .summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .summary-card { padding: 9px 10px; background: linear-gradient(180deg, #fbfdff 0%, #f1f6fc 100%); }
+  .summary-card .label { display: block; color: #66788a; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 4px; }
+  .summary-card .value { font-size: 0.94rem; font-weight: 800; color: #0f3460; }
+  .summary-card.total { grid-column: 1 / -1; background: linear-gradient(135deg, #0f3460, #145da0); border-color: transparent; }
+  .summary-card.total .label, .summary-card.total .value { color: #ffffff; }
+  .details-section { margin-top: 4px; }
+  .table-wrap { width: 100%; border: 1px solid #d8e2ef; border-radius: 12px; overflow: hidden; }
+  table { border-collapse: separate; border-spacing: 0; width: 100%; table-layout: fixed; background: #ffffff; }
+  th, td { border-bottom: 1px solid #e4ebf3; padding: 6px 8px; font-size: 0.7rem; text-align: left; vertical-align: top; line-height: 1.3; }
+  thead th { background: #0f3460; color: #fff; font-weight: 700; position: sticky; top: 0; }
+  tbody tr:nth-child(even) { background: #f9fbfe; }
+  .amount, .number { text-align: right; font-variant-numeric: tabular-nums; }
+  .total-row td { font-weight: 800; background: #edf4ff; color: #0f3460; border-bottom: none; }
+  .signature { margin-top: 40px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; page-break-inside: avoid; }
+  .signature > div { min-height: 46px; border-top: 2px solid #243447; padding-top: 6px; text-align: center; font-weight: 600; font-size: 0.7rem; }
+  th:nth-child(1), td:nth-child(1) { width: 25%; }
+  th:nth-child(2), td:nth-child(2) { width: 25%; }
+  th:nth-child(3), td:nth-child(3) { width: 25%; }
+  th:nth-child(4), td:nth-child(4) { width: 25%; }
+</style>
+</head>
+<body>
+  <div class="no-print" style="margin-bottom: 10px; text-align: center;">
+    <button class="print-button" onclick="window.print()">🖨 Imprimer / Enregistrer en PDF</button>
+  </div>
+  
+  <div class="page-shell">
+    <div class="page-inner">
+      <div class="header">
+        <div class="header-brand">
+          <div class="header-logo">
+            <img src="${logoUrl}" alt="Logo" crossorigin="anonymous">
+          </div>
+          <div class="header-text">
+            <h1>Judo Club de Cattenom-Rodemack</h1>
+            <p>Association loi 1901</p>
+          </div>
+        </div>
+        <div class="document-badge">
+          <span class="label">Relevé d'heures mensuel</span>
+          <h2>${month}/${year}</h2>
+          <p>Édité le ${today}</p>
+        </div>
+      </div>
+
+      <div class="info-grid">
+        <div class="info-card">
+          <h3>Informations ${profileLabel}</h3>
+          <div class="info-list">
+            <div class="info-row"><span class="label">Nom complet</span><span class="value">${__escapeHtml(coachDisplayName)}</span></div>
+            <div class="info-row"><span class="label">Email</span><span class="value">${__escapeHtml(currentCoach.email || "-")}</span></div>
+            <div class="info-row"><span class="label">Statut</span><span class="value">${profileLabel}</span></div>
+          </div>
+        </div>
+        <div class="info-card">
+          <h3>Paramètres du mois</h3>
+          <div class="info-list">
+            <div class="info-row"><span class="label">Mois / Année</span><span class="value">${month}/${year}</span></div>
+            <div class="info-row"><span class="label">Taux horaire</span><span class="value">${hourlyRate.toFixed(2)} €</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="summary-section">
+        <h3>Récapitulatif</h3>
+        <div class="summary-grid">
+          <div class="summary-card">
+            <span class="label">Total Heures</span>
+            <span class="value">${totalHours}</span>
+          </div>
+          <div class="summary-card total">
+            <span class="label">Total à payer</span>
+            <span class="value">${totalAmount.toFixed(2)} €</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="details-section">
+        <h3>Détail des heures d'entraînement</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th class="number">Durée (heures)</th>
+                <th class="amount">Taux</th>
+                <th class="amount">Montant (€)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map(r => `
+                <tr>
+                  <td>${r.date}</td>
+                  <td class="number">${r.hours}</td>
+                  <td class="amount">${hourlyRate.toFixed(2)} €</td>
+                  <td class="amount">${(r.hours * hourlyRate).toFixed(2)}</td>
+                </tr>
+              `).join("")}
+              <tr class="total-row">
+                <td>Total</td>
+                <td class="number">${totalHours}</td>
+                <td class="amount">-</td>
+                <td class="amount">${totalAmount.toFixed(2)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="signature">
+        <div>${signatureLabel}</div>
+        <div>Pour le club (Trésorier / Président)</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  const win = window.open("", "_blank");
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+  
+  __logAuditEvent('export.timesheet_pdf', currentCoach.id, {
+    coach_name: coachDisplayName,
+    month: currentMonth,
+    total_hours: totalHours,
+    total_amount: totalAmount,
+  });
+}
+
 // Expose the function
 window.exportMileageHTML = exportExpenseHTML;
 window.exportExpenseHTML = exportExpenseHTML;
@@ -4200,6 +4420,7 @@ window.deleteCoach = deleteCoach;
 window.inviteCoach = inviteCoach;
 window.saveDay = saveDay;
 window.deleteDay = deleteDay;
+
 
 
 
