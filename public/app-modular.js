@@ -8,7 +8,7 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-13-audit-logs-1';
+const __BUILD_ID = '2026-03-13-audit-ui-1';
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 let __deferredInstallPrompt = null;
@@ -312,6 +312,7 @@ let currentUser = null;
 let currentSession = null;
 let currentAccessToken = null;
 let __eventListenersSetup = false;
+let auditLogs = [];
 
 function __safeBase64UrlDecode(value) {
   const normalized = String(value || '').replace(/-/g, '+').replace(/_/g, '/');
@@ -659,7 +660,7 @@ async function __coachWriteViaRest(coachData, { editingId = null } = {}) {
   }
 }
 
-async function __restSelect(table, { select = '*', filters = [] } = {}) {
+async function __restSelect(table, { select = '*', filters = [], order = null, limit = null } = {}) {
   if (!currentAccessToken) {
     return {
       data: null,
@@ -673,6 +674,13 @@ async function __restSelect(table, { select = '*', filters = [] } = {}) {
   urlObj.searchParams.set('select', select);
   for (const [col, op, value] of filters) {
     urlObj.searchParams.set(col, `${op}.${value}`);
+  }
+  if (order?.column) {
+    const direction = String(order.direction || 'asc').toLowerCase() === 'desc' ? 'desc' : 'asc';
+    urlObj.searchParams.set('order', `${order.column}.${direction}`);
+  }
+  if (Number.isFinite(limit) && Number(limit) > 0) {
+    urlObj.searchParams.set('limit', String(limit));
   }
   const url = urlObj.toString();
 
@@ -747,6 +755,137 @@ async function __logAuditEvent(action, entityType, {
   }
 
   return null;
+}
+
+function __escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function __formatAuditDateTime(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString('fr-FR');
+}
+
+function __getAuditActionGroup(action) {
+  const value = String(action || '').toLowerCase();
+  if (value.startsWith('profile.')) return 'profile';
+  if (value.startsWith('time_data.')) return 'time_data';
+  if (value.startsWith('timesheet.')) return 'timesheet';
+  if (value.startsWith('export.')) return 'export';
+  if (value.startsWith('invite.') || value.startsWith('auth_user.')) return 'invite';
+  return 'other';
+}
+
+function __auditMatchesCurrentCoach(row) {
+  if (!currentCoach) return true;
+  const metadata = row?.metadata || {};
+  const currentCoachEmail = __normalizeEmail(currentCoach.email);
+  return (
+    metadata?.coach_id === currentCoach.id
+    || row?.entity_id === currentCoach.id
+    || row?.entity_id === `${currentCoach.id}-${__normalizeMonth(currentMonth)}`
+    || (currentCoach.owner_uid && row?.target_user_id === currentCoach.owner_uid)
+    || (__normalizeEmail(row?.target_email) && __normalizeEmail(row?.target_email) === currentCoachEmail)
+  );
+}
+
+function __formatAuditDetails(row) {
+  const metadata = row?.metadata || {};
+  const entries = [];
+
+  if (metadata.coach_name) entries.push(`Profil : ${metadata.coach_name}`);
+  if (metadata.month) entries.push(`Mois : ${metadata.month}`);
+  if (metadata.date) entries.push(`Date : ${metadata.date}`);
+  if (metadata.rows_inserted != null) entries.push(`Lignes : ${metadata.rows_inserted}`);
+  if (metadata.total_amount != null) entries.push(`Montant : ${Number(metadata.total_amount).toFixed(2)} €`);
+  if (metadata.requestId) entries.push(`Ref : ${metadata.requestId}`);
+
+  if (!entries.length) {
+    const keys = Object.keys(metadata).slice(0, 3);
+    keys.forEach((key) => entries.push(`${key} : ${metadata[key]}`));
+  }
+
+  return entries.length
+    ? `<div class="audit-meta">${entries.map((entry) => `<span class="audit-meta-item">${__escapeHtml(entry)}</span>`).join('')}</div>`
+    : '<span class="audit-empty">—</span>';
+}
+
+function renderAuditLogs() {
+  const body = document.getElementById('auditLogsTableBody');
+  const status = document.getElementById('auditLogsStatus');
+  const filter = document.getElementById('auditActionFilter')?.value || 'all';
+  const currentCoachOnly = !!document.getElementById('auditCurrentCoachOnly')?.checked;
+
+  if (!body || !status) return;
+
+  let rows = [...auditLogs];
+  if (filter !== 'all') {
+    rows = rows.filter((row) => __getAuditActionGroup(row.action) === filter);
+  }
+  if (currentCoachOnly) {
+    rows = rows.filter((row) => __auditMatchesCurrentCoach(row));
+  }
+
+  status.textContent = `${rows.length} action(s) affichée(s)`;
+
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="5" class="audit-empty">Aucune action trouvée.</td></tr>';
+    return;
+  }
+
+  body.innerHTML = rows.map((row) => {
+    const actor = row.actor_email || row.actor_uid || '—';
+    const target = row.target_email || row.target_user_id || row.entity_id || '—';
+    return `
+      <tr>
+        <td>${__escapeHtml(__formatAuditDateTime(row.created_at))}</td>
+        <td><span class="audit-badge">${__escapeHtml(row.action || '—')}</span></td>
+        <td>${__escapeHtml(actor)}</td>
+        <td>${__escapeHtml(target)}</td>
+        <td>${__formatAuditDetails(row)}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function loadAuditLogs() {
+  const status = document.getElementById('auditLogsStatus');
+  if (status) status.textContent = 'Chargement…';
+
+  const res = await __restSelect('audit_logs', {
+    order: { column: 'created_at', direction: 'desc' },
+    limit: 250,
+  });
+
+  if (res.error) {
+    if (status) status.textContent = `Erreur : ${res.error.message}`;
+    auditLogs = [];
+    renderAuditLogs();
+    return;
+  }
+
+  auditLogs = (res.data || []).map((row) => ({
+    ...row,
+    metadata: row.metadata && typeof row.metadata === 'object' ? row.metadata : {},
+  }));
+  renderAuditLogs();
+}
+
+async function openAuditLogsModal() {
+  if (!__isAdminForUi()) {
+    alert("Seul l'administrateur peut consulter l'historique.");
+    return;
+  }
+
+  document.getElementById('auditLogsModal')?.classList.add('active');
+  await loadAuditLogs();
 }
 
 // ===== Holiday data (dynamically fetched, with static fallback) =====
@@ -1206,12 +1345,14 @@ function setupAuthListeners() {
         document.getElementById("editCoachBtn").style.display = "inline-block";
         document.getElementById("inviteAdminBtn").style.display = "inline-block";
         document.getElementById("freezeBtn").style.display = "inline-block";
+        document.getElementById("auditLogsBtn").style.display = "inline-block";
         document.getElementById("importGroup").style.display = "flex";
       } else {
         document.getElementById("addCoachBtn").style.display = "none";
         document.getElementById("editCoachBtn").style.display = "none";
         document.getElementById("inviteAdminBtn").style.display = "none";
         document.getElementById("freezeBtn").style.display = "none";
+        document.getElementById("auditLogsBtn").style.display = "none";
         document.getElementById("importGroup").style.display = "none";
       }
 
@@ -1263,6 +1404,7 @@ function setupAuthListeners() {
       currentAccessToken = null;
       coaches = [];
       timeData = {};
+      auditLogs = [];
       currentCoach = null;
       if (select) select.innerHTML = '<option value="">-- Sélectionner --</option>';
       statusSpan.textContent = "Non connecté.";
@@ -1601,6 +1743,17 @@ function setupEventListeners() {
     document.getElementById("helpModal").classList.add("active");
   };
 
+  document.getElementById("auditLogsBtn").onclick = openAuditLogsModal;
+
+  document.getElementById("refreshAuditLogsBtn").onclick = loadAuditLogs;
+
+  document.getElementById("auditActionFilter").onchange = renderAuditLogs;
+  document.getElementById("auditCurrentCoachOnly").onchange = renderAuditLogs;
+
+  document.getElementById("closeAuditLogs").onclick = () => {
+    document.getElementById("auditLogsModal").classList.remove("active");
+  };
+
   document.getElementById("closeHelp").onclick = () => {
     document.getElementById("helpModal").classList.remove("active");
   };
@@ -1611,11 +1764,18 @@ function setupEventListeners() {
     }
   };
 
+  document.getElementById("auditLogsModal").onclick = (e) => {
+    if (e.target.id === "auditLogsModal") {
+      document.getElementById("auditLogsModal").classList.remove("active");
+    }
+  };
+
   document.getElementById("coachSelect").onchange = (e) => {
     currentCoach = coaches.find((c) => c.id === e.target.value) || null;
     updateCurrentProfileUI();
     updateCalendar();
     updateSummary();
+    renderAuditLogs();
   };
 
   document.getElementById("monthSelect").onchange = (e) => {
@@ -1623,6 +1783,7 @@ function setupEventListeners() {
     updateCalendar();
     updateSummary();
     updateFreezeUI();
+    renderAuditLogs();
   };
 
   document.getElementById("competitionDay").onchange = (e) => {

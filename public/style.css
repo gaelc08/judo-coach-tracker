@@ -1208,3 +1208,137 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   border-radius: var(--radius-sm);
   padding: 14px 16px;
 }
+
+.modal-content-audit {
+  width: min(96vw, 1200px);
+  max-width: min(96vw, 1200px);
+  min-width: min(96vw, 320px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.audit-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+}
+
+.audit-toolbar label {
+  margin: 0;
+  min-width: 180px;
+  flex: 1 1 220px;
+}
+
+.audit-toolbar select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 2px solid var(--gray-300);
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+  color: var(--gray-900);
+  background: white;
+}
+
+.audit-checkbox {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+}
+
+.audit-checkbox input {
+  width: auto !important;
+}
+
+.audit-status {
+  font-size: 0.9rem;
+  color: var(--gray-700);
+}
+
+.audit-table-wrap {
+  width: 100%;
+  max-height: 60vh;
+  overflow: auto;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-sm);
+  background: white;
+}
+
+.audit-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.audit-table th,
+.audit-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--gray-200);
+  text-align: left;
+  vertical-align: top;
+  font-size: 0.88rem;
+}
+
+.audit-table th {
+  position: sticky;
+  top: 0;
+  background: var(--judo-navy);
+  color: white;
+  z-index: 1;
+}
+
+.audit-table tbody tr:nth-child(even) {
+  background: var(--gray-100);
+}
+
+.audit-meta {
+  display: grid;
+  gap: 4px;
+}
+
+.audit-meta-item {
+  color: var(--gray-700);
+  line-height: 1.35;
+}
+
+.audit-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  background: #eaf2ff;
+  color: var(--judo-navy);
+}
+
+.audit-empty {
+  color: var(--gray-500);
+  text-align: center !important;
+}
+
+@media (max-width: 768px) {
+  .modal-content-audit {
+    width: 95vw;
+    min-width: unset;
+  }
+
+  .audit-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .audit-toolbar label,
+  .audit-toolbar button {
+    width: 100%;
+  }
+
+  .audit-table th,
+  .audit-table td {
+    font-size: 0.8rem;
+    padding: 8px 10px;
+  }
+}

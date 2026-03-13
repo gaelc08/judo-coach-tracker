@@ -13,7 +13,7 @@
     <link rel="icon" href="logo-jcc.png">
     <link rel="apple-touch-icon" href="logo-jcc.png">
     <title>Judo Club de Cattenom-Rodemack – Gestion des intervenants et frais</title>
-    <link rel="stylesheet" href="style.css?v=2026-03-13-audit-logs-1">
+    <link rel="stylesheet" href="style.css?v=2026-03-13-audit-ui-1">
   </head>
 <body>
 
@@ -75,6 +75,7 @@
           <button id="editCoachBtn" class="admin-only btn-secondary" style="display:none">✏️ Modifier</button>
           <button id="inviteAdminBtn" class="admin-only btn-secondary" style="display:none">✉️ Inviter admin</button>
           <button id="freezeBtn" class="admin-only btn-secondary" style="display:none">🔒 Geler la fiche</button>
+          <button id="auditLogsBtn" class="admin-only btn-secondary" style="display:none">📜 Historique</button>
         </div>
       </div>
 
@@ -151,6 +152,59 @@
           <input id="importFile" type="file" accept=".json">
           <button id="importBtn" class="btn-secondary">📥 Importer JSON</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Audit logs modal -->
+  <div id="auditLogsModal" class="modal">
+    <div class="modal-content modal-content-audit">
+      <h2>📜 Historique des actions</h2>
+
+      <div class="audit-toolbar">
+        <label>
+          Type d'action
+          <select id="auditActionFilter">
+            <option value="all">Toutes</option>
+            <option value="profile">Profils</option>
+            <option value="time_data">Jours / saisies</option>
+            <option value="timesheet">Gel / dégel</option>
+            <option value="export">Exports</option>
+            <option value="invite">Invitations / comptes</option>
+          </select>
+        </label>
+
+        <label class="audit-checkbox">
+          <input id="auditCurrentCoachOnly" type="checkbox">
+          Profil sélectionné uniquement
+        </label>
+
+        <button id="refreshAuditLogsBtn" class="btn-secondary">↻ Actualiser</button>
+      </div>
+
+      <div id="auditLogsStatus" class="audit-status">Chargement…</div>
+
+      <div class="audit-table-wrap">
+        <table class="audit-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Action</th>
+              <th>Auteur</th>
+              <th>Cible</th>
+              <th>Détails</th>
+            </tr>
+          </thead>
+          <tbody id="auditLogsTableBody">
+            <tr>
+              <td colspan="5">Aucune donnée.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="modal-actions">
+        <button id="closeAuditLogs" class="btn-primary">Fermer</button>
       </div>
     </div>
   </div>
@@ -400,6 +454,6 @@
     </div>
   </div>
 
-  <script type="module" src="app-modular.js?v=2026-03-13-audit-logs-1"></script>
+  <script type="module" src="app-modular.js?v=2026-03-13-audit-ui-1"></script>
 </body>
 </html>
