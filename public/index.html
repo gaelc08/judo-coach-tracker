@@ -13,7 +13,7 @@
     <link rel="icon" href="logo-jcc.png">
     <link rel="apple-touch-icon" href="logo-jcc.png">
     <title>Judo Club de Cattenom-Rodemack – Gestion des intervenants et frais</title>
-    <link rel="stylesheet" href="style.css?v=2026-03-13-audit-ui-1">
+    <link rel="stylesheet" href="style.css?v=2026-03-13-features-1">
   </head>
 <body>
 
@@ -145,9 +145,10 @@
       </div>
 
       <div class="actions card">
-        <button id="exportBtn" class="btn-primary">📊 Exporter déclaration salaire (XLSX)</button>
+        <button id="exportBtn" class="btn-primary">📊 Exporter déclaration (XLSX)</button>
+        <button id="timesheetBtn" class="btn-primary">🗓 Exporter relevé d'heures</button>
         <button id="mileageBtn" class="btn-secondary">🧾 Exporter note de frais</button>
-        <button id="backupBtn" class="btn-secondary">💾 Exporter backup JSON</button>
+        <button id="backupBtn" class="btn-secondary admin-only" style="display:none">💾 Exporter backup JSON</button>
         <div id="importGroup" class="import-group" style="display:none">
           <input id="importFile" type="file" accept=".json">
           <button id="importBtn" class="btn-secondary">📥 Importer JSON</button>
@@ -454,6 +455,7 @@
     </div>
   </div>
 
-  <script type="module" src="app-modular.js?v=2026-03-13-audit-ui-1"></script>
+  <script type="module" src="app-modular.js?v=2026-03-13-features-1"></script>
 </body>
 </html>
+

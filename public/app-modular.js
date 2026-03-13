@@ -8,7 +8,7 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-13-audit-ui-1';
+const __BUILD_ID = '2026-03-13-features-1';
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 let __deferredInstallPrompt = null;
@@ -732,6 +732,18 @@ function __toAuditJson(value) {
   return String(value);
 }
 
+async function notifyAdminAlert(coachName, date, data) {
+  if (__isAdminForUi()) return;
+  try {
+    await supabase.functions.invoke('alert-admin', {
+      body: { coachName, date, data }
+    });
+  } catch (err) {
+    console.error('Failed to notify admin', err);
+  }
+}
+
+
 async function __logAuditEvent(action, entityType, {
   entityId = null,
   targetUserId = null,
@@ -1347,6 +1359,7 @@ function setupAuthListeners() {
         document.getElementById("freezeBtn").style.display = "inline-block";
         document.getElementById("auditLogsBtn").style.display = "inline-block";
         document.getElementById("importGroup").style.display = "flex";
+        document.getElementById("backupBtn").style.display = "inline-block";
       } else {
         document.getElementById("addCoachBtn").style.display = "none";
         document.getElementById("editCoachBtn").style.display = "none";
@@ -1354,6 +1367,7 @@ function setupAuthListeners() {
         document.getElementById("freezeBtn").style.display = "none";
         document.getElementById("auditLogsBtn").style.display = "none";
         document.getElementById("importGroup").style.display = "none";
+        document.getElementById("backupBtn").style.display = "none";
       }
 
       // Coach selector: admins can switch between coaches; non-admin coaches only see themselves.
@@ -1799,6 +1813,7 @@ function setupEventListeners() {
   };
 
   document.getElementById("exportBtn").onclick = exportDeclarationXLS;
+  document.getElementById("timesheetBtn").onclick = exportTimesheetHTML;
   document.getElementById("backupBtn").onclick = exportBackupJSON;
 
   document.getElementById("importBtn").onclick = () => {
@@ -2711,6 +2726,7 @@ async function saveDay() {
           source: 'saveDay-empty-payload',
         },
       });
+        await notifyAdminAlert(currentCoach.name, selectedDay, { deleted: true });
     }
     delete timeData[key];
   } else {
@@ -2774,6 +2790,7 @@ async function saveDay() {
           had_existing_id: !!existingId,
         },
       });
+        await notifyAdminAlert(currentCoach.name, selectedDay, timeData[key]);
     } else {
       const { data: inserted, error } = await supabase.from('time_data').insert(data).select();
       if (error) throw error;
@@ -2812,6 +2829,7 @@ async function saveDay() {
           achat,
         },
       });
+        await notifyAdminAlert(currentCoach.name, selectedDay, timeData[key]);
     }
   }
 
@@ -2847,6 +2865,7 @@ async function deleteDay() {
         source: 'deleteDay',
       },
     });
+        await notifyAdminAlert(currentCoach.name, selectedDay, { deleted: true });
   }
   delete timeData[key];
 
@@ -3416,6 +3435,9 @@ function exportExpenseHTML() {
 
   @media print {
     @page { size: A4 portrait; margin: 8mm; }
+    * {
+      box-shadow: none !important;
+    }
     html, body {
       width: 194mm;
       margin: 0;
@@ -3772,7 +3794,7 @@ function exportExpenseHTML() {
   }
   
   .signature { 
-    margin-top: 12px; 
+    margin-top: 40px; 
     display: grid; 
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px;
@@ -4022,6 +4044,7 @@ ${rows
 // Expose the function
 window.exportMileageHTML = exportExpenseHTML;
 window.exportExpenseHTML = exportExpenseHTML;
+window.exportTimesheetHTML = exportTimesheetHTML;
 // ===== Import JSON =====
 async function importCoachData(data) {
   if (!currentCoach || !currentUser) {
@@ -4177,3 +4200,7 @@ window.deleteCoach = deleteCoach;
 window.inviteCoach = inviteCoach;
 window.saveDay = saveDay;
 window.deleteDay = deleteDay;
+
+
+
+
