@@ -8,7 +8,7 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-11-freeze-cleanup-1';
+const __BUILD_ID = '2026-03-13-audit-logs-1';
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 let __deferredInstallPrompt = null;
@@ -700,6 +700,55 @@ async function __restSelect(table, { select = '*', filters = [] } = {}) {
   }
 }
 
+function __toAuditJson(value) {
+  if (value == null) return null;
+  if (value instanceof Date) return value.toISOString();
+  if (value instanceof File) {
+    return {
+      name: value.name || null,
+      size: Number(value.size) || 0,
+      type: value.type || null,
+    };
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => __toAuditJson(item));
+  }
+  if (typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, entry]) => typeof entry !== 'function' && entry !== undefined)
+        .map(([key, entry]) => [key, __toAuditJson(entry)])
+    );
+  }
+  if (['string', 'number', 'boolean'].includes(typeof value)) return value;
+  return String(value);
+}
+
+async function __logAuditEvent(action, entityType, {
+  entityId = null,
+  targetUserId = null,
+  targetEmail = null,
+  metadata = {},
+} = {}) {
+  if (!currentUser) return null;
+
+  try {
+    const { error } = await supabase.rpc('log_audit_event', {
+      p_action: String(action || '').trim(),
+      p_entity_type: String(entityType || '').trim(),
+      p_entity_id: entityId == null ? null : String(entityId),
+      p_target_user_id: targetUserId || null,
+      p_target_email: __normalizeEmail(targetEmail) || (targetEmail ? String(targetEmail) : null),
+      p_metadata: __toAuditJson(metadata || {}),
+    });
+    if (error) throw error;
+  } catch (e) {
+    console.warn('DEBUG audit log failed:', action, e);
+  }
+
+  return null;
+}
+
 // ===== Holiday data (dynamically fetched, with static fallback) =====
 
 // Static fallback data per year (used if API calls fail)
@@ -1383,6 +1432,16 @@ async function toggleFreezeMonth() {
       return;
     }
     frozenMonths.delete(key);
+    await __logAuditEvent('timesheet.unfreeze', 'frozen_timesheet', {
+      entityId: key,
+      targetUserId: currentCoach.owner_uid || null,
+      targetEmail: currentCoach.email || null,
+      metadata: {
+        coach_id: currentCoach.id,
+        coach_name: __getCoachDisplayName(currentCoach) || currentCoach.name || null,
+        month: normalizedMonth,
+      },
+    });
   } else {
     const res = await globalThis.fetch(`${supabaseUrl}/rest/v1/frozen_timesheets`, {
       method: 'POST',
@@ -1405,6 +1464,16 @@ async function toggleFreezeMonth() {
       return;
     }
     frozenMonths.add(key);
+    await __logAuditEvent('timesheet.freeze', 'frozen_timesheet', {
+      entityId: key,
+      targetUserId: currentCoach.owner_uid || null,
+      targetEmail: currentCoach.email || null,
+      metadata: {
+        coach_id: currentCoach.id,
+        coach_name: __getCoachDisplayName(currentCoach) || currentCoach.name || null,
+        month: normalizedMonth,
+      },
+    });
   }
   currentMonth = normalizedMonth;
   updateFreezeUI();
@@ -1726,6 +1795,8 @@ const coachData = {
 
   console.log('DEBUG coachData:', JSON.stringify(coachData, null, 2));
 
+  const wasEditMode = !!(editMode && editingCoachId);
+
   try {
     console.log('DEBUG DB start');
     let res;
@@ -1803,6 +1874,17 @@ const coachData = {
       }
       currentCoach = saved;
       loadCoaches();
+      await __logAuditEvent(wasEditMode ? 'profile.update' : 'profile.create', 'user_profile', {
+        entityId: saved.id,
+        targetUserId: saved.owner_uid || null,
+        targetEmail: saved.email || null,
+        metadata: {
+          coach_id: saved.id,
+          coach_name: __getCoachDisplayName(saved) || saved.name || null,
+          profile_type: saved.profile_type || profileType,
+          role: saved.role || coachData.role,
+        },
+      });
     }
 
     document.getElementById('coachModal').classList.remove('active');
@@ -1890,6 +1972,17 @@ async function deleteCoach() {
     // Delete all timeData for this coach
     const { error: error2 } = await supabase.from('time_data').delete().eq('coach_id', editingCoachId);
     if (error2) throw error2;
+
+    await __logAuditEvent('profile.delete', 'user_profile', {
+      entityId: editingCoachId,
+      targetUserId: targetCoach?.owner_uid || null,
+      targetEmail: targetCoach?.email || null,
+      metadata: {
+        coach_id: editingCoachId,
+        coach_name: targetCoach ? (__getCoachDisplayName(targetCoach) || targetCoach.name || null) : null,
+        deleted_auth_user: !!(targetCoach?.owner_uid || targetCoach?.email),
+      },
+    });
 
     await loadAllDataFromSupabase();
 
@@ -2347,6 +2440,7 @@ function openDayModal(dateStr) {
 async function saveDay() {
   if (!currentCoach || !currentUser) return;
   const isVolunteer = __isVolunteerProfile(currentCoach);
+  const existingId = timeData[`${currentCoach.id}-${selectedDay}`]?.id || null;
 
   const isAdmin = __isAdminForUi();
   if (!isAdmin && isCurrentMonthFrozen()) {
@@ -2444,6 +2538,18 @@ async function saveDay() {
     if (existing && existing.id) {
       const { error } = await supabase.from('time_data').delete().eq('id', existing.id);
       if (error) throw error;
+      await __logAuditEvent('time_data.delete', 'time_data', {
+        entityId: existing.id,
+        targetUserId: currentCoach.owner_uid || null,
+        targetEmail: currentCoach.email || null,
+        metadata: {
+          coach_id: currentCoach.id,
+          coach_name: __getCoachDisplayName(currentCoach) || currentCoach.name || null,
+          date: selectedDay,
+          month: __normalizeMonth(currentMonth),
+          source: 'saveDay-empty-payload',
+        },
+      });
     }
     delete timeData[key];
   } else {
@@ -2489,6 +2595,24 @@ async function saveDay() {
         ownerEmail: ownerEmailForRow,
         id: existing.id
       };
+      await __logAuditEvent('time_data.update', 'time_data', {
+        entityId: existing.id,
+        targetUserId: currentCoach.owner_uid || null,
+        targetEmail: currentCoach.email || null,
+        metadata: {
+          coach_id: currentCoach.id,
+          coach_name: __getCoachDisplayName(currentCoach) || currentCoach.name || null,
+          date: selectedDay,
+          month: __normalizeMonth(currentMonth),
+          hours,
+          competition,
+          km,
+          peage,
+          hotel,
+          achat,
+          had_existing_id: !!existingId,
+        },
+      });
     } else {
       const { data: inserted, error } = await supabase.from('time_data').insert(data).select();
       if (error) throw error;
@@ -2510,6 +2634,23 @@ async function saveDay() {
         ownerEmail: ownerEmailForRow,
         id: inserted[0].id
       };
+      await __logAuditEvent('time_data.create', 'time_data', {
+        entityId: inserted?.[0]?.id || null,
+        targetUserId: currentCoach.owner_uid || null,
+        targetEmail: currentCoach.email || null,
+        metadata: {
+          coach_id: currentCoach.id,
+          coach_name: __getCoachDisplayName(currentCoach) || currentCoach.name || null,
+          date: selectedDay,
+          month: __normalizeMonth(currentMonth),
+          hours,
+          competition,
+          km,
+          peage,
+          hotel,
+          achat,
+        },
+      });
     }
   }
 
@@ -2533,6 +2674,18 @@ async function deleteDay() {
   if (existing && existing.id) {
     const { error } = await supabase.from('time_data').delete().eq('id', existing.id);
     if (error) throw error;
+    await __logAuditEvent('time_data.delete', 'time_data', {
+      entityId: existing.id,
+      targetUserId: currentCoach.owner_uid || null,
+      targetEmail: currentCoach.email || null,
+      metadata: {
+        coach_id: currentCoach.id,
+        coach_name: __getCoachDisplayName(currentCoach) || currentCoach.name || null,
+        date: selectedDay,
+        month: __normalizeMonth(currentMonth),
+        source: 'deleteDay',
+      },
+    });
   }
   delete timeData[key];
 
@@ -2882,6 +3035,19 @@ async function exportDeclarationXLS() {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });
   __downloadBlob(blob, `declaration_salaire_${safeName}_${currentMonth}.xlsx`);
+  await __logAuditEvent('export.declaration_xlsx', 'export', {
+    entityId: `${currentCoach.id}-${currentMonth}`,
+    targetUserId: currentCoach.owner_uid || null,
+    targetEmail: currentCoach.email || null,
+    metadata: {
+      coach_id: currentCoach.id,
+      coach_name: coachDisplayName || null,
+      month: currentMonth,
+      total_hours: totalHours,
+      competition_days: competitionDays,
+      total_amount: grandTotal,
+    },
+  });
 }
 
 function __isStandaloneApp() {
@@ -3664,6 +3830,20 @@ ${rows
   const fileName = `note_frais_${currentCoach.name}_${currentMonth}.html`;
   const blob = new Blob([html], { type: "text/html;charset=utf-8;" });
 
+  __logAuditEvent('export.expense_html', 'export', {
+    entityId: `${currentCoach.id}-${currentMonth}`,
+    targetUserId: currentCoach.owner_uid || null,
+    targetEmail: currentCoach.email || null,
+    metadata: {
+      coach_id: currentCoach.id,
+      coach_name: coachDisplayName || null,
+      month: currentMonth,
+      total_amount: total,
+      total_km: totalMileageKm,
+      rows: rows.length,
+    },
+  });
+
   if (__isStandaloneApp()) {
     __showMileagePreviewModal(html, fileName);
     return;
@@ -3748,6 +3928,17 @@ async function importCoachData(data) {
     const { error } = await supabase.from('time_data').insert(inserts);
     if (error) throw error;
   }
+  await __logAuditEvent('time_data.import_json', 'import', {
+    entityId: `${currentCoach.id}-${currentMonth}`,
+    targetUserId: currentCoach.owner_uid || null,
+    targetEmail: currentCoach.email || null,
+    metadata: {
+      coach_id: currentCoach.id,
+      coach_name: __getCoachDisplayName(currentCoach) || currentCoach.name || null,
+      rows_inserted: inserts.length,
+      source_profile_name: data.entraineur || null,
+    },
+  });
   await loadAllDataFromSupabase();
   updateCalendar();
   updateSummary();
@@ -3804,6 +3995,16 @@ function exportBackupJSON() {
   a.download = `backup_${safeName}_${new Date().toISOString().split("T")[0]}.json`;
   a.click();
   URL.revokeObjectURL(url);
+  __logAuditEvent('export.backup_json', 'export', {
+    entityId: currentCoach.id,
+    targetUserId: currentCoach.owner_uid || null,
+    targetEmail: currentCoach.email || null,
+    metadata: {
+      coach_id: currentCoach.id,
+      coach_name: __getCoachDisplayName(currentCoach) || currentCoach.name || null,
+      entries: entries.length,
+    },
+  });
 }
 
 // Optionally expose some functions globally if needed

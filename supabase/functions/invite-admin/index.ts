@@ -51,6 +51,44 @@ function maskEmail(email: string | null | undefined): string | null {
   return `${maskedLocal}@${domain}`
 }
 
+async function insertAuditLog(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  {
+    actorUid,
+    actorEmail,
+    action,
+    entityType,
+    entityId = null,
+    targetUserId = null,
+    targetEmail = null,
+    metadata = {},
+  }: {
+    actorUid: string | null
+    actorEmail: string | null
+    action: string
+    entityType: string
+    entityId?: string | null
+    targetUserId?: string | null
+    targetEmail?: string | null
+    metadata?: Record<string, unknown>
+  }
+) {
+  const { error } = await supabaseAdmin.from('audit_logs').insert({
+    actor_uid: actorUid,
+    actor_email: actorEmail,
+    action,
+    entity_type: entityType,
+    entity_id: entityId,
+    target_user_id: targetUserId,
+    target_email: targetEmail,
+    metadata,
+  })
+
+  if (error) {
+    console.warn('DEBUG invite-admin audit log failed:', error.message)
+  }
+}
+
 async function findUserByEmail(supabaseAdmin: ReturnType<typeof createClient>, email: string) {
   let page = 1
 
@@ -161,6 +199,22 @@ Deno.serve(async (req: Request): Promise<Response> => {
       userId: targetUser.id,
       inviteSent,
       alreadyExisted,
+    })
+
+    await insertAuditLog(supabaseAdmin, {
+      actorUid: user.id,
+      actorEmail: user.email ?? null,
+      action: alreadyExisted ? 'invite.admin.promote_existing' : 'invite.admin',
+      entityType: 'auth_invitation',
+      entityId: targetUser.id,
+      targetUserId: targetUser.id,
+      targetEmail: normalizedEmail,
+      metadata: {
+        requestId,
+        inviteSent,
+        alreadyExisted,
+        redirectTo: siteUrl,
+      },
     })
 
     return jsonResponse({

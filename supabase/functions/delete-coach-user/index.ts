@@ -31,6 +31,44 @@ function normalizeEmail(email: unknown): string | null {
   return value || null
 }
 
+async function insertAuditLog(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  {
+    actorUid,
+    actorEmail,
+    action,
+    entityType,
+    entityId = null,
+    targetUserId = null,
+    targetEmail = null,
+    metadata = {},
+  }: {
+    actorUid: string | null
+    actorEmail: string | null
+    action: string
+    entityType: string
+    entityId?: string | null
+    targetUserId?: string | null
+    targetEmail?: string | null
+    metadata?: Record<string, unknown>
+  }
+) {
+  const { error } = await supabaseAdmin.from('audit_logs').insert({
+    actor_uid: actorUid,
+    actor_email: actorEmail,
+    action,
+    entity_type: entityType,
+    entity_id: entityId,
+    target_user_id: targetUserId,
+    target_email: targetEmail,
+    metadata,
+  })
+
+  if (error) {
+    console.warn('DEBUG delete-coach-user audit log failed:', error.message)
+  }
+}
+
 Deno.serve(async (req: Request): Promise<Response> => {
   const requestId = crypto.randomUUID()
 
@@ -102,6 +140,19 @@ Deno.serve(async (req: Request): Promise<Response> => {
     if (deleteError) {
       return jsonResponse({ error: deleteError.message, requestId, userId: targetUserId }, 400)
     }
+
+    await insertAuditLog(supabaseAdmin, {
+      actorUid: user.id,
+      actorEmail: user.email ?? null,
+      action: 'auth_user.delete',
+      entityType: 'auth_user',
+      entityId: targetUserId,
+      targetUserId,
+      targetEmail: normalizedEmail,
+      metadata: {
+        requestId,
+      },
+    })
 
     return jsonResponse({ success: true, deleted: true, userId: targetUserId, requestId }, 200)
   } catch (e) {

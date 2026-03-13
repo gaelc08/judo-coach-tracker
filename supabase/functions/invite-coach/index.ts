@@ -61,6 +61,44 @@ function maskEmail(email: string | null | undefined): string | null {
   return `${maskedLocal}@${domain}`
 }
 
+async function insertAuditLog(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  {
+    actorUid,
+    actorEmail,
+    action,
+    entityType,
+    entityId = null,
+    targetUserId = null,
+    targetEmail = null,
+    metadata = {},
+  }: {
+    actorUid: string | null
+    actorEmail: string | null
+    action: string
+    entityType: string
+    entityId?: string | null
+    targetUserId?: string | null
+    targetEmail?: string | null
+    metadata?: Record<string, unknown>
+  }
+) {
+  const { error } = await supabaseAdmin.from('audit_logs').insert({
+    actor_uid: actorUid,
+    actor_email: actorEmail,
+    action,
+    entity_type: entityType,
+    entity_id: entityId,
+    target_user_id: targetUserId,
+    target_email: targetEmail,
+    metadata,
+  })
+
+  if (error) {
+    console.warn('DEBUG invite-coach audit log failed:', error.message)
+  }
+}
+
 Deno.serve(async (req: Request): Promise<Response> => {
   const requestId = crypto.randomUUID()
 
@@ -134,6 +172,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
       console.error('DEBUG invite-coach invite failed:', { requestId, error: inviteError.message, email: maskEmail(email) })
       return jsonResponse({ error: inviteError.message, requestId }, 400)
     }
+
+    await insertAuditLog(supabaseAdmin, {
+      actorUid: user.id,
+      actorEmail: user.email ?? null,
+      action: 'invite.coach',
+      entityType: 'auth_invitation',
+      entityId: data.user?.id ?? null,
+      targetUserId: data.user?.id ?? null,
+      targetEmail: email,
+      metadata: {
+        requestId,
+        redirectTo: siteUrl,
+      },
+    })
 
     console.log('DEBUG invite-coach success:', { requestId, email: maskEmail(email), userId: data.user?.id })
     return jsonResponse({ success: true, userId: data.user?.id, requestId }, 200)
