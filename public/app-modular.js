@@ -8,7 +8,7 @@ const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
 const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-13-features-1';
+const __BUILD_ID = '2026-03-13-features-2';
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 let __deferredInstallPrompt = null;
@@ -773,6 +773,12 @@ async function __logAuditEvent(action, entityType, {
       if (!resp.ok) {
         throw new Error(`Failed to log audit event: ${resp.status}`);
       }
+    } catch (e) {
+      console.warn('DEBUG audit log failed:', action, e);
+    }
+
+    return null;
+  }
 
 function __escapeHtml(value) {
   return String(value ?? '')
