@@ -2788,7 +2788,7 @@ function exportExpenseHTML() {
   .page-shell {
     width: 194mm;
     max-width: 194mm;
-    min-height: 260mm;
+    min-height: 245mm;
     margin: 0 auto;
     background: #ffffff;
     border: none;
@@ -2799,8 +2799,8 @@ function exportExpenseHTML() {
   }
 
   .page-inner {
-    padding: 14px 16px 16px;
-    min-height: 260mm;
+    padding: 8px 12px 12px;
+    min-height: 245mm;
     display: flex;
     flex-direction: column;
   }
