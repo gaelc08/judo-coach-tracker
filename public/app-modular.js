@@ -3418,8 +3418,8 @@ function exportTimesheetHTML() {
     .summary-card.total { grid-column: 1 / -1 !important; }
   }
   body { margin: 0; padding: 10px; background: #ffffff; color: #243447; font-family: Inter, Arial, sans-serif; }
-  .page-shell { width: 194mm; max-width: 194mm; min-height: 281mm; margin: 0 auto; background: #ffffff; border: none; border-radius: 12px; box-shadow: none; display: flex; overflow: hidden; }
-  .page-inner { padding: 14px 16px 16px; min-height: 281mm; display: flex; flex-direction: column; }
+  .page-shell { width: 194mm; max-width: 194mm; min-height: 245mm; margin: 0 auto; background: #ffffff; border: none; border-radius: 12px; box-shadow: none; display: flex; overflow: hidden; }
+  .page-inner { padding: 14px 16px 16px; min-height: 245mm; display: flex; flex-direction: column; }
   .print-button { margin: 0 0 10px; padding: 8px 14px; background: linear-gradient(135deg, #0f3460, #145da0); color: white; border: none; border-radius: 999px; cursor: pointer; font-size: 0.82rem; font-weight: 700; box-shadow: none; }
   .header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; border-bottom: 2px solid #d8e2ef; padding-bottom: 10px; margin-bottom: 10px; }
   .header-brand { display: flex; align-items: center; gap: 12px; }
