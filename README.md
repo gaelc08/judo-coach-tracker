@@ -15,6 +15,7 @@ Technical documentation:
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Running Locally](#running-locally)
+  - [Connecting to your dev environment](#connecting-to-your-dev-environment)
   - [Deployment](#deployment)
     - [Deploying Edge Functions](#deploying-the-supabase-edge-functions)
 - [Configuration](#configuration)
@@ -133,6 +134,135 @@ npx http-server public -p 8000
 ```
 
 Then open `http://localhost:8000/` in your browser.
+
+### Connecting to your dev environment
+
+This section explains how to spin up a **fully local** development stack (Supabase + frontend) so you can develop and test without touching the production database.
+
+#### 1. Install the Supabase CLI
+
+```bash
+# macOS / Linux (Homebrew)
+brew install supabase/tap/supabase
+
+# npm (any platform)
+npm install -g supabase
+
+# Verify
+supabase --version
+```
+
+> The CLI also requires [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or any Docker-compatible runtime) to be running.
+
+#### 2. Start the local Supabase stack
+
+From the root of this repository:
+
+```bash
+supabase start
+```
+
+This pulls the required Docker images (first run only) and starts a local Supabase instance.  When it finishes you will see output similar to:
+
+```
+Started supabase local development setup.
+
+         API URL: http://127.0.0.1:54321
+     GraphQL URL: http://127.0.0.1:54321/graphql/v1
+  S3 Storage URL: http://127.0.0.1:54321/storage/v1/s3
+          DB URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      Studio URL: http://127.0.0.1:54323
+    Inbucket URL: http://127.0.0.1:54324
+      JWT secret: super-secret-jwt-token-with-at-least-32-characters-long
+        anon key: <local-anon-key>
+service_role key: <local-service-role-key>
+```
+
+You can retrieve these values at any time with:
+
+```bash
+supabase status
+```
+
+> **Supabase Studio** (`http://127.0.0.1:54323`) gives you a full dashboard for the local database — Auth users, table editor, SQL editor, Storage, and more.
+>
+> **Inbucket** (`http://127.0.0.1:54324`) is a local mail sink that captures all emails sent by Supabase Auth (invitations, password resets, etc.) so you can inspect them without a real email provider.
+
+#### 3. Apply the database migrations
+
+```bash
+supabase db reset
+```
+
+This resets the local database and re-applies every migration in `supabase/migrations/` in order, giving you an up-to-date local schema.  Run it again whenever new migrations are added.
+
+#### 4. Point the frontend at your local Supabase
+
+The app reads the Supabase URL and anon key from two constants at the top of `public/app-modular.js`.  For local development, replace them with the **local** values printed by `supabase status`:
+
+```js
+// ── Local dev ───────────────────────────────────────────────────────────────
+const supabaseUrl = 'http://127.0.0.1:54321';
+const supabaseKey = '<local-anon-key>';   // copy from `supabase status`
+```
+
+**Recommended workflow to avoid accidentally committing local credentials:**
+
+```bash
+# 1. Stash the local change before switching back to production:
+git stash push -m "local-supabase-config" public/app-modular.js
+
+# 2. Work against production as usual.
+
+# 3. Reapply local config whenever you return to local dev:
+git stash pop
+```
+
+Alternatively, always check `git diff public/app-modular.js` before committing — if it shows the local URL, run `git restore public/app-modular.js` to discard the local values.
+
+#### 5. Add `localhost` to the Supabase redirect URLs
+
+Auth emails (password reset, invitation) include a redirect URL.  For local testing, add `http://localhost:8000` to the list in `supabase/config.toml`:
+
+```toml
+additional_redirect_urls = [
+  "http://localhost:8000",
+  "http://127.0.0.1:8000",
+  # … existing production URLs …
+]
+```
+
+Then push the config to your local instance:
+
+```bash
+supabase config push --local
+```
+
+#### 6. Serve the frontend
+
+```bash
+# Using Python
+cd public && python -m http.server 8000
+
+# Using Node.js
+npx http-server public -p 8000
+```
+
+Open `http://localhost:8000/` in your browser.  The app now talks to your local Supabase instance.  Log in via Supabase Studio (`http://127.0.0.1:54323` → Authentication → Users) to create test users.
+
+#### 7. Stop the local stack
+
+When you are done:
+
+```bash
+supabase stop
+```
+
+Add `--no-backup` to skip saving the local database state:
+
+```bash
+supabase stop --no-backup
+```
 
 ### Deployment
 
