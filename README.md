@@ -1,138 +1,90 @@
+
+
+
 # Judo Coach Tracker
 
-A web application for tracking judo coach training hours, competition days, mileage, and generating expense reports for **Judo Club de Cattenom-Rodemack**.
-
-Technical documentation:
-
-- [Technical Architecture](docs/technical-architecture.md)
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [Project Structure](#project-structure)
-- [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Running Locally](#running-locally)
-  - [Deployment](#deployment)
-    - [Deploying Edge Functions](#deploying-the-supabase-edge-functions)
-- [Configuration](#configuration)
-  - [Supabase Setup](#supabase-setup)
-  - [French Invite Email Template](#personalising-the-invitation-e-mail-french-template)
-- [Data Models](#data-models)
-- [Application Pages](#application-pages)
-  - [Coach Application](#coach-application)
-- [Usage](#usage)
-  - [For Coaches](#for-coaches)
-  - [For Administrators](#for-administrators)
-- [Export Formats](#export-formats)
-- [Technical Architecture](docs/technical-architecture.md)
-
----
-
-## Overview
-
-Judo Coach Tracker is a client-side web application that allows judo coaches to log their working hours, competition days, travel distances, and toll expenses. Administrators can view all coaches' data, manage coach profiles, and export reports.
-
-The application is entirely static (HTML, CSS, and JavaScript) and relies on **Supabase** for authentication, data storage, and file uploads.
+Web application for the Judo Club de Cattenom-Rodemack to manage coach activities, expenses, and club administration.
 
 ---
 
 ## Features
 
-### Coach Features
+### For Coaches
+- Log training, competitions, and travel in a calendar
+- Track mileage, tolls, and upload receipts
+- View summaries for hours, competitions, kilometers, and payments
+- Export timesheets, mileage reports, or backups
 
-- **Monthly calendar view** — visualise and enter data day by day.
-- **Training hours** — record hours worked per day in 0.5-hour increments.
-- **Competition days** — flag competition days and log travel details.
-- **Mileage tracking** — record departure and arrival locations, distance (km), and tolls.
-- **Receipt upload** — attach toll receipt files (PDF, JPG, PNG) per entry.
-- **Summary panel** — real-time calculation of total hours, competition days, kilometres, and total payment.
-- **CSV export** — export a salary summary spreadsheet.
-- **Mileage note export** — export a printable HTML mileage report (suitable for printing to PDF).
-- **Timesheet PDF export** — export a printable PDF report for the coach's monthly training hours.
-- **JSON import/export** — import/export previous month's data from a JSON backup.
-
-### Admin Features
-
-- **Coach management** — create, edit, and delete coach profiles.
-- **Rate configuration** — set hourly rate, daily competition allowance, and km rate per coach.
-- **Read-only dashboard** — view any coach's calendar and summary for any month.
-- **Audit Logs** — track all modifications and data exports within the app.
-- **Admin Email Alerts** — automatically receive email notifications whenever a coach modifies data.
-- **JSON Access** — securely import or export raw JSON payloads.
-- **Mileage export** — export mileage notes on behalf of any coach.
-
-### Calendar Highlights
-
-Days are colour-coded for quick reference:
-
-| Colour | Meaning |
-|--------|---------|
-| Green | Training hours recorded |
-| Blue | Competition day |
-| Gray | Weekend |
-| Light orange | School holidays |
-| Pink/Red | Public holidays (France) |
+### For Administrators
+- Manage coach profiles
+- Set rates for hours, competitions, mileage
+- View/export any coach’s data
+- Receive notifications and review audit logs
 
 ---
 
-## Tech Stack
+## How to Use
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | HTML5, CSS3, Vanilla JavaScript (ES6 modules) |
-| Backend | [Supabase](https://supabase.com) (Auth, PostgreSQL, Storage) |
-| Hosting | GitHub Pages (frontend) + Supabase (backend) |
-
-No build tool or bundler is required — the application is served directly as static files.
+1. Log in with your email and password (admins invite new users)
+2. Click a calendar day to add hours, competitions, or travel
+3. Upload receipts for expenses
+4. Review automatic totals
+5. Export reports as needed
 
 ---
 
-## Project Structure
+## Calendar Color Codes
 
-```
-judo-coach-tracker/
-├── .github/
-│   └── workflows/
-│       ├── deploy-pages.yml          # GitHub Pages auto-deploy on push to main
-│       └── deploy-supabase.yml       # Supabase Edge Functions deploy on push to main
-├── public/
-│   ├── index.html        # Application entry point
-│   ├── app-modular.js    # Application logic (Supabase)
-│   ├── style.css         # Shared stylesheet
-│   └── logo-jcc.png      # Club logo
-├── supabase/
-│   ├── config.toml       # Supabase project configuration
-│   ├── migrations/       # Timestamped database migrations applied in order
-│   └── sql/
-│       └── admin/        # Optional SQL maintenance helpers for admin users
-└── package.json          # NPM dependencies
-```
+| Color    | Meaning                  |
+|----------|--------------------------|
+| Green    | Training entered         |
+| Blue     | Competition day          |
+| Gray     | Weekend                  |
+| Orange   | School holiday           |
+| Red/Pink | Public holiday (France)  |
 
 ---
 
-## Getting Started
+## Technical Overview
 
-### Prerequisites
+- Static SPA (HTML, CSS, ES6 JS modules), no build step
+- Supabase (Postgres, Auth, Storage, Edge Functions) for backend
+- Hosted on GitHub Pages
+- PWA: installable, offline support
+- Row-Level Security (RLS) in Supabase; admin actions via Edge Functions
+- REST API for user/admin management
+- Audit logging for sensitive actions
 
-- A modern web browser (Chrome, Firefox, Edge, Safari)
-- A Supabase project (for authentication and data)
+---
 
-### Supabase CLI on Windows
+## Repository Structure
 
-If `supabase` is not recognized in PowerShell, use the repo-local wrapper commands:
+- `public/` — Static frontend (HTML, JS, CSS, PWA, modules)
+- `supabase/` — Config, SQL migrations, Edge Functions
+- `docs/` — Documentation
+- `.github/workflows/` — CI/CD for deploys
+- `scripts/` — Admin/dev helper scripts
 
-```bash
-npm run sb:version
-npm run sb -- login
-npm run sb -- link -- --project-ref nkzsjyzhpvivfgslzltn
-npm run sb -- db push -- --project-ref nkzsjyzhpvivfgslzltn
-npm run sb:db:push:dev
-npm run sb:db:push:prod
-npm run sb:config:push:dev
-npm run sb:config:push:prod
+---
+
+## Development
+
+- Requires a Supabase project (see `supabase/config.toml`)
+- Use npm scripts for Supabase CLI tasks
+- No build step: edit and reload in browser
+
+---
+
+## Help
+
+- Use the in-app “Help” button
+- Contact your club administrator for issues
+
+---
+
+## Developers
+
+See `docs/technical-architecture.md` for full details.
 npm run sb:functions:deploy:dev
 npm run sb:functions:deploy:prod
 ```

@@ -1,203 +1,177 @@
+
+
+
 # Technical Architecture
 
-## 1. Purpose
-
-This document describes the technical architecture of the Judo Club de Cattenom-Rodemack coaching and expense application.
-
-The application supports:
-
-- authentication for coaches, volunteers, and administrators
-- monthly timesheet entry on a calendar UI
-- competition, mileage, toll, hotel, and purchase expense capture
-- receipt upload to Supabase Storage
-- administrative profile management and invitations
-- monthly declaration and expense exports
-- month freezing to prevent edits after validation
-
-The system is intentionally lightweight: the frontend is a static single-page application and Supabase provides the backend platform services.
+This document describes the technical architecture of the Judo Coach Tracker for the Judo Club de Cattenom-Rodemack.
 
 ---
 
-## 2. Architectural Overview
+## System Overview
 
-### 2.1 High-level view
+- Static SPA (HTML, CSS, ES6 JS modules), no build step
+- Supabase (Postgres, Auth, Storage, Edge Functions) for backend
+- Hosted on GitHub Pages
+- PWA: service worker for offline/installable support
+- Row-Level Security (RLS) in Supabase; admin actions via Edge Functions
+
+---
+
+## Architecture Diagram
 
 ```mermaid
 flowchart TD
-    User[Coach / Volunteer / Admin]
-    Browser[Static SPA in browser\nHTML + CSS + Vanilla JS]
-    Hosting[Static hosting\nGitHub Pages / Firebase Hosting / custom host]
-    Auth[Supabase Auth]
-    DB[Supabase Postgres\nusers, time_data, frozen_timesheets]
-    Storage[Supabase Storage\njustifications bucket]
-    Edge[Supabase Edge Functions\ninvite-coach, invite-admin, delete-coach-user, app]
-    External1[French public holiday API]
-    External2[French school holiday API]
+  User[Coach / Volunteer / Admin]
+  Browser[SPA: HTML/CSS/JS]
+  Hosting[GitHub Pages]
+  Auth[Supabase Auth]
+  DB[Supabase Postgres]
+  Storage[Supabase Storage]
+  Edge[Supabase Edge Functions]
+  Ext1[French public holiday API]
+  Ext2[French school holiday API]
 
-    User --> Browser
-    Hosting --> Browser
-    Browser --> Auth
-    Browser --> DB
-    Browser --> Storage
-    Browser --> Edge
-    Browser --> External1
-    Browser --> External2
+  User --> Browser
+  Hosting --> Browser
+  Browser --> Auth
+  Browser --> DB
+  Browser --> Storage
+  Browser --> Edge
+  Browser --> Ext1
+  Browser --> Ext2
 ```
 
-### 2.2 Architectural style
+---
 
-The application follows a pragmatic frontend-heavy architecture:
+## Key Principles
 
-- **presentation, state, and orchestration** live mainly in the browser
-- **persistence, authentication, RLS, and file storage** are delegated to Supabase
-- **administrative privileged actions** are handled by Edge Functions using the service role key
-- **deployment** is static for the frontend and serverless for the backend functions
-
-This keeps infrastructure simple while still enforcing security server-side through Supabase Row-Level Security (RLS).
+- All UI, state, and orchestration in the browser
+- Supabase as BaaS: persistence, authentication, RLS, file storage
+- Serverless Edge Functions for privileged/admin actions
+- Static deployment: no build step, files on GitHub Pages
+- Security: RLS enforced in Supabase
 
 ---
 
-## 3. Repository Structure
+## Repository Structure
 
-```text
-judo-coach-app/
-├── .github/workflows/
-│   ├── deploy-pages.yml
-│   └── deploy-supabase.yml
-├── docs/
-│   └── technical-architecture.md
-├── public/
-│   ├── index.html
-│   ├── app-modular.js
-│   ├── style.css
-│   ├── sw.js
-│   ├── manifest.webmanifest
-│   └── admin.html / admin-app.js / app.js (legacy/older entry points)
-├── supabase/
-│   ├── config.toml
-│   ├── migrations/
-│   ├── functions/
-│   │   ├── app/
-│   │   ├── invite-coach/
-│   │   ├── invite-admin/
-│   │   └── delete-coach-user/
-│   └── sql/admin/
-├── scripts/
-├── firebase.json
-├── package.json
-└── README.md
-```
-
-### 3.1 Key directories
-
-- `public/`: production frontend assets
-- `supabase/migrations/`: database schema and RLS evolution
-- `supabase/functions/`: privileged serverless operations
-- `.github/workflows/`: CI/CD automation
-- `docs/`: project documentation
+- `public/` — Static frontend (HTML, JS, CSS, PWA, modules)
+- `supabase/` — Config, SQL migrations, Edge Functions
+- `docs/` — Documentation
+- `.github/workflows/` — CI/CD for deploys
+- `scripts/` — Admin/dev helper scripts
 
 ---
 
-## 4. Frontend Architecture
+## Key Modules
 
-## 4.1 Runtime model
-
-The frontend is a **static SPA** loaded from `public/index.html`.
-
-Main runtime characteristics:
-
-- no bundler
-- no frontend framework
-- ES module import of Supabase client from CDN
-- application logic concentrated in `public/app-modular.js`
-- CSS styling in `public/style.css`
-- offline shell and cache management via `public/sw.js`
-
-## 4.2 Main frontend files
-
-- `public/index.html`
-  - single application shell
-  - auth area, toolbar, calendar, summary, modals, help content
-- `public/app-modular.js`
-  - Supabase client creation
-  - auth/session handling
-  - in-memory state
-  - data loading
-  - calendar rendering
-  - day editing and persistence
-  - exports
-  - admin flows
-  - holiday fetching
-  - PWA install support
-- `public/style.css`
-  - shared application styling
-  - calendar status colors
-  - modal, toolbar, summary, export layout styles
-- `public/sw.js`
-  - app-shell caching
-  - offline fallback
-  - cache version invalidation
-- `public/manifest.webmanifest`
-  - PWA metadata and app icons
-
-## 4.3 Frontend state model
-
-The app uses in-memory state variables rather than a formal store.
-
-Core state includes:
-
-- `coaches` / user profiles loaded from Supabase
-- `timeData` keyed by `coach_id-date`
-- `currentCoach`
-- `currentMonth`
-- `selectedDay`
-- `currentUser`, `currentSession`, `currentAccessToken`
-- `frozenMonths`
-- in-memory caches for holiday data
-
-This approach is simple and effective for the app size, but it makes `app-modular.js` a central orchestration file.
-
-## 4.4 UI composition
-
-The main screen is composed of:
-
-- **authentication panel**
-- **header and toolbar**
-- **profile selector**
-- **month selector**
-- **calendar grid**
-- **monthly summary panel**
-- **export actions**
-- **coach profile modal**
-- **day-entry modal**
-- **help modal**
-- **password/invite onboarding modals**
-
-## 4.5 PWA behavior
-
-The app includes progressive web app capabilities:
-
-- install prompt support in the browser
-- service worker registration from the SPA
-- cache-busted static assets using a build ID
-- offline shell support for static assets
-
-`public/sw.js` caches:
-
-- `index.html`
-- `style.css`
-- `app-modular.js`
-- `manifest.webmanifest`
-- logo assets
-- offline page
+- `app-modular.js`: Main SPA logic, imports all modules, handles Supabase client, state, orchestration
+- `modules/pwa.js`: Registers service worker, manages PWA install prompt
+- `modules/rest-gateway.js`: Handles REST API calls for user/admin management
+- `modules/audit-controller.js`: Renders/filters audit logs for admins
+- `modules/auth-admin.js` / `auth-runtime.js`: Admin checks, authentication, session management
+- `modules/env.js`: Environment and Supabase project selection (dev/prod, overrides)
 
 ---
 
-## 5. Backend Architecture
+## Supabase Integration
 
-## 5.1 Supabase services used
+- Auth: Supabase Auth for login, registration, session
+- Database: Postgres with RLS for all user/admin data
+- Storage: File uploads (receipts, justifications) in Supabase Storage
+- Edge Functions: TypeScript functions for privileged/admin actions (invite, delete, audit, etc)
 
-The application relies on the following Supabase services:
+---
+
+## Security
+
+- RLS: All data access protected by Row-Level Security in Supabase
+- Admin actions: Only via Edge Functions with service role key
+- Audit logging: All sensitive actions logged and viewable by admins
+
+---
+
+## External Integrations
+
+- French public/school holiday APIs: For calendar color coding/validation
+
+---
+
+## Development & Deployment
+
+- No build step: edit JS/HTML/CSS and reload in browser
+- Supabase CLI: use npm scripts for migrations, config, function deploys
+- CI/CD: GitHub Actions for Pages and Supabase Edge Functions deploys
+- **State:** In-memory JS objects for user, month, time data, and caches.
+
+### 5.2 UI Composition
+- Auth panel, toolbar, profile/month selectors, calendar grid, summary, modals (profile, day entry, help, onboarding).
+
+### 5.3 PWA Details
+- Service worker caches all static assets and provides offline fallback.
+- Manifest for installability and icons.
+
+---
+
+## 6. Backend Architecture
+
+### 6.1 Supabase Services
+- **Auth:** Email/password authentication, session management.
+- **Database:** PostgreSQL with RLS for all tables (users, time_data, frozen_timesheets, etc).
+- **Storage:** File uploads (receipts, justifications) in a dedicated bucket.
+- **Edge Functions:**
+  - `invite-coach`, `invite-admin`: Secure coach/admin onboarding
+  - `delete-coach-user`: Admin-only user deletion
+  - `app`: General privileged operations
+
+### 6.2 Security
+- **Row-Level Security:** All data access is protected by RLS policies.
+- **Service Role Key:** Edge Functions use service role for admin actions.
+
+---
+
+## 7. Data Model (Simplified)
+
+### 7.1 Main Tables
+- `users`: Coach/admin profiles, roles, invite status
+- `time_data`: Per-day work, competition, mileage, expenses
+- `frozen_timesheets`: Month freeze status
+
+### 7.2 Storage
+- `justifications` bucket: PDF/JPG/PNG receipts
+
+---
+
+## 8. CI/CD and Deployment
+
+- **Frontend:** GitHub Actions auto-deploys to GitHub Pages on push to `main`.
+- **Edge Functions:** GitHub Actions deploys Supabase Edge Functions on push.
+- **Migrations:** SQL migrations in `supabase/migrations/` applied via Supabase CLI.
+
+---
+
+## 9. External Integrations
+
+- **French public holiday API**: For calendar highlights
+- **French school holiday API**: For school holiday coloring
+
+---
+
+## 10. Developer Notes
+
+- No framework or bundler: All code is plain JS modules.
+- All business logic is in `public/app-modular.js`.
+- Use Supabase CLI for local dev, migrations, and function deploys.
+- RLS policies are critical—review them before schema changes.
+- Edge Functions are TypeScript, deployed via Supabase CLI.
+
+---
+
+## 11. Further Reading
+
+- [Supabase Docs](https://supabase.com/docs)
+- [GitHub Pages Docs](https://pages.github.com/)
+- [PWA Overview](https://web.dev/progressive-web-apps/)
 
 - **Auth** for email/password accounts and invitations
 - **Postgres** for domain data
