@@ -3,6 +3,8 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { BUILD_ID as __BUILD_ID, effectiveEnv as __effectiveEnv, supabaseKey, supabaseUrl } from './modules/env.js';
+import { auditMatchesCurrentCoach, formatAuditDateTime, formatAuditDetails, getAuditActionGroup } from './modules/audit-ui.js';
+import { isAdminViaLocalClaims, isAdminViaRest } from './modules/auth-admin.js';
 import { publicHolidaysFallback, schoolHolidaysFallback } from './modules/holidays-data.js';
 import { createHolidayService } from './modules/holidays-service.js';
 import { setupPWA } from './modules/pwa.js';
@@ -530,58 +532,6 @@ async function notifyAdminAlert(coachName, date, data) {
   }
 }
 
-
-function __formatAuditDateTime(value) {
-  if (!value) return '—';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  return date.toLocaleString('fr-FR');
-}
-
-function __getAuditActionGroup(action) {
-  const value = String(action || '').toLowerCase();
-  if (value.startsWith('profile.')) return 'profile';
-  if (value.startsWith('time_data.')) return 'time_data';
-  if (value.startsWith('timesheet.')) return 'timesheet';
-  if (value.startsWith('export.')) return 'export';
-  if (value.startsWith('invite.') || value.startsWith('auth_user.')) return 'invite';
-  return 'other';
-}
-
-function __auditMatchesCurrentCoach(row) {
-  if (!currentCoach) return true;
-  const metadata = row?.metadata || {};
-  const currentCoachEmail = __normalizeEmail(currentCoach.email);
-  return (
-    metadata?.coach_id === currentCoach.id
-    || row?.entity_id === currentCoach.id
-    || row?.entity_id === `${currentCoach.id}-${__normalizeMonth(currentMonth)}`
-    || (currentCoach.owner_uid && row?.target_user_id === currentCoach.owner_uid)
-    || (__normalizeEmail(row?.target_email) && __normalizeEmail(row?.target_email) === currentCoachEmail)
-  );
-}
-
-function __formatAuditDetails(row) {
-  const metadata = row?.metadata || {};
-  const entries = [];
-
-  if (metadata.coach_name) entries.push(`Profil : ${metadata.coach_name}`);
-  if (metadata.month) entries.push(`Mois : ${metadata.month}`);
-  if (metadata.date) entries.push(`Date : ${metadata.date}`);
-  if (metadata.rows_inserted != null) entries.push(`Lignes : ${metadata.rows_inserted}`);
-  if (metadata.total_amount != null) entries.push(`Montant : ${Number(metadata.total_amount).toFixed(2)} €`);
-  if (metadata.requestId) entries.push(`Ref : ${metadata.requestId}`);
-
-  if (!entries.length) {
-    const keys = Object.keys(metadata).slice(0, 3);
-    keys.forEach((key) => entries.push(`${key} : ${metadata[key]}`));
-  }
-
-  return entries.length
-    ? `<div class="audit-meta">${entries.map((entry) => `<span class="audit-meta-item">${__escapeHtml(entry)}</span>`).join('')}</div>`
-    : '<span class="audit-empty">—</span>';
-}
-
 function renderAuditLogs() {
   const body = document.getElementById('auditLogsTableBody');
   const status = document.getElementById('auditLogsStatus');
@@ -592,10 +542,15 @@ function renderAuditLogs() {
 
   let rows = [...auditLogs];
   if (filter !== 'all') {
-    rows = rows.filter((row) => __getAuditActionGroup(row.action) === filter);
+    rows = rows.filter((row) => getAuditActionGroup(row.action) === filter);
   }
   if (currentCoachOnly) {
-    rows = rows.filter((row) => __auditMatchesCurrentCoach(row));
+    rows = rows.filter((row) => auditMatchesCurrentCoach(row, {
+      currentCoach,
+      currentMonth,
+      normalizeEmail: __normalizeEmail,
+      normalizeMonth: __normalizeMonth,
+    }));
   }
 
   status.textContent = `${rows.length} action(s) affichée(s)`;
@@ -610,11 +565,11 @@ function renderAuditLogs() {
     const target = row.target_email || row.target_user_id || row.entity_id || '—';
     return `
       <tr>
-        <td>${__escapeHtml(__formatAuditDateTime(row.created_at))}</td>
+        <td>${__escapeHtml(formatAuditDateTime(row.created_at))}</td>
         <td><span class="audit-badge">${__escapeHtml(row.action || '—')}</span></td>
         <td>${__escapeHtml(actor)}</td>
         <td>${__escapeHtml(target)}</td>
-        <td>${__formatAuditDetails(row)}</td>
+        <td>${formatAuditDetails(row, { escapeHtml: __escapeHtml })}</td>
       </tr>
     `;
   }).join('');
@@ -696,60 +651,18 @@ document.addEventListener("DOMContentLoaded", () => {
 let __adminCache = { userId: null, value: null, atMs: 0 };
 let __adminInFlight = null;
 
-function __isAdminViaLocalClaims() {
-  const tokenAdmin = __hasAdminClaim(currentAccessToken);
-  const currentUserAdmin = currentUser?.app_metadata?.is_admin === true || currentUser?.app_metadata?.is_admin === 'true';
-  const sessionUserAdmin = currentSession?.user?.app_metadata?.is_admin === true || currentSession?.user?.app_metadata?.is_admin === 'true';
-  return !!(tokenAdmin || currentUserAdmin || sessionUserAdmin);
-}
-
-async function __isAdminViaRest() {
-  if (!currentUser) return false;
-  if (!currentAccessToken) return false;
-
-  const url = `${supabaseUrl}/rest/v1/rpc/is_admin`;
-  const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-  const timeoutMs = 10000;
-  const timeoutId = controller ? setTimeout(() => {
-    try { controller.abort(); } catch {}
-  }, timeoutMs) : null;
-
-  try {
-    const res = await globalThis.fetch(url, {
-      method: 'POST',
-      headers: {
-        apikey: supabaseKey,
-        Authorization: `Bearer ${currentAccessToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: '{}',
-      signal: controller?.signal
-    });
-
-    const text = await res.text();
-    let json;
-    try { json = text ? JSON.parse(text) : null; } catch { json = null; }
-
-    if (!res.ok) {
-      const message = (json && (json.message || json.error_description || json.error))
-        ? (json.message || json.error_description || json.error)
-        : (text || `${res.status} ${res.statusText}`);
-      throw new Error(`is_admin REST failed: ${message}`);
-    }
-
-    return !!json;
-  } finally {
-    if (timeoutId) clearTimeout(timeoutId);
-  }
-}
-
 async function isCurrentUserAdminDB() {
   if (!currentUser) {
     console.log('DEBUG no currentUser');
     return false;
   }
 
-  const localAdmin = __isAdminViaLocalClaims();
+  const localAdmin = isAdminViaLocalClaims({
+    accessToken: currentAccessToken,
+    currentUser,
+    currentSession,
+    hasAdminClaim: __hasAdminClaim,
+  });
 
   const ttlMs = 5 * 60 * 1000;
   if (__adminCache.userId === currentUser.id && typeof __adminCache.value === 'boolean' && (Date.now() - __adminCache.atMs) < ttlMs) {
@@ -765,7 +678,13 @@ async function isCurrentUserAdminDB() {
   }
 
   __adminInFlight = (async () => {
-    let value = await __isAdminViaRest();
+    let value = await isAdminViaRest({
+      supabaseUrl,
+      supabaseKey,
+      accessToken: currentAccessToken,
+      currentUser,
+      fetchImpl: globalThis.fetch?.bind(globalThis),
+    });
     if (!value && localAdmin) {
       console.warn('DEBUG is_admin REST returned false, using local admin claim fallback');
       value = true;
@@ -2071,7 +1990,12 @@ function __isAdminForUi() {
   if (__adminCache.userId === currentUser?.id && __adminCache.value === true) {
     return true;
   }
-  return __isAdminViaLocalClaims();
+  return isAdminViaLocalClaims({
+    accessToken: currentAccessToken,
+    currentUser,
+    currentSession,
+    hasAdminClaim: __hasAdminClaim,
+  });
 }
 
 async function handleDayClick(dateStr) {
