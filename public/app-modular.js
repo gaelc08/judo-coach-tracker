@@ -6,6 +6,7 @@ import { BUILD_ID as __BUILD_ID, effectiveEnv as __effectiveEnv, supabaseKey, su
 import { auditMatchesCurrentCoach, formatAuditDateTime, formatAuditDetails, getAuditActionGroup } from './modules/audit-ui.js';
 import { isAdminViaLocalClaims, isAdminViaRest } from './modules/auth-admin.js';
 import { createAuthNoHangLock, createAuthStorage, detectInviteFlowFromUrlHash } from './modules/auth-runtime.js';
+import { currencyDisplay, numberDisplay } from './modules/display-format.js';
 import { blobToDataUrl, downloadBlob, isStandaloneApp, loadExcelJs } from './modules/export-runtime.js';
 import { publicHolidaysFallback, schoolHolidaysFallback } from './modules/holidays-data.js';
 import { createHolidayService } from './modules/holidays-service.js';
@@ -2249,14 +2250,6 @@ function updateSummary() {
   document.getElementById(
     "totalPayment"
   ).textContent = `€${totalPayment.toFixed(2)}`;
-}
-
-function numberDisplay(value, digits = 0) {
-  return Number(value || 0).toFixed(digits).replace('.', ',');
-}
-
-function currencyDisplay(value) {
-  return `${numberDisplay(value, 2)} €`;
 }
 
 const __loadExcelJs = loadExcelJs;
