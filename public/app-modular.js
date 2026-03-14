@@ -2550,7 +2550,7 @@ function updateCurrentProfileUI() {
   if (urssafTotalItem) urssafTotalItem.style.display = isVolunteer ? "none" : "";
 
   const reimbursementLabel = document.getElementById("reimbursementTotalLabel");
-  if (reimbursementLabel) reimbursementLabel.textContent = isVolunteer ? "Total remboursable" : "Total remboursements";
+  if (reimbursementLabel) reimbursementLabel.textContent = isVolunteer ? "Total à rembourser" : "Remboursement frais";
 
   const exportBtn = document.getElementById("exportBtn");
   if (exportBtn) exportBtn.style.display = isVolunteer ? "none" : "";
