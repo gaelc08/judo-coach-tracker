@@ -13,6 +13,10 @@ site_url = "https://jccattenom.cantarero.fr/"
 # so that the `redirectTo` parameter passed in resetPasswordForEmail() is
 # honoured.  Without a matching entry Supabase falls back to `site_url`.
 additional_redirect_urls = [
+  "http://localhost:8000",
+  "http://localhost:8000/",
+  "http://127.0.0.1:8000",
+  "http://127.0.0.1:8000/",
   "https://jccattenom.cantarero.fr",
   "https://jccattenom.cantarero.fr/",
   "https://gaelc08.github.io/judo-coach-tracker",

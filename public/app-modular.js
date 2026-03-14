@@ -334,6 +334,19 @@ const fetchSchoolHolidays = __holidayService.fetchSchoolHolidays;
 let publicHolidays = {};
 let schoolHolidays = [];
 
+function setupEnvironmentBanner() {
+  const envBanner = document.getElementById('envBanner');
+  if (!envBanner) return;
+
+  if (__effectiveEnv !== 'dev') {
+    envBanner.style.display = 'none';
+    return;
+  }
+
+  envBanner.textContent = `🧪 ENVIRONNEMENT DEV — ${supabaseUrl}`;
+  envBanner.style.display = 'block';
+}
+
 // ===== Init =====
 async function debugSession() {
   try {
@@ -350,6 +363,7 @@ async function debugSession() {
 
 document.addEventListener("DOMContentLoaded", () => {
   console.log('DEBUG DOMContentLoaded');
+  setupEnvironmentBanner();
   setupPWA();
   setupAuthListeners();
   debugSession();

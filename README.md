@@ -120,6 +120,20 @@ judo-coach-tracker/
 - A modern web browser (Chrome, Firefox, Edge, Safari)
 - A Supabase project (for authentication and data)
 
+### Supabase CLI on Windows
+
+If `supabase` is not recognized in PowerShell, use the repo-local wrapper commands:
+
+```bash
+npm run sb:version
+npm run sb -- login
+npm run sb -- link -- --project-ref nkzsjyzhpvivfgslzltn
+npm run sb -- db push -- --project-ref nkzsjyzhpvivfgslzltn
+```
+
+This uses `npx supabase` under the hood and does not require a global Supabase CLI install.
+You can also call the CLI directly with `npx supabase ...`.
+
 ### Running Locally
 
 Because the application uses ES6 modules, it must be served over HTTP (not opened directly as a file). Use any static file server:
@@ -133,6 +147,24 @@ npx http-server public -p 8000
 ```
 
 Then open `http://localhost:8000/` in your browser.
+
+### Remote Supabase dev environment (recommended)
+
+The local app automatically uses the `dev` environment on `localhost`, and `dev` is configured to target the remote Supabase dev project:
+
+- URL: `https://nkzsjyzhpvivfgslzltn.supabase.co`
+- Publishable key: `sb_publishable_lHFJ9uxG0ZgkCeONR3PXyA_Jf8Lx_p_`
+
+Use these commands to apply backend changes to that dev project:
+
+```bash
+supabase login
+supabase link --project-ref nkzsjyzhpvivfgslzltn
+supabase db push --project-ref nkzsjyzhpvivfgslzltn
+supabase config push --project-ref nkzsjyzhpvivfgslzltn
+```
+
+If needed, you can still override dev credentials from the browser using localStorage keys `jct.dev.supabase.url` and `jct.dev.supabase.key`.
 
 ### Deployment
 

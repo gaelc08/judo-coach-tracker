@@ -38,6 +38,21 @@ body {
   color: var(--gray-900);
 }
 
+.env-banner {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  width: 100%;
+  text-align: center;
+  padding: 8px 12px;
+  background: var(--judo-gold);
+  color: var(--judo-black);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  border-bottom: 1px solid var(--judo-gold-light);
+}
+
 html {
   width: 100%;
   max-width: 100%;
