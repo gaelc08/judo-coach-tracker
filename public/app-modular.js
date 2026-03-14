@@ -1159,6 +1159,10 @@ function clearCoachForm() {
 
 function loadCoaches() {
   const select = document.getElementById("coachSelect");
+  if (!select) {
+    updateCurrentProfileUI();
+    return;
+  }
   const hasCoaches = Array.isArray(coaches) && coaches.length > 0;
   const hasSingleCoach = hasCoaches && coaches.length === 1;
   const ownCoach =
@@ -1168,7 +1172,7 @@ function loadCoaches() {
   const fallbackCoach = ownCoach || (hasCoaches ? coaches[0] : null);
   const shouldAutoSelectDisabledCoach = select.disabled && fallbackCoach;
   const shouldAutoSelectCoach =
-    !currentCoach && (hasSingleCoach || shouldAutoSelectDisabledCoach);
+    !currentCoach && (hasSingleCoach || shouldAutoSelectDisabledCoach || !!fallbackCoach);
   select.innerHTML = '<option value="">-- Sélectionner --</option>';
 
   coaches.forEach((coach) => {
