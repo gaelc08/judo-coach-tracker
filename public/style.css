@@ -722,6 +722,17 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   text-align: center;
 }
 
+.dev-env-banner {
+  background: #fff3cd;
+  border-bottom: 2px solid #e6a817;
+  padding: 8px 16px;
+  color: #7a4f00;
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
 /* ===== Modals ===== */
 .modal {
   display: none;

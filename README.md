@@ -15,6 +15,7 @@ Technical documentation:
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Running Locally](#running-locally)
+  - [Connecting to your dev environment](#connecting-to-your-dev-environment)
   - [Deployment](#deployment)
     - [Deploying Edge Functions](#deploying-the-supabase-edge-functions)
 - [Configuration](#configuration)
@@ -133,6 +134,83 @@ npx http-server public -p 8000
 ```
 
 Then open `http://localhost:8000/` in your browser.
+
+### Connecting to your dev environment
+
+This section explains how to use the **remote Supabase dev project** (already provisioned) so you can develop and test without touching the production database.
+
+#### 1. Get your dev project credentials
+
+1. Open the [Supabase dashboard](https://app.supabase.com) and select your **dev** project.
+2. Go to **Project Settings** → **API** (sometimes labelled **Data API**).
+3. Copy the **Project URL** and the **anon / public** key.
+
+#### 2. Fill in the dev credentials in `public/app-modular.js`
+
+Near the top of `public/app-modular.js`, two constants hold the dev project's URL and anon key.  Replace the placeholder values with what you copied above:
+
+```js
+// Dev project — accessed by appending ?env=dev to the URL
+const __DEV_URL = 'https://<dev-project-id>.supabase.co';
+const __DEV_KEY = '<dev-anon-key>';
+```
+
+These credentials are the public **anon** key, so it is safe to commit them.
+
+#### 3. Access the app in dev mode
+
+Append `?env=dev` to any URL of the deployed (or locally served) app:
+
+```
+# Production deployment
+https://jccattenom.cantarero.fr/?env=dev
+
+# GitHub Pages
+https://gaelc08.github.io/judo-coach-tracker/?env=dev
+
+# Local static server
+http://localhost:8000/?env=dev
+```
+
+When active, the app:
+- Connects to the dev Supabase project instead of production.
+- Shows a yellow banner at the top of the page: **⚠️ Environnement de développement**.
+- Logs a warning in the browser console.
+
+Remove `?env=dev` from the URL (or navigate to the root) to switch back to the production project.
+
+#### 4. Apply the database migrations to your dev project
+
+Install the [Supabase CLI](https://supabase.com/docs/guides/cli) if you haven't already:
+
+```bash
+# macOS / Linux (Homebrew)
+brew install supabase/tap/supabase
+
+# npm (any platform)
+npm install -g supabase
+```
+
+Then push all migrations from `supabase/migrations/` to your remote dev project in one command:
+
+```bash
+supabase db push --project-ref <dev-project-ref>
+```
+
+The project ref is the part of your dev project URL before `.supabase.co` (e.g. `abcdefghijklmnop`).  Re-run this command whenever new migrations are added.
+
+> **Tip:** you can also apply migrations one-by-one via the Supabase SQL editor — Dashboard → SQL Editor → paste the file contents → Run.
+
+#### 5. Allow the app origins in the dev project's redirect URLs
+
+Auth emails (password reset, invitation) check that the redirect URL is in the allow-list.  Add any origin you use with dev mode to the **dev** project:
+
+1. Open the [Supabase dashboard](https://app.supabase.com) → your **dev** project → **Authentication** → **URL Configuration**.
+2. Under **Redirect URLs**, add every origin you serve the app from, e.g.:
+   - `https://jccattenom.cantarero.fr`
+   - `https://gaelc08.github.io/judo-coach-tracker`
+   - `http://localhost:8000`
+3. Save.
 
 ### Deployment
 
