@@ -565,7 +565,12 @@ function setupAuthListeners() {
     if (event === 'SIGNED_IN' && __inviteFlowActive && session?.user) {
       document.getElementById("invitePasswordModal").classList.add("active");
       // Use onclick assignment so repeated firings replace the handler cleanly.
-      document.getElementById("inviteSetPasswordBtn").onclick = async () => {
+      const inviteSetPasswordBtn = document.getElementById("inviteSetPasswordBtn");
+      if (!inviteSetPasswordBtn) {
+        console.warn('WARN missing element: #inviteSetPasswordBtn');
+        return;
+      }
+      inviteSetPasswordBtn.onclick = async () => {
         const newPass = document.getElementById("inviteNewPasswordInput").value;
         const confirmPass = document.getElementById("inviteConfirmPasswordInput").value;
         if (!newPass) { alert("Veuillez saisir un mot de passe."); return; }
@@ -594,7 +599,12 @@ function setupAuthListeners() {
     if (event === 'PASSWORD_RECOVERY') {
       document.getElementById("passwordResetModal").classList.add("active");
       // Use onclick assignment (not addEventListener) so re-fires replace the handler cleanly.
-      document.getElementById("updatePasswordBtn").onclick = async () => {
+      const updatePasswordBtn = document.getElementById("updatePasswordBtn");
+      if (!updatePasswordBtn) {
+        console.warn('WARN missing element: #updatePasswordBtn');
+        return;
+      }
+      updatePasswordBtn.onclick = async () => {
         const newPass = document.getElementById("newPasswordInput").value;
         const confirmPass = document.getElementById("confirmPasswordInput").value;
         if (!newPass) { alert("Veuillez saisir un nouveau mot de passe."); return; }
@@ -911,8 +921,29 @@ async function toggleFreezeMonth() {
 
 // ===== Event listeners =====
 function setupEventListeners() {
+  const bindClick = (id, handler) => {
+    const el = document.getElementById(id);
+    if (!el) {
+      console.warn(`WARN missing element for click binding: #${id}`);
+      return null;
+    }
+    el.onclick = handler;
+    return el;
+  };
+
+  const bindChange = (id, handler) => {
+    const el = document.getElementById(id);
+    if (!el) {
+      console.warn(`WARN missing element for change binding: #${id}`);
+      return null;
+    }
+    el.onchange = handler;
+    return el;
+  };
+
   // Set month picker to the current month
-  document.getElementById("monthSelect").value = currentMonth;
+  const monthSelectEl = document.getElementById("monthSelect");
+  if (monthSelectEl) monthSelectEl.value = currentMonth;
 
   // App-level logout button (in the header)
   const logoutBtnApp = document.getElementById("logoutBtnApp");
@@ -936,7 +967,7 @@ function setupEventListeners() {
     });
   }
 
-  document.getElementById("addCoachBtn").onclick = () => {
+  bindClick("addCoachBtn", () => {
     editMode = false;
     editingCoachId = null;
     clearCoachForm();
@@ -946,9 +977,9 @@ function setupEventListeners() {
     document.getElementById("inviteCoach").style.display = "none";
     document.getElementById("deleteCoach").style.display = "none";
     document.getElementById("coachModal").classList.add("active");
-  };
+  });
 
-  document.getElementById("editCoachBtn").onclick = () => {
+  bindClick("editCoachBtn", () => {
     if (!currentCoach) {
       alert("Veuillez sélectionner un profil.");
       return;
@@ -972,21 +1003,21 @@ function setupEventListeners() {
     updateCoachFormProfileUI(currentCoach);
     document.getElementById("coachModal").classList.add("active");
     document.getElementById("deleteCoach").style.display = "inline-block";
-  };
+  });
 
-  document.getElementById("saveCoach").onclick = saveCoach;
-  document.getElementById("inviteCoach").onclick = async () => {
+  bindClick("saveCoach", saveCoach);
+  bindClick("inviteCoach", async () => {
     const email = __normalizeEmail(document.getElementById("coachEmail").value);
     if (!email) {
       alert("Veuillez renseigner l'adresse e-mail du profil.");
       return;
     }
     await inviteCoach(email);
-  };
-  document.getElementById("coachProfileType").onchange = (e) => {
+  });
+  bindChange("coachProfileType", (e) => {
     updateCoachFormProfileUI(e.target.value);
-  };
-  document.getElementById("inviteAdminBtn").onclick = async () => {
+  });
+  bindClick("inviteAdminBtn", async () => {
     const rawEmail = globalThis.prompt("Adresse e-mail du nouvel administrateur :", "");
     if (rawEmail == null) return;
 
@@ -997,8 +1028,8 @@ function setupEventListeners() {
     }
 
     await inviteAdmin(email);
-  };
-  document.getElementById("cancelCoach").onclick = () => {
+  });
+  bindClick("cancelCoach", () => {
     document.getElementById("coachModal").classList.remove("active");
     clearCoachForm();
     editMode = false;
@@ -1006,11 +1037,11 @@ function setupEventListeners() {
     document.getElementById("deleteCoach").style.display = "none";
     document.getElementById("inviteCoach").style.display = "none";
     updateCoachFormProfileUI("coach");
-  };
+  });
 
-  document.getElementById("deleteCoach").onclick = deleteCoach;
+  bindClick("deleteCoach", deleteCoach);
 
-  document.getElementById("coachModal").onclick = (e) => {
+  bindClick("coachModal", (e) => {
     if (e.target.id === "coachModal") {
       document.getElementById("coachModal").classList.remove("active");
       clearCoachForm();
@@ -1019,77 +1050,77 @@ function setupEventListeners() {
       document.getElementById("inviteCoach").style.display = "none";
       updateCoachFormProfileUI("coach");
     }
-  };
+  });
 
-  document.getElementById("dayModal").onclick = (e) => {
+  bindClick("dayModal", (e) => {
     if (e.target.id === "dayModal") {
       document.getElementById("dayModal").classList.remove("active");
     }
-  };
+  });
 
-  document.getElementById("helpBtn").onclick = () => {
+  bindClick("helpBtn", () => {
     document.getElementById("helpModal").classList.add("active");
-  };
+  });
 
-  document.getElementById("auditLogsBtn").onclick = openAuditLogsModal;
+  bindClick("auditLogsBtn", openAuditLogsModal);
 
-  document.getElementById("refreshAuditLogsBtn").onclick = loadAuditLogs;
+  bindClick("refreshAuditLogsBtn", loadAuditLogs);
 
-  document.getElementById("auditActionFilter").onchange = renderAuditLogs;
-  document.getElementById("auditCurrentCoachOnly").onchange = renderAuditLogs;
+  bindChange("auditActionFilter", renderAuditLogs);
+  bindChange("auditCurrentCoachOnly", renderAuditLogs);
 
-  document.getElementById("closeAuditLogs").onclick = () => {
+  bindClick("closeAuditLogs", () => {
     document.getElementById("auditLogsModal").classList.remove("active");
-  };
+  });
 
-  document.getElementById("closeHelp").onclick = () => {
+  bindClick("closeHelp", () => {
     document.getElementById("helpModal").classList.remove("active");
-  };
+  });
 
-  document.getElementById("helpModal").onclick = (e) => {
+  bindClick("helpModal", (e) => {
     if (e.target.id === "helpModal") {
       document.getElementById("helpModal").classList.remove("active");
     }
-  };
+  });
 
-  document.getElementById("auditLogsModal").onclick = (e) => {
+  bindClick("auditLogsModal", (e) => {
     if (e.target.id === "auditLogsModal") {
       document.getElementById("auditLogsModal").classList.remove("active");
     }
-  };
+  });
 
-  document.getElementById("coachSelect").onchange = (e) => {
+  bindChange("coachSelect", (e) => {
     currentCoach = coaches.find((c) => c.id === e.target.value) || null;
     updateCurrentProfileUI();
     updateCalendar();
     updateSummary();
     renderAuditLogs();
-  };
+  });
 
-  document.getElementById("monthSelect").onchange = (e) => {
+  bindChange("monthSelect", (e) => {
     currentMonth = __normalizeMonth(e.target.value);
     updateCalendar();
     updateSummary();
     updateFreezeUI();
     renderAuditLogs();
-  };
+  });
 
-  document.getElementById("competitionDay").onchange = (e) => {
+  bindChange("competitionDay", (e) => {
     document.getElementById("travelGroup").style.display = e.target.checked
       ? "block"
       : "none";
-  };
+  });
 
-  document.getElementById("saveDay").onclick = saveDay;
-  document.getElementById("deleteDay").onclick = deleteDay;
-  document.getElementById("cancelDay").onclick = () => {
+  bindClick("saveDay", saveDay);
+  bindClick("deleteDay", deleteDay);
+  bindClick("cancelDay", () => {
     document.getElementById("dayModal").classList.remove("active");
-  };
+  });
 
-  document.getElementById("timesheetBtn").onclick = exportTimesheetHTML;
-  document.getElementById("backupBtn").onclick = exportBackupJSON;
+  bindClick("timesheetBtn", exportTimesheetHTML);
+  bindClick("backupBtn", exportBackupJSON);
 
-  document.getElementById("importBtn").onclick = () => {
+  bindClick("importBtn", () => {
     const fileInput = document.getElementById("importFile");
     const file = fileInput.files[0];
     if (!file) {
@@ -1106,10 +1137,10 @@ function setupEventListeners() {
       }
     };
     reader.readAsText(file);
-  };
+  });
 
-  document.getElementById("mileageBtn").onclick = exportExpenseHTML;
-  document.getElementById("freezeBtn").onclick = toggleFreezeMonth;
+  bindClick("mileageBtn", exportExpenseHTML);
+  bindClick("freezeBtn", toggleFreezeMonth);
 }
 
 // ===== Coach management =====
