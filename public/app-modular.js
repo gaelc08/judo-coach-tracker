@@ -2736,10 +2736,15 @@ function exportExpenseHTML() {
       margin: 0;
       width: 194mm;
       max-width: 194mm;
+      min-height: 281mm;
+      display: flex;
       border-radius: 0;
     }
     .page-inner {
       padding: 0;
+      min-height: 281mm;
+      display: flex;
+      flex-direction: column;
     }
     .header,
     .header-brand {
@@ -2783,16 +2788,21 @@ function exportExpenseHTML() {
   .page-shell {
     width: 194mm;
     max-width: 194mm;
+    min-height: 281mm;
     margin: 0 auto;
     background: #ffffff;
     border: 1px solid #d8e2ef;
     border-radius: 12px;
     box-shadow: none;
+    display: flex;
     overflow: hidden;
   }
 
   .page-inner {
     padding: 14px 16px 16px;
+    min-height: 281mm;
+    display: flex;
+    flex-direction: column;
   }
 
   .print-button {
@@ -3078,7 +3088,8 @@ function exportExpenseHTML() {
   }
   
   .signature { 
-    margin-top: 40px; 
+    margin-top: auto;
+    padding-top: 20px;
     display: grid; 
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px;
@@ -3401,8 +3412,8 @@ function exportTimesheetHTML() {
       -webkit-print-color-adjust: exact; print-color-adjust: exact;
     }
     .no-print { display: none; }
-    .page-shell { box-shadow: none; border: none; margin: 0; width: 194mm; max-width: 194mm; border-radius: 0; }
-    .page-inner { padding: 0; }
+    .page-shell { box-shadow: none; border: none; margin: 0; width: 194mm; max-width: 194mm; min-height: 281mm; display: flex; border-radius: 0; }
+    .page-inner { padding: 0; min-height: 281mm; display: flex; flex-direction: column; }
     .header, .header-brand { display: flex !important; flex-direction: row !important; align-items: flex-start !important; justify-content: space-between !important; }
     .document-badge { text-align: right !important; min-width: 180px !important; }
     .info-grid, .summary-grid, .signature { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
@@ -3410,8 +3421,8 @@ function exportTimesheetHTML() {
     .summary-card.total { grid-column: 1 / -1 !important; }
   }
   body { margin: 0; padding: 10px; background: #eef3f9; color: #243447; font-family: Inter, Arial, sans-serif; }
-  .page-shell { width: 194mm; max-width: 194mm; margin: 0 auto; background: #ffffff; border: 1px solid #d8e2ef; border-radius: 12px; box-shadow: none; overflow: hidden; }
-  .page-inner { padding: 14px 16px 16px; }
+  .page-shell { width: 194mm; max-width: 194mm; min-height: 281mm; margin: 0 auto; background: #ffffff; border: 1px solid #d8e2ef; border-radius: 12px; box-shadow: none; display: flex; overflow: hidden; }
+  .page-inner { padding: 14px 16px 16px; min-height: 281mm; display: flex; flex-direction: column; }
   .print-button { margin: 0 0 10px; padding: 8px 14px; background: linear-gradient(135deg, #0f3460, #145da0); color: white; border: none; border-radius: 999px; cursor: pointer; font-size: 0.82rem; font-weight: 700; box-shadow: none; }
   .header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; border-bottom: 2px solid #d8e2ef; padding-bottom: 10px; margin-bottom: 10px; }
   .header-brand { display: flex; align-items: center; gap: 12px; }
@@ -3446,7 +3457,7 @@ function exportTimesheetHTML() {
   tbody tr:nth-child(even) { background: #f9fbfe; }
   .amount, .number { text-align: right; font-variant-numeric: tabular-nums; }
   .total-row td { font-weight: 800; background: #edf4ff; color: #0f3460; border-bottom: none; }
-  .signature { margin-top: 40px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; page-break-inside: avoid; }
+  .signature { margin-top: auto; padding-top: 20px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; page-break-inside: avoid; }
   .signature > div { min-height: 46px; border-top: 2px solid #243447; padding-top: 6px; text-align: center; font-weight: 600; font-size: 0.7rem; }
   th:nth-child(1), td:nth-child(1) { width: 16%; }
   th:nth-child(2), td:nth-child(2) { width: 14%; }
