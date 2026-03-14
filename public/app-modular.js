@@ -4,6 +4,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { BUILD_ID as __BUILD_ID, effectiveEnv as __effectiveEnv, supabaseKey, supabaseUrl } from './modules/env.js';
 import { setupPWA } from './modules/pwa.js';
+import { createRestGateway } from './modules/rest-gateway.js';
 import {
   __decodeJwtPayload,
   __describeJwt,
@@ -280,6 +281,21 @@ let currentAccessToken = null;
 let __eventListenersSetup = false;
 let auditLogs = [];
 
+const __restGateway = createRestGateway({
+  supabaseUrl,
+  supabaseKey,
+  getAccessToken: () => currentAccessToken,
+  getCurrentUser: () => currentUser,
+  normalizeEmail: __normalizeEmail,
+  toAuditJson: __toAuditJson,
+  fetchImpl: globalThis.fetch?.bind(globalThis),
+  logger: console,
+});
+
+const __coachWriteViaRest = __restGateway.coachWriteViaRest;
+const __restSelect = __restGateway.restSelect;
+const __logAuditEvent = __restGateway.logAuditEvent;
+
 function __collectInviteDebug({ token = currentAccessToken, inviteEmail, ...extra } = {}) {
   return {
     buildId: __BUILD_ID,
@@ -501,105 +517,6 @@ function __getMonthlyMileageBreakdown(coach, monthValue) {
   };
 }
 
-async function __coachWriteViaRest(coachData, { editingId = null } = {}) {
-  if (!currentAccessToken) {
-    return {
-      data: null,
-      error: { message: 'No access token available (not logged in yet?)' },
-      status: 0,
-      statusText: 'NO_TOKEN'
-    };
-  }
-
-  const isUpdate = !!editingId;
-  const baseUrl = `${supabaseUrl}/rest/v1/users`;
-  const url = isUpdate
-    ? `${baseUrl}?id=eq.${encodeURIComponent(editingId)}`
-    : baseUrl;
-
-  const method = isUpdate ? 'PATCH' : 'POST';
-
-  try {
-    const res = await globalThis.fetch(url, {
-      method,
-      headers: {
-        apikey: supabaseKey,
-        Authorization: `Bearer ${currentAccessToken}`,
-        'Content-Type': 'application/json',
-        Prefer: 'return=representation'
-      },
-      body: JSON.stringify(coachData)
-    });
-
-    const text = await res.text();
-    let json = null;
-    try {
-      json = text ? JSON.parse(text) : null;
-    } catch {
-      json = null;
-    }
-
-    if (!res.ok) {
-      const message = (json && (json.message || json.error_description || json.error))
-        ? (json.message || json.error_description || json.error)
-        : (text || `${res.status} ${res.statusText}`);
-      return { data: null, error: { message }, status: res.status, statusText: res.statusText };
-    }
-
-    return { data: Array.isArray(json) ? json : (json ? [json] : []), error: null, status: res.status, statusText: res.statusText };
-  } catch (e) {
-    return { data: null, error: { message: e?.message || String(e) }, status: 0, statusText: 'FETCH_ERROR' };
-  }
-}
-
-async function __restSelect(table, { select = '*', filters = [], order = null, limit = null } = {}) {
-  if (!currentAccessToken) {
-    return {
-      data: null,
-      error: { message: 'No access token available' },
-      status: 0,
-      statusText: 'NO_TOKEN'
-    };
-  }
-
-  const urlObj = new URL(`${supabaseUrl}/rest/v1/${table}`);
-  urlObj.searchParams.set('select', select);
-  for (const [col, op, value] of filters) {
-    urlObj.searchParams.set(col, `${op}.${value}`);
-  }
-  if (order?.column) {
-    const direction = String(order.direction || 'asc').toLowerCase() === 'desc' ? 'desc' : 'asc';
-    urlObj.searchParams.set('order', `${order.column}.${direction}`);
-  }
-  if (Number.isFinite(limit) && Number(limit) > 0) {
-    urlObj.searchParams.set('limit', String(limit));
-  }
-  const url = urlObj.toString();
-
-  try {
-    const res = await globalThis.fetch(url, {
-      headers: {
-        apikey: supabaseKey,
-        Authorization: `Bearer ${currentAccessToken}`
-      }
-    });
-    const text = await res.text();
-    let json = null;
-    try { json = text ? JSON.parse(text) : null; } catch { json = null; }
-
-    if (!res.ok) {
-      const message = (json && (json.message || json.error_description || json.error))
-        ? (json.message || json.error_description || json.error)
-        : (text || `${res.status} ${res.statusText}`);
-      return { data: null, error: { message }, status: res.status, statusText: res.statusText };
-    }
-
-    return { data: Array.isArray(json) ? json : (json ? [json] : []), error: null, status: res.status, statusText: res.statusText };
-  } catch (e) {
-    return { data: null, error: { message: e?.message || String(e) }, status: 0, statusText: 'FETCH_ERROR' };
-  }
-}
-
 async function notifyAdminAlert(coachName, date, data) {
   if (__isAdminForUi()) return;
   try {
@@ -611,42 +528,6 @@ async function notifyAdminAlert(coachName, date, data) {
   }
 }
 
-
-async function __logAuditEvent(action, entityType, {
-  entityId = null,
-  targetUserId = null,
-  targetEmail = null,
-  metadata = {},
-} = {}) {
-    if (!currentUser || !currentAccessToken) return null;
-
-    try {
-      const resp = await fetch(`${supabaseUrl}/rest/v1/rpc/log_audit_event`, {
-        method: 'POST',
-        headers: {
-          'apikey': supabaseKey,
-          'Authorization': `Bearer ${currentAccessToken}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal'
-        },
-        body: JSON.stringify({
-          p_action: String(action || '').trim(),
-          p_entity_type: String(entityType || '').trim(),
-          p_entity_id: entityId == null ? null : String(entityId),
-          p_target_user_id: targetUserId || null,
-          p_target_email: __normalizeEmail(targetEmail) || (targetEmail ? String(targetEmail) : null),
-          p_metadata: __toAuditJson(metadata || {}),
-        })
-      });
-      if (!resp.ok) {
-        throw new Error(`Failed to log audit event: ${resp.status}`);
-      }
-    } catch (e) {
-      console.warn('DEBUG audit log failed:', action, e);
-    }
-
-    return null;
-  }
 
 function __formatAuditDateTime(value) {
   if (!value) return '—';
