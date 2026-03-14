@@ -8,6 +8,7 @@ import { isAdminViaLocalClaims, isAdminViaRest } from './modules/auth-admin.js';
 import { createAuthNoHangLock, createAuthStorage, detectInviteFlowFromUrlHash } from './modules/auth-runtime.js';
 import { publicHolidaysFallback, schoolHolidaysFallback } from './modules/holidays-data.js';
 import { createHolidayService } from './modules/holidays-service.js';
+import { createInviteDebugTools } from './modules/invite-debug.js';
 import { setupPWA } from './modules/pwa.js';
 import { createRestGateway } from './modules/rest-gateway.js';
 import {
@@ -220,46 +221,20 @@ const __coachWriteViaRest = __restGateway.coachWriteViaRest;
 const __restSelect = __restGateway.restSelect;
 const __logAuditEvent = __restGateway.logAuditEvent;
 
-function __collectInviteDebug({ token = currentAccessToken, inviteEmail, ...extra } = {}) {
-  return {
-    buildId: __BUILD_ID,
-    href: window.location.href,
-    currentUserId: currentUser?.id || null,
-    currentUserEmail: __maskEmail(currentUser?.email),
-    currentSessionUserId: currentSession?.user?.id || null,
-    currentSessionEmail: __maskEmail(currentSession?.user?.email),
-    sessionExpiresAt: currentSession?.expires_at || null,
-    jwt: __describeJwt(token),
-    ...extra,
-    inviteEmail: __maskEmail(inviteEmail)
-  };
-}
+const __inviteDebugTools = createInviteDebugTools({
+  buildId: __BUILD_ID,
+  maskEmail: __maskEmail,
+  describeJwt: __describeJwt,
+  getCurrentUser: () => currentUser,
+  getCurrentSession: () => currentSession,
+  getCurrentAccessToken: () => currentAccessToken,
+  getInviteDebugLast: () => window.__inviteDebugLast || null,
+});
 
-function __getInviteDebugReport() {
-  return [
-    '=== INVITE DEBUG REPORT START ===',
-    JSON.stringify({
-      generatedAt: new Date().toISOString(),
-      debug: window.__inviteDebugLast || null
-    }, null, 2),
-    '=== INVITE DEBUG REPORT END ==='
-  ].join('\n');
-}
-
-async function __copyInviteDebugReport() {
-  const report = __getInviteDebugReport();
-  if (navigator.clipboard?.writeText) {
-    try {
-      await navigator.clipboard.writeText(report);
-    } catch (e) {
-      console.warn('DEBUG invite report clipboard copy failed:', e);
-    }
-  }
-  return report;
-}
-
-window.__getInviteDebugReport = __getInviteDebugReport;
-window.__copyInviteDebugReport = __copyInviteDebugReport;
+const __collectInviteDebug = __inviteDebugTools.collectInviteDebug;
+const __getInviteDebugReport = __inviteDebugTools.getInviteDebugReport;
+const __copyInviteDebugReport = __inviteDebugTools.copyInviteDebugReport;
+__inviteDebugTools.installGlobalDebugApis();
 
 function __getCoachDisplayName(coach) {
   if (!coach) return '';
