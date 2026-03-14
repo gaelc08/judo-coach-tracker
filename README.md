@@ -51,13 +51,17 @@ The application is entirely static (HTML, CSS, and JavaScript) and relies on **S
 - **Summary panel** — real-time calculation of total hours, competition days, kilometres, and total payment.
 - **CSV export** — export a salary summary spreadsheet.
 - **Mileage note export** — export a printable HTML mileage report (suitable for printing to PDF).
-- **JSON import** — import previous month's data from a JSON backup.
+- **Timesheet PDF export** — export a printable PDF report for the coach's monthly training hours.
+- **JSON import/export** — import/export previous month's data from a JSON backup.
 
 ### Admin Features
 
 - **Coach management** — create, edit, and delete coach profiles.
 - **Rate configuration** — set hourly rate, daily competition allowance, and km rate per coach.
 - **Read-only dashboard** — view any coach's calendar and summary for any month.
+- **Audit Logs** — track all modifications and data exports within the app.
+- **Admin Email Alerts** — automatically receive email notifications whenever a coach modifies data.
+- **JSON Access** — securely import or export raw JSON payloads.
 - **Mileage export** — export mileage notes on behalf of any coach.
 
 ### Calendar Highlights
@@ -182,7 +186,7 @@ npx http-server public -p 8000
 
 #### Deploying the Supabase Edge Functions
 
-A GitHub Actions workflow (`.github/workflows/deploy-supabase.yml`) automatically deploys the `invite-coach` Edge Function whenever code under `supabase/functions/` is pushed to `main`.
+A GitHub Actions workflow (`.github/workflows/deploy-supabase.yml`) automatically deploys the Supabase Edge Functions (`invite-coach`, `alert-admin`, etc.) whenever code under `supabase/functions/` is pushed to `main`.
 
 The workflow authenticates with Supabase using a personal access token stored as a GitHub Actions secret.  You must add this secret once before the workflow can succeed:
 
@@ -419,13 +423,23 @@ Administrators log in through the same application. Once authenticated as an adm
 
 ## Export Formats
 
+### Timesheet (PDF / HTML)
+
+Exported from the application. Generates a formatted page optimized for PDF printing including:
+
+- Coach name, status, and hourly rate.
+- Month and year recap.
+- Total hours worked per day (when > 0).
+- Total amount due.
+- Club header with logo and signature blocks.
+
 ### Salary CSV
 
 Exported from the coach application. Contains one row per day with columns for date, hours, competition flag, and payment calculations. Suitable for import into spreadsheet software.
 
-### Mileage Note (HTML)
+### Mileage Note (PDF / HTML)
 
-Exported from the application. Generates a formatted HTML page including:
+Exported from the application. Generates a formatted HTML page optimized for PDF printing including:
 
 - Coach name, address, and vehicle details.
 - A table of competition travel entries (date, departure, arrival, km, tolls).
