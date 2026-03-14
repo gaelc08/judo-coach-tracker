@@ -3480,7 +3480,7 @@ function exportTimesheetHTML() {
           </div>
           <div class="header-text">
             <h1>Judo Club de Cattenom-Rodemack</h1>
-            <p>Association loi 1901</p>
+            
           </div>
         </div>
         <div class="document-badge">
