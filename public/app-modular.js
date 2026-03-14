@@ -3416,7 +3416,13 @@ function exportTimesheetHTML() {
     .no-print { display: none; }
     .page-shell { box-shadow: none; border: none; margin: 0; width: 194mm; max-width: 194mm; display: flex; border-radius: 0; }
     .page-inner { padding: 0; display: flex; flex-direction: column; }
-    .header, .header-brand { display: flex !important; flex-direction: row !important; align-items: flex-start !important; justify-content: space-between !important; }
+    .header, .header-brand {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      gap: 12px !important;
+    }
     .document-badge { text-align: right !important; min-width: 180px !important; }
     .info-grid, .summary-grid, .signature { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
     .info-row { grid-template-columns: 120px 1fr !important; }
