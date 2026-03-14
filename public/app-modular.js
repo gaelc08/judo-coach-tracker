@@ -2718,7 +2718,7 @@ function exportExpenseHTML() {
   }
 
   @media print {
-    @page { size: A4 portrait; margin: 8mm; }
+    @page { size: A4 portrait; margin: 15mm; }
     * {
       box-shadow: none !important;
       text-shadow: none !important;
@@ -2788,7 +2788,7 @@ function exportExpenseHTML() {
   .page-shell {
     width: 194mm;
     max-width: 194mm;
-    min-height: 281mm;
+    min-height: 260mm;
     margin: 0 auto;
     background: #ffffff;
     border: none;
@@ -2800,7 +2800,7 @@ function exportExpenseHTML() {
 
   .page-inner {
     padding: 14px 16px 16px;
-    min-height: 281mm;
+    min-height: 260mm;
     display: flex;
     flex-direction: column;
   }
