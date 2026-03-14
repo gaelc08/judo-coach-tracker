@@ -2168,7 +2168,8 @@ function updateSummary() {
     document.getElementById("tollPayment").textContent = "€0.00";
     document.getElementById("hotelPayment").textContent = "€0.00";
     document.getElementById("purchasePayment").textContent = "€0.00";
-    document.getElementById("totalPayment").textContent = "€0.00";
+    document.getElementById("urssafTotalPayment").textContent = "€0.00";
+    document.getElementById("reimbursementTotalPayment").textContent = "€0.00";
     return;
   }
 
@@ -2196,7 +2197,8 @@ function updateSummary() {
   const trainingPayment = isVolunteer ? 0 : totalHours * currentCoach.hourly_rate;
   const compPayment = isVolunteer ? 0 : compDays * currentCoach.daily_allowance;
   const kmPayment = mileageBreakdown.totalAmount;
-  const totalPayment = trainingPayment + compPayment + kmPayment + tollPayment + hotelPayment + purchasePayment;
+  const urssafTotalPayment = trainingPayment + compPayment;
+  const reimbursementTotalPayment = kmPayment + tollPayment + hotelPayment + purchasePayment;
 
   document.getElementById("totalHours").textContent = totalHours.toFixed(1);
   document.getElementById(
@@ -2217,8 +2219,11 @@ function updateSummary() {
   document.getElementById("hotelPayment").textContent = `€${hotelPayment.toFixed(2)}`;
   document.getElementById("purchasePayment").textContent = `€${purchasePayment.toFixed(2)}`;
   document.getElementById(
-    "totalPayment"
-  ).textContent = `€${totalPayment.toFixed(2)}`;
+    "urssafTotalPayment"
+  ).textContent = `€${urssafTotalPayment.toFixed(2)}`;
+  document.getElementById(
+    "reimbursementTotalPayment"
+  ).textContent = `€${reimbursementTotalPayment.toFixed(2)}`;
 }
 
 const __loadExcelJs = loadExcelJs;
@@ -2541,8 +2546,11 @@ function updateCurrentProfileUI() {
     if (el) el.style.display = isVolunteer ? "none" : "";
   });
 
-  const totalLabel = document.getElementById("totalPaymentLabel");
-  if (totalLabel) totalLabel.textContent = isVolunteer ? "Total remboursable" : "Paiement total";
+  const urssafTotalItem = document.getElementById("summaryUrssafTotalItem");
+  if (urssafTotalItem) urssafTotalItem.style.display = isVolunteer ? "none" : "";
+
+  const reimbursementLabel = document.getElementById("reimbursementTotalLabel");
+  if (reimbursementLabel) reimbursementLabel.textContent = isVolunteer ? "Total remboursable" : "Total remboursements";
 
   const exportBtn = document.getElementById("exportBtn");
   if (exportBtn) exportBtn.style.display = isVolunteer ? "none" : "";
