@@ -3156,6 +3156,24 @@ function exportExpenseHTML() {
     }
   }
 </style>
+  /* Force header-text style for relevé d'heures export */
+  .header-text {
+    text-align: center;
+    font-size: 0.72rem;
+    line-height: 1.2;
+  }
+  .header-text h1 {
+    margin: 0 0 4px;
+    font-size: 1.1rem;
+    color: #0f3460;
+    line-height: 1.1;
+  }
+  .header-text p {
+    margin: 1px 0;
+    color: #526274;
+    font-size: 0.72rem;
+    line-height: 1.2;
+  }
 </head>
 <body>
   <div class="page-shell">
