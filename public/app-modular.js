@@ -3499,7 +3499,7 @@ function exportTimesheetHTML() {
       <div class="header">
         <div class="header-brand">
           <div class="header-logo">
-            <img src="${logoUrl}" alt="Judo Club Cattenom-Rodemack" />
+            <img src="${logoUrl}" alt="Logo" crossorigin="anonymous">
           </div>
           <div class="header-text">
             <h1>Judo Club de Cattenom-Rodemack</h1>
