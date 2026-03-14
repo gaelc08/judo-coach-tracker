@@ -9,6 +9,7 @@ import { createAuthNoHangLock, createAuthStorage, detectInviteFlowFromUrlHash } 
 import { publicHolidaysFallback, schoolHolidaysFallback } from './modules/holidays-data.js';
 import { createHolidayService } from './modules/holidays-service.js';
 import { createInviteDebugTools } from './modules/invite-debug.js';
+import { findExistingProfileByEmail, getCoachDisplayName, getCurrentUserDisplayName, getProfileLabel, getProfileType, isVolunteerProfile } from './modules/profile-utils.js';
 import { setupPWA } from './modules/pwa.js';
 import { createRestGateway } from './modules/rest-gateway.js';
 import {
@@ -236,68 +237,26 @@ const __getInviteDebugReport = __inviteDebugTools.getInviteDebugReport;
 const __copyInviteDebugReport = __inviteDebugTools.copyInviteDebugReport;
 __inviteDebugTools.installGlobalDebugApis();
 
-function __getCoachDisplayName(coach) {
-  if (!coach) return '';
-  const firstName = String(coach.first_name || '').trim();
-  const lastName = String(coach.name || '').trim();
-  return [firstName, lastName].filter(Boolean).join(' ').trim();
-}
+const __getCoachDisplayName = getCoachDisplayName;
+const __getProfileType = getProfileType;
+const __isVolunteerProfile = isVolunteerProfile;
+const __getProfileLabel = getProfileLabel;
 
 function __getCurrentUserDisplayName(user, preferredCoach = null) {
-  if (!user) return '';
-
-  const preferredName = __getCoachDisplayName(preferredCoach);
-  if (preferredName) return preferredName;
-
-  const ownedCoach = coaches.find((coach) =>
-    coach?.owner_uid === user.id ||
-    (__normalizeEmail(coach?.email) && __normalizeEmail(coach?.email) === __normalizeEmail(user.email))
-  );
-  const ownedCoachName = __getCoachDisplayName(ownedCoach);
-  if (ownedCoachName) return ownedCoachName;
-
-  const metaFirstName = String(user.user_metadata?.first_name || user.user_metadata?.firstname || '').trim();
-  const metaLastName = String(user.user_metadata?.last_name || user.user_metadata?.lastname || user.user_metadata?.name || '').trim();
-  const metadataName = [metaFirstName, metaLastName].filter(Boolean).join(' ').trim();
-  if (metadataName) return metadataName;
-
-  return String(user.email || '').trim();
-}
-
-function __getProfileType(profileOrType) {
-  const raw = typeof profileOrType === 'string'
-    ? profileOrType
-    : (profileOrType?.profile_type || profileOrType?.role);
-  const normalized = String(raw || 'coach').trim().toLowerCase();
-  return normalized === 'benevole' ? 'benevole' : 'coach';
-}
-
-function __isVolunteerProfile(profileOrType) {
-  return __getProfileType(profileOrType) === 'benevole';
-}
-
-function __getProfileLabel(profileOrType, { capitalized = false, plural = false } = {}) {
-  const type = __getProfileType(profileOrType);
-  let label = plural
-    ? (type === 'benevole' ? 'bénévoles' : 'entraîneurs')
-    : (type === 'benevole' ? 'bénévole' : 'entraîneur');
-
-  if (capitalized) {
-    label = label.charAt(0).toUpperCase() + label.slice(1);
-  }
-
-  return label;
+  return getCurrentUserDisplayName(user, {
+    preferredCoach,
+    coaches,
+    normalizeEmail: __normalizeEmail,
+    getCoachDisplayNameFn: __getCoachDisplayName,
+  });
 }
 
 function __findExistingProfileByEmail(email, { excludeId = null } = {}) {
-  const normalizedEmail = __normalizeEmail(email);
-  if (!normalizedEmail) return null;
-
-  return coaches.find((coach) => {
-    if (!coach) return false;
-    if (excludeId && coach.id === excludeId) return false;
-    return __normalizeEmail(coach.email) === normalizedEmail;
-  }) || null;
+  return findExistingProfileByEmail(email, {
+    excludeId,
+    coaches,
+    normalizeEmail: __normalizeEmail,
+  });
 }
 
 const __MILEAGE_SCALE = {
