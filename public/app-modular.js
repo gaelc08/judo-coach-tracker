@@ -5,6 +5,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { BUILD_ID as __BUILD_ID, effectiveEnv as __effectiveEnv, supabaseKey, supabaseUrl } from './modules/env.js';
 import { auditMatchesCurrentCoach, formatAuditDateTime, formatAuditDetails, getAuditActionGroup } from './modules/audit-ui.js';
 import { isAdminViaLocalClaims, isAdminViaRest } from './modules/auth-admin.js';
+import { createAuditController } from './modules/audit-controller.js';
 import { createAuthNoHangLock, createAuthStorage, detectInviteFlowFromUrlHash } from './modules/auth-runtime.js';
 import { currencyDisplay, numberDisplay } from './modules/display-format.js';
 import { blobToDataUrl, downloadBlob, isStandaloneApp, loadExcelJs } from './modules/export-runtime.js';
@@ -288,80 +289,34 @@ async function notifyAdminAlert(coachName, date, data) {
   }
 }
 
+const __auditController = createAuditController({
+  getAuditLogs: () => auditLogs,
+  setAuditLogs: (nextRows) => { auditLogs = nextRows; },
+  getCurrentCoach: () => currentCoach,
+  getCurrentMonth: () => currentMonth,
+  restSelect: __restSelect,
+  isAdminForUi: __isAdminForUi,
+  escapeHtml: __escapeHtml,
+  formatAuditDateTime,
+  formatAuditDetails,
+  getAuditActionGroup,
+  auditMatchesCurrentCoach,
+  normalizeEmail: __normalizeEmail,
+  normalizeMonth: __normalizeMonth,
+  getElementById: (id) => document.getElementById(id),
+  alertFn: (message) => alert(message),
+});
+
 function renderAuditLogs() {
-  const body = document.getElementById('auditLogsTableBody');
-  const status = document.getElementById('auditLogsStatus');
-  const filter = document.getElementById('auditActionFilter')?.value || 'all';
-  const currentCoachOnly = !!document.getElementById('auditCurrentCoachOnly')?.checked;
-
-  if (!body || !status) return;
-
-  let rows = [...auditLogs];
-  if (filter !== 'all') {
-    rows = rows.filter((row) => getAuditActionGroup(row.action) === filter);
-  }
-  if (currentCoachOnly) {
-    rows = rows.filter((row) => auditMatchesCurrentCoach(row, {
-      currentCoach,
-      currentMonth,
-      normalizeEmail: __normalizeEmail,
-      normalizeMonth: __normalizeMonth,
-    }));
-  }
-
-  status.textContent = `${rows.length} action(s) affichée(s)`;
-
-  if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="5" class="audit-empty">Aucune action trouvée.</td></tr>';
-    return;
-  }
-
-  body.innerHTML = rows.map((row) => {
-    const actor = row.actor_email || row.actor_uid || '—';
-    const target = row.target_email || row.target_user_id || row.entity_id || '—';
-    return `
-      <tr>
-        <td>${__escapeHtml(formatAuditDateTime(row.created_at))}</td>
-        <td><span class="audit-badge">${__escapeHtml(row.action || '—')}</span></td>
-        <td>${__escapeHtml(actor)}</td>
-        <td>${__escapeHtml(target)}</td>
-        <td>${formatAuditDetails(row, { escapeHtml: __escapeHtml })}</td>
-      </tr>
-    `;
-  }).join('');
+  return __auditController.renderAuditLogs();
 }
 
 async function loadAuditLogs() {
-  const status = document.getElementById('auditLogsStatus');
-  if (status) status.textContent = 'Chargement…';
-
-  const res = await __restSelect('audit_logs', {
-    order: { column: 'created_at', direction: 'desc' },
-    limit: 250,
-  });
-
-  if (res.error) {
-    if (status) status.textContent = `Erreur : ${res.error.message}`;
-    auditLogs = [];
-    renderAuditLogs();
-    return;
-  }
-
-  auditLogs = (res.data || []).map((row) => ({
-    ...row,
-    metadata: row.metadata && typeof row.metadata === 'object' ? row.metadata : {},
-  }));
-  renderAuditLogs();
+  return await __auditController.loadAuditLogs();
 }
 
 async function openAuditLogsModal() {
-  if (!__isAdminForUi()) {
-    alert("Seul l'administrateur peut consulter l'historique.");
-    return;
-  }
-
-  document.getElementById('auditLogsModal')?.classList.add('active');
-  await loadAuditLogs();
+  return await __auditController.openAuditLogsModal();
 }
 
 // ===== Holiday data (dynamically fetched, with static fallback) =====
