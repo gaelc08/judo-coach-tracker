@@ -5,6 +5,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { BUILD_ID as __BUILD_ID, effectiveEnv as __effectiveEnv, supabaseKey, supabaseUrl } from './modules/env.js';
 import { auditMatchesCurrentCoach, formatAuditDateTime, formatAuditDetails, getAuditActionGroup } from './modules/audit-ui.js';
 import { isAdminViaLocalClaims, isAdminViaRest } from './modules/auth-admin.js';
+import { createAuthNoHangLock, createAuthStorage, detectInviteFlowFromUrlHash } from './modules/auth-runtime.js';
 import { publicHolidaysFallback, schoolHolidaysFallback } from './modules/holidays-data.js';
 import { createHolidayService } from './modules/holidays-service.js';
 import { setupPWA } from './modules/pwa.js';
@@ -161,96 +162,15 @@ async function debugSupabaseHealthFetch() {
 // ===== Auth storage override (avoid getSession/storage lock hangs) =====
 // Prefer persistent localStorage so invite / password-reset sessions survive a
 // reload, but fall back to in-memory storage if Web Storage is unavailable.
-const __authStorage = (() => {
-  const store = new Map();
-  let persistentStorage = null;
-
-  try {
-    const probeKey = '__judo_coach_tracker_auth_probe__';
-    window.localStorage.setItem(probeKey, '1');
-    window.localStorage.removeItem(probeKey);
-    persistentStorage = window.localStorage;
-  } catch (_) {
-    persistentStorage = null;
-  }
-
-  return {
-    getItem: (key) => {
-      try {
-        const value = persistentStorage?.getItem(key);
-        if (value != null) return value;
-      } catch (_) {
-        persistentStorage = null;
-      }
-      return store.has(key) ? store.get(key) : null;
-    },
-    setItem: (key, value) => {
-      const normalized = String(value);
-      try {
-        persistentStorage?.setItem(key, normalized);
-      } catch (_) {
-        persistentStorage = null;
-      }
-      store.set(key, normalized);
-    },
-    removeItem: (key) => {
-      try {
-        persistentStorage?.removeItem(key);
-      } catch (_) {
-        persistentStorage = null;
-      }
-      store.delete(key);
-    }
-  };
-})();
+const __authStorage = createAuthStorage();
 
 // Custom lock implementation to avoid Web Locks API hangs.
 // Signature varies by gotrue-js version; we accept (name, fn) or (name, acquireTimeout, fn).
-const __authNoHangLock = async (...args) => {
-  const lockName = String(args?.[0] ?? '');
-  const maybeFn = args[args.length - 1];
-  const fn = (typeof maybeFn === 'function') ? maybeFn : null;
-  const timeoutMs = (typeof args?.[1] === 'number' && args.length >= 3) ? args[1] : 2500;
-  const startedAt = performance.now();
-
-  if (!fn) {
-    console.warn('DEBUG auth.lock called without fn', args);
-    return undefined;
-  }
-
-  console.log('DEBUG auth.lock ->', lockName, `timeout=${timeoutMs}`);
-  try {
-    const fnPromise = Promise.resolve().then(() => fn());
-    const timeoutToken = Symbol('auth.lock.timeout');
-    const raced = await Promise.race([
-      fnPromise,
-      new Promise((resolve) => setTimeout(() => resolve(timeoutToken), timeoutMs))
-    ]);
-
-    if (raced === timeoutToken) {
-      console.warn('DEBUG auth.lock TIMEOUT (returning undefined):', lockName);
-      return undefined;
-    }
-
-    console.log('DEBUG auth.lock <-', lockName, `${Math.round(performance.now() - startedAt)}ms`);
-    return raced;
-  } catch (e) {
-    console.error('DEBUG auth.lock error:', lockName, e);
-    // Fail-open: let callers continue.
-    return undefined;
-  }
-};
+const __authNoHangLock = createAuthNoHangLock({ logger: console });
 
 // Detect invite flow from URL before createClient's detectSessionInUrl consumes the hash.
 // Supabase appends `type=invite` to the URL fragment when the user follows an invitation link.
-let __inviteFlowActive = (() => {
-  try {
-    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-    return hashParams.get('type') === 'invite';
-  } catch {
-    return false;
-  }
-})();
+let __inviteFlowActive = detectInviteFlowFromUrlHash(window.location.hash);
 if (__inviteFlowActive) {
   console.log('DEBUG invite flow detected from URL hash');
 }
