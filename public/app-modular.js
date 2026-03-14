@@ -2,57 +2,35 @@
 // Uses Supabase JS SDK
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { BUILD_ID as __BUILD_ID, effectiveEnv as __effectiveEnv, supabaseKey, supabaseUrl } from './modules/env.js';
+import { auditMatchesCurrentCoach, formatAuditDateTime, formatAuditDetails, getAuditActionGroup } from './modules/audit-ui.js';
+import { isAdminViaLocalClaims, isAdminViaRest } from './modules/auth-admin.js';
+import { createAuditController } from './modules/audit-controller.js';
+import { createAuthNoHangLock, createAuthStorage, detectInviteFlowFromUrlHash } from './modules/auth-runtime.js';
+import { currencyDisplay, numberDisplay } from './modules/display-format.js';
+import { blobToDataUrl, downloadBlob, isStandaloneApp, loadExcelJs } from './modules/export-runtime.js';
+import { publicHolidaysFallback, schoolHolidaysFallback } from './modules/holidays-data.js';
+import { createHolidayService } from './modules/holidays-service.js';
+import { createInviteDebugTools } from './modules/invite-debug.js';
+import { calculateAnnualMileageAmount, formatNumberFr, getLegacyKmRateFromFiscalPower, getMileageScaleBand, getMileageScaleDescription, getMileageYearBreakdown, getMonthlyMileageBreakdown, parseFiscalPower } from './modules/mileage-service.js';
+import { findExistingProfileByEmail, getCoachDisplayName, getCurrentUserDisplayName, getProfileLabel, getProfileType, isVolunteerProfile } from './modules/profile-utils.js';
+import { setupPWA } from './modules/pwa.js';
+import { createRestGateway } from './modules/rest-gateway.js';
+import {
+  __decodeJwtPayload,
+  __describeJwt,
+  __escapeHtml,
+  __hasAdminClaim,
+  __maskEmail,
+  __normalizeEmail,
+  __normalizeMonth,
+  __safeBase64UrlDecode,
+  __toAuditJson,
+} from './modules/shared-utils.js';
 
 // ----- Supabase config -----
-const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
-const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
-
-// Bump this string when deploying to confirm the browser loaded the latest JS.
-const __BUILD_ID = '2026-03-13-features-2';
+// Bump this string in modules/env.js when deploying to confirm the browser loaded the latest JS.
 console.log('DEBUG BUILD:', __BUILD_ID);
-
-let __deferredInstallPrompt = null;
-
-function setupPWA() {
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', async () => {
-      try {
-        const swUrl = new URL('sw.js', window.location.href);
-        const scopeUrl = new URL('./', window.location.href);
-        const reg = await navigator.serviceWorker.register(swUrl.href, {
-          scope: scopeUrl.pathname
-        });
-        console.log('DEBUG service worker registered:', reg.scope);
-      } catch (e) {
-        console.warn('DEBUG service worker registration failed:', e);
-      }
-    });
-  }
-
-  const installBtn = document.getElementById('installAppBtn');
-  if (!installBtn) return;
-
-  window.addEventListener('beforeinstallprompt', (event) => {
-    event.preventDefault();
-    __deferredInstallPrompt = event;
-    installBtn.style.display = 'inline-block';
-  });
-
-  window.addEventListener('appinstalled', () => {
-    __deferredInstallPrompt = null;
-    installBtn.style.display = 'none';
-  });
-
-  installBtn.addEventListener('click', async () => {
-    if (!__deferredInstallPrompt) return;
-    __deferredInstallPrompt.prompt();
-    try {
-      await __deferredInstallPrompt.userChoice;
-    } catch {}
-    __deferredInstallPrompt = null;
-    installBtn.style.display = 'none';
-  });
-}
 
 // ===== Network debug (Supabase requests) =====
 // We pass a custom fetch into createClient so requests can't bypass our logs.
@@ -190,96 +168,15 @@ async function debugSupabaseHealthFetch() {
 // ===== Auth storage override (avoid getSession/storage lock hangs) =====
 // Prefer persistent localStorage so invite / password-reset sessions survive a
 // reload, but fall back to in-memory storage if Web Storage is unavailable.
-const __authStorage = (() => {
-  const store = new Map();
-  let persistentStorage = null;
-
-  try {
-    const probeKey = '__judo_coach_tracker_auth_probe__';
-    window.localStorage.setItem(probeKey, '1');
-    window.localStorage.removeItem(probeKey);
-    persistentStorage = window.localStorage;
-  } catch (_) {
-    persistentStorage = null;
-  }
-
-  return {
-    getItem: (key) => {
-      try {
-        const value = persistentStorage?.getItem(key);
-        if (value != null) return value;
-      } catch (_) {
-        persistentStorage = null;
-      }
-      return store.has(key) ? store.get(key) : null;
-    },
-    setItem: (key, value) => {
-      const normalized = String(value);
-      try {
-        persistentStorage?.setItem(key, normalized);
-      } catch (_) {
-        persistentStorage = null;
-      }
-      store.set(key, normalized);
-    },
-    removeItem: (key) => {
-      try {
-        persistentStorage?.removeItem(key);
-      } catch (_) {
-        persistentStorage = null;
-      }
-      store.delete(key);
-    }
-  };
-})();
+const __authStorage = createAuthStorage();
 
 // Custom lock implementation to avoid Web Locks API hangs.
 // Signature varies by gotrue-js version; we accept (name, fn) or (name, acquireTimeout, fn).
-const __authNoHangLock = async (...args) => {
-  const lockName = String(args?.[0] ?? '');
-  const maybeFn = args[args.length - 1];
-  const fn = (typeof maybeFn === 'function') ? maybeFn : null;
-  const timeoutMs = (typeof args?.[1] === 'number' && args.length >= 3) ? args[1] : 2500;
-  const startedAt = performance.now();
-
-  if (!fn) {
-    console.warn('DEBUG auth.lock called without fn', args);
-    return undefined;
-  }
-
-  console.log('DEBUG auth.lock ->', lockName, `timeout=${timeoutMs}`);
-  try {
-    const fnPromise = Promise.resolve().then(() => fn());
-    const timeoutToken = Symbol('auth.lock.timeout');
-    const raced = await Promise.race([
-      fnPromise,
-      new Promise((resolve) => setTimeout(() => resolve(timeoutToken), timeoutMs))
-    ]);
-
-    if (raced === timeoutToken) {
-      console.warn('DEBUG auth.lock TIMEOUT (returning undefined):', lockName);
-      return undefined;
-    }
-
-    console.log('DEBUG auth.lock <-', lockName, `${Math.round(performance.now() - startedAt)}ms`);
-    return raced;
-  } catch (e) {
-    console.error('DEBUG auth.lock error:', lockName, e);
-    // Fail-open: let callers continue.
-    return undefined;
-  }
-};
+const __authNoHangLock = createAuthNoHangLock({ logger: console });
 
 // Detect invite flow from URL before createClient's detectSessionInUrl consumes the hash.
 // Supabase appends `type=invite` to the URL fragment when the user follows an invitation link.
-let __inviteFlowActive = (() => {
-  try {
-    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-    return hashParams.get('type') === 'invite';
-  } catch {
-    return false;
-  }
-})();
+let __inviteFlowActive = detectInviteFlowFromUrlHash(window.location.hash);
 if (__inviteFlowActive) {
   console.log('DEBUG invite flow detected from URL hash');
 }
@@ -314,422 +211,71 @@ let currentAccessToken = null;
 let __eventListenersSetup = false;
 let auditLogs = [];
 
-function __safeBase64UrlDecode(value) {
-  const normalized = String(value || '').replace(/-/g, '+').replace(/_/g, '/');
-  const remainder = normalized.length % 4;
-  const padLength = remainder === 0 ? 0 : 4 - remainder;
-  const padded = normalized + '='.repeat(padLength);
-  return window.atob(padded);
-}
+const __restGateway = createRestGateway({
+  supabaseUrl,
+  supabaseKey,
+  getAccessToken: () => currentAccessToken,
+  getCurrentUser: () => currentUser,
+  normalizeEmail: __normalizeEmail,
+  toAuditJson: __toAuditJson,
+  fetchImpl: globalThis.fetch?.bind(globalThis),
+  logger: console,
+});
 
-function __maskEmail(email) {
-  if (email == null) return null;
-  const value = String(email).trim();
-  if (!value) return null;
-  const atIndex = value.indexOf('@');
-  if (atIndex <= 0) return '[invalid-email]';
+const __coachWriteViaRest = __restGateway.coachWriteViaRest;
+const __restSelect = __restGateway.restSelect;
+const __logAuditEvent = __restGateway.logAuditEvent;
 
-  const local = value.slice(0, atIndex);
-  const domain = value.slice(atIndex + 1);
-  const maskedLocal = local.length <= 2
-    ? `${local[0]}${'*'.repeat(Math.max(local.length - 1, 0))}`
-    : `${local[0]}${'*'.repeat(Math.max(local.length - 2, 1))}${local.slice(-1)}`;
+const __inviteDebugTools = createInviteDebugTools({
+  buildId: __BUILD_ID,
+  maskEmail: __maskEmail,
+  describeJwt: __describeJwt,
+  getCurrentUser: () => currentUser,
+  getCurrentSession: () => currentSession,
+  getCurrentAccessToken: () => currentAccessToken,
+  getInviteDebugLast: () => window.__inviteDebugLast || null,
+});
 
-  return `${maskedLocal}@${domain}`;
-}
+const __collectInviteDebug = __inviteDebugTools.collectInviteDebug;
+const __getInviteDebugReport = __inviteDebugTools.getInviteDebugReport;
+const __copyInviteDebugReport = __inviteDebugTools.copyInviteDebugReport;
+__inviteDebugTools.installGlobalDebugApis();
 
-function __normalizeEmail(email) {
-  const value = String(email || '').trim().toLowerCase();
-  return value || null;
-}
-
-function __decodeJwtPayload(token) {
-  const parts = String(token || '').split('.');
-  if (parts.length < 2) return null;
-  try {
-    return JSON.parse(__safeBase64UrlDecode(parts[1]));
-  } catch {
-    return null;
-  }
-}
-
-function __describeJwt(token) {
-  const value = String(token || '').trim();
-  if (!value) {
-    return { present: false };
-  }
-
-  const payload = __decodeJwtPayload(value);
-  const expMs = typeof payload?.exp === 'number' ? payload.exp * 1000 : null;
-
-  return {
-    present: true,
-    length: value.length,
-    segments: value.split('.').length,
-    sub: payload?.sub || null,
-    email: __maskEmail(payload?.email),
-    appMetadataIsAdmin: payload?.app_metadata?.is_admin ?? null,
-    role: payload?.role || null,
-    aud: payload?.aud || null,
-    iss: payload?.iss || null,
-    exp: payload?.exp ?? null,
-    expIso: expMs ? new Date(expMs).toISOString() : null,
-    expired: expMs ? expMs <= Date.now() : null
-  };
-}
-
-function __hasAdminClaim(token) {
-  const isAdmin = __decodeJwtPayload(token)?.app_metadata?.is_admin;
-  return isAdmin === true || isAdmin === 'true';
-}
-
-function __collectInviteDebug({ token = currentAccessToken, inviteEmail, ...extra } = {}) {
-  return {
-    buildId: __BUILD_ID,
-    href: window.location.href,
-    currentUserId: currentUser?.id || null,
-    currentUserEmail: __maskEmail(currentUser?.email),
-    currentSessionUserId: currentSession?.user?.id || null,
-    currentSessionEmail: __maskEmail(currentSession?.user?.email),
-    sessionExpiresAt: currentSession?.expires_at || null,
-    jwt: __describeJwt(token),
-    ...extra,
-    inviteEmail: __maskEmail(inviteEmail)
-  };
-}
-
-function __getInviteDebugReport() {
-  return [
-    '=== INVITE DEBUG REPORT START ===',
-    JSON.stringify({
-      generatedAt: new Date().toISOString(),
-      debug: window.__inviteDebugLast || null
-    }, null, 2),
-    '=== INVITE DEBUG REPORT END ==='
-  ].join('\n');
-}
-
-async function __copyInviteDebugReport() {
-  const report = __getInviteDebugReport();
-  if (navigator.clipboard?.writeText) {
-    try {
-      await navigator.clipboard.writeText(report);
-    } catch (e) {
-      console.warn('DEBUG invite report clipboard copy failed:', e);
-    }
-  }
-  return report;
-}
-
-window.__getInviteDebugReport = __getInviteDebugReport;
-window.__copyInviteDebugReport = __copyInviteDebugReport;
-
-function __normalizeMonth(value) {
-  const s = String(value ?? '').trim();
-  return /^\d{4}-\d{2}/.test(s) ? s.slice(0, 7) : s;
-}
-
-function __getCoachDisplayName(coach) {
-  if (!coach) return '';
-  const firstName = String(coach.first_name || '').trim();
-  const lastName = String(coach.name || '').trim();
-  return [firstName, lastName].filter(Boolean).join(' ').trim();
-}
+const __getCoachDisplayName = getCoachDisplayName;
+const __getProfileType = getProfileType;
+const __isVolunteerProfile = isVolunteerProfile;
+const __getProfileLabel = getProfileLabel;
 
 function __getCurrentUserDisplayName(user, preferredCoach = null) {
-  if (!user) return '';
-
-  const preferredName = __getCoachDisplayName(preferredCoach);
-  if (preferredName) return preferredName;
-
-  const ownedCoach = coaches.find((coach) =>
-    coach?.owner_uid === user.id ||
-    (__normalizeEmail(coach?.email) && __normalizeEmail(coach?.email) === __normalizeEmail(user.email))
-  );
-  const ownedCoachName = __getCoachDisplayName(ownedCoach);
-  if (ownedCoachName) return ownedCoachName;
-
-  const metaFirstName = String(user.user_metadata?.first_name || user.user_metadata?.firstname || '').trim();
-  const metaLastName = String(user.user_metadata?.last_name || user.user_metadata?.lastname || user.user_metadata?.name || '').trim();
-  const metadataName = [metaFirstName, metaLastName].filter(Boolean).join(' ').trim();
-  if (metadataName) return metadataName;
-
-  return String(user.email || '').trim();
-}
-
-function __getProfileType(profileOrType) {
-  const raw = typeof profileOrType === 'string'
-    ? profileOrType
-    : (profileOrType?.profile_type || profileOrType?.role);
-  const normalized = String(raw || 'coach').trim().toLowerCase();
-  return normalized === 'benevole' ? 'benevole' : 'coach';
-}
-
-function __isVolunteerProfile(profileOrType) {
-  return __getProfileType(profileOrType) === 'benevole';
-}
-
-function __getProfileLabel(profileOrType, { capitalized = false, plural = false } = {}) {
-  const type = __getProfileType(profileOrType);
-  let label = plural
-    ? (type === 'benevole' ? 'bénévoles' : 'entraîneurs')
-    : (type === 'benevole' ? 'bénévole' : 'entraîneur');
-
-  if (capitalized) {
-    label = label.charAt(0).toUpperCase() + label.slice(1);
-  }
-
-  return label;
+  return getCurrentUserDisplayName(user, {
+    preferredCoach,
+    coaches,
+    normalizeEmail: __normalizeEmail,
+    getCoachDisplayNameFn: __getCoachDisplayName,
+  });
 }
 
 function __findExistingProfileByEmail(email, { excludeId = null } = {}) {
-  const normalizedEmail = __normalizeEmail(email);
-  if (!normalizedEmail) return null;
-
-  return coaches.find((coach) => {
-    if (!coach) return false;
-    if (excludeId && coach.id === excludeId) return false;
-    return __normalizeEmail(coach.email) === normalizedEmail;
-  }) || null;
+  return findExistingProfileByEmail(email, {
+    excludeId,
+    coaches,
+    normalizeEmail: __normalizeEmail,
+  });
 }
 
-const __MILEAGE_SCALE = {
-  3: { upTo5000: 0.529, midRate: 0.316, midFixed: 1065, over20000: 0.37 },
-  4: { upTo5000: 0.606, midRate: 0.34, midFixed: 1330, over20000: 0.407 },
-  5: { upTo5000: 0.636, midRate: 0.357, midFixed: 1395, over20000: 0.427 },
-  6: { upTo5000: 0.665, midRate: 0.374, midFixed: 1457, over20000: 0.447 },
-  7: { upTo5000: 0.697, midRate: 0.394, midFixed: 1515, over20000: 0.47 },
-};
-
-function __parseFiscalPower(value) {
-  const parsed = Number.parseInt(String(value ?? '').trim(), 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-}
-
-function __getMileageScaleBand(fiscalPower) {
-  const parsed = __parseFiscalPower(fiscalPower);
-  if (!parsed) return null;
-  if (parsed <= 3) return 3;
-  if (parsed >= 7) return 7;
-  return parsed;
-}
-
-function __getLegacyKmRateFromFiscalPower(fiscalPower) {
-  const band = __getMileageScaleBand(fiscalPower);
-  return band ? __MILEAGE_SCALE[band].upTo5000 : 0;
-}
-
-function __formatNumberFr(value, digits = 3) {
-  return Number(value || 0).toFixed(digits).replace('.', ',');
-}
-
-function __getMileageScaleDescription(fiscalPower) {
-  const band = __getMileageScaleBand(fiscalPower);
-  if (!band) return 'Barème non disponible';
-
-  const scale = __MILEAGE_SCALE[band];
-  const bandLabel = band === 3 ? '3 CV et moins' : (band === 7 ? '7 CV et plus' : `${band} CV`);
-  return `${bandLabel} — jusqu'à 5 000 km : ${__formatNumberFr(scale.upTo5000)} €/km`;
-}
-
-function __calculateAnnualMileageAmount(distanceKm, fiscalPower) {
-  const distance = Math.max(0, Number(distanceKm) || 0);
-  const band = __getMileageScaleBand(fiscalPower);
-  if (!distance || !band) return 0;
-
-  const scale = __MILEAGE_SCALE[band];
-  if (distance <= 5000) return distance * scale.upTo5000;
-  if (distance <= 20000) return distance * scale.midRate + scale.midFixed;
-  return distance * scale.over20000;
-}
+const __parseFiscalPower = parseFiscalPower;
+const __getMileageScaleBand = getMileageScaleBand;
+const __getLegacyKmRateFromFiscalPower = getLegacyKmRateFromFiscalPower;
+const __formatNumberFr = formatNumberFr;
+const __getMileageScaleDescription = getMileageScaleDescription;
+const __calculateAnnualMileageAmount = calculateAnnualMileageAmount;
 
 function __getMileageYearBreakdown(coach, year) {
-  const breakdown = {
-    byKey: {},
-    totalKm: 0,
-    usesLegalScale: Boolean(__getMileageScaleBand(coach?.fiscal_power)),
-  };
-
-  if (!coach?.id || !year) return breakdown;
-
-  const fiscalPower = __parseFiscalPower(coach.fiscal_power);
-  const fallbackKmRate = Number(coach.km_rate) || 0;
-  let cumulativeKm = 0;
-
-  Object.keys(timeData)
-    .filter((key) => key.startsWith(`${coach.id}-${year}-`))
-    .sort()
-    .forEach((key) => {
-      const data = timeData[key] || {};
-      const km = Math.max(0, Number(data.km) || 0);
-      const previousKm = cumulativeKm;
-      cumulativeKm += km;
-
-      const amount = fiscalPower
-        ? __calculateAnnualMileageAmount(cumulativeKm, fiscalPower) - __calculateAnnualMileageAmount(previousKm, fiscalPower)
-        : km * fallbackKmRate;
-
-      breakdown.byKey[key] = {
-        km,
-        amount,
-        cumulativeKmBefore: previousKm,
-        cumulativeKmAfter: cumulativeKm,
-        effectiveRate: km > 0 ? amount / km : 0,
-      };
-    });
-
-  breakdown.totalKm = cumulativeKm;
-  breakdown.usesLegalScale = Boolean(fiscalPower);
-  return breakdown;
+  return getMileageYearBreakdown(coach, year, { timeData });
 }
 
 function __getMonthlyMileageBreakdown(coach, monthValue) {
-  if (!coach || !monthValue) {
-    return { totalKm: 0, totalAmount: 0, byKey: {}, usesLegalScale: false };
-  }
-
-  const [year, month] = monthValue.split('-');
-  const yearBreakdown = __getMileageYearBreakdown(coach, year);
-  const byKey = {};
-  let totalKm = 0;
-  let totalAmount = 0;
-
-  Object.entries(yearBreakdown.byKey).forEach(([key, value]) => {
-    if (!key.startsWith(`${coach.id}-${year}-${month}`)) return;
-    byKey[key] = value;
-    totalKm += value.km;
-    totalAmount += value.amount;
-  });
-
-  return {
-    totalKm,
-    totalAmount,
-    byKey,
-    usesLegalScale: yearBreakdown.usesLegalScale,
-  };
-}
-
-async function __coachWriteViaRest(coachData, { editingId = null } = {}) {
-  if (!currentAccessToken) {
-    return {
-      data: null,
-      error: { message: 'No access token available (not logged in yet?)' },
-      status: 0,
-      statusText: 'NO_TOKEN'
-    };
-  }
-
-  const isUpdate = !!editingId;
-  const baseUrl = `${supabaseUrl}/rest/v1/users`;
-  const url = isUpdate
-    ? `${baseUrl}?id=eq.${encodeURIComponent(editingId)}`
-    : baseUrl;
-
-  const method = isUpdate ? 'PATCH' : 'POST';
-
-  try {
-    const res = await globalThis.fetch(url, {
-      method,
-      headers: {
-        apikey: supabaseKey,
-        Authorization: `Bearer ${currentAccessToken}`,
-        'Content-Type': 'application/json',
-        Prefer: 'return=representation'
-      },
-      body: JSON.stringify(coachData)
-    });
-
-    const text = await res.text();
-    let json = null;
-    try {
-      json = text ? JSON.parse(text) : null;
-    } catch {
-      json = null;
-    }
-
-    if (!res.ok) {
-      const message = (json && (json.message || json.error_description || json.error))
-        ? (json.message || json.error_description || json.error)
-        : (text || `${res.status} ${res.statusText}`);
-      return { data: null, error: { message }, status: res.status, statusText: res.statusText };
-    }
-
-    return { data: Array.isArray(json) ? json : (json ? [json] : []), error: null, status: res.status, statusText: res.statusText };
-  } catch (e) {
-    return { data: null, error: { message: e?.message || String(e) }, status: 0, statusText: 'FETCH_ERROR' };
-  }
-}
-
-async function __restSelect(table, { select = '*', filters = [], order = null, limit = null } = {}) {
-  if (!currentAccessToken) {
-    return {
-      data: null,
-      error: { message: 'No access token available' },
-      status: 0,
-      statusText: 'NO_TOKEN'
-    };
-  }
-
-  const urlObj = new URL(`${supabaseUrl}/rest/v1/${table}`);
-  urlObj.searchParams.set('select', select);
-  for (const [col, op, value] of filters) {
-    urlObj.searchParams.set(col, `${op}.${value}`);
-  }
-  if (order?.column) {
-    const direction = String(order.direction || 'asc').toLowerCase() === 'desc' ? 'desc' : 'asc';
-    urlObj.searchParams.set('order', `${order.column}.${direction}`);
-  }
-  if (Number.isFinite(limit) && Number(limit) > 0) {
-    urlObj.searchParams.set('limit', String(limit));
-  }
-  const url = urlObj.toString();
-
-  try {
-    const res = await globalThis.fetch(url, {
-      headers: {
-        apikey: supabaseKey,
-        Authorization: `Bearer ${currentAccessToken}`
-      }
-    });
-    const text = await res.text();
-    let json = null;
-    try { json = text ? JSON.parse(text) : null; } catch { json = null; }
-
-    if (!res.ok) {
-      const message = (json && (json.message || json.error_description || json.error))
-        ? (json.message || json.error_description || json.error)
-        : (text || `${res.status} ${res.statusText}`);
-      return { data: null, error: { message }, status: res.status, statusText: res.statusText };
-    }
-
-    return { data: Array.isArray(json) ? json : (json ? [json] : []), error: null, status: res.status, statusText: res.statusText };
-  } catch (e) {
-    return { data: null, error: { message: e?.message || String(e) }, status: 0, statusText: 'FETCH_ERROR' };
-  }
-}
-
-function __toAuditJson(value) {
-  if (value == null) return null;
-  if (value instanceof Date) return value.toISOString();
-  if (value instanceof File) {
-    return {
-      name: value.name || null,
-      size: Number(value.size) || 0,
-      type: value.type || null,
-    };
-  }
-  if (Array.isArray(value)) {
-    return value.map((item) => __toAuditJson(item));
-  }
-  if (typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value)
-        .filter(([, entry]) => typeof entry !== 'function' && entry !== undefined)
-        .map(([key, entry]) => [key, __toAuditJson(entry)])
-    );
-  }
-  if (['string', 'number', 'boolean'].includes(typeof value)) return value;
-  return String(value);
+  return getMonthlyMileageBreakdown(coach, monthValue, { timeData });
 }
 
 async function notifyAdminAlert(coachName, date, data) {
@@ -743,311 +289,63 @@ async function notifyAdminAlert(coachName, date, data) {
   }
 }
 
-
-async function __logAuditEvent(action, entityType, {
-  entityId = null,
-  targetUserId = null,
-  targetEmail = null,
-  metadata = {},
-} = {}) {
-    if (!currentUser || !currentAccessToken) return null;
-
-    try {
-      const resp = await fetch(`${supabaseUrl}/rest/v1/rpc/log_audit_event`, {
-        method: 'POST',
-        headers: {
-          'apikey': supabaseKey,
-          'Authorization': `Bearer ${currentAccessToken}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal'
-        },
-        body: JSON.stringify({
-          p_action: String(action || '').trim(),
-          p_entity_type: String(entityType || '').trim(),
-          p_entity_id: entityId == null ? null : String(entityId),
-          p_target_user_id: targetUserId || null,
-          p_target_email: __normalizeEmail(targetEmail) || (targetEmail ? String(targetEmail) : null),
-          p_metadata: __toAuditJson(metadata || {}),
-        })
-      });
-      if (!resp.ok) {
-        throw new Error(`Failed to log audit event: ${resp.status}`);
-      }
-    } catch (e) {
-      console.warn('DEBUG audit log failed:', action, e);
-    }
-
-    return null;
-  }
-
-function __escapeHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function __formatAuditDateTime(value) {
-  if (!value) return '—';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  return date.toLocaleString('fr-FR');
-}
-
-function __getAuditActionGroup(action) {
-  const value = String(action || '').toLowerCase();
-  if (value.startsWith('profile.')) return 'profile';
-  if (value.startsWith('time_data.')) return 'time_data';
-  if (value.startsWith('timesheet.')) return 'timesheet';
-  if (value.startsWith('export.')) return 'export';
-  if (value.startsWith('invite.') || value.startsWith('auth_user.')) return 'invite';
-  return 'other';
-}
-
-function __auditMatchesCurrentCoach(row) {
-  if (!currentCoach) return true;
-  const metadata = row?.metadata || {};
-  const currentCoachEmail = __normalizeEmail(currentCoach.email);
-  return (
-    metadata?.coach_id === currentCoach.id
-    || row?.entity_id === currentCoach.id
-    || row?.entity_id === `${currentCoach.id}-${__normalizeMonth(currentMonth)}`
-    || (currentCoach.owner_uid && row?.target_user_id === currentCoach.owner_uid)
-    || (__normalizeEmail(row?.target_email) && __normalizeEmail(row?.target_email) === currentCoachEmail)
-  );
-}
-
-function __formatAuditDetails(row) {
-  const metadata = row?.metadata || {};
-  const entries = [];
-
-  if (metadata.coach_name) entries.push(`Profil : ${metadata.coach_name}`);
-  if (metadata.month) entries.push(`Mois : ${metadata.month}`);
-  if (metadata.date) entries.push(`Date : ${metadata.date}`);
-  if (metadata.rows_inserted != null) entries.push(`Lignes : ${metadata.rows_inserted}`);
-  if (metadata.total_amount != null) entries.push(`Montant : ${Number(metadata.total_amount).toFixed(2)} €`);
-  if (metadata.requestId) entries.push(`Ref : ${metadata.requestId}`);
-
-  if (!entries.length) {
-    const keys = Object.keys(metadata).slice(0, 3);
-    keys.forEach((key) => entries.push(`${key} : ${metadata[key]}`));
-  }
-
-  return entries.length
-    ? `<div class="audit-meta">${entries.map((entry) => `<span class="audit-meta-item">${__escapeHtml(entry)}</span>`).join('')}</div>`
-    : '<span class="audit-empty">—</span>';
-}
+const __auditController = createAuditController({
+  getAuditLogs: () => auditLogs,
+  setAuditLogs: (nextRows) => { auditLogs = nextRows; },
+  getCurrentCoach: () => currentCoach,
+  getCurrentMonth: () => currentMonth,
+  restSelect: __restSelect,
+  isAdminForUi: __isAdminForUi,
+  escapeHtml: __escapeHtml,
+  formatAuditDateTime,
+  formatAuditDetails,
+  getAuditActionGroup,
+  auditMatchesCurrentCoach,
+  normalizeEmail: __normalizeEmail,
+  normalizeMonth: __normalizeMonth,
+  getElementById: (id) => document.getElementById(id),
+  alertFn: (message) => alert(message),
+});
 
 function renderAuditLogs() {
-  const body = document.getElementById('auditLogsTableBody');
-  const status = document.getElementById('auditLogsStatus');
-  const filter = document.getElementById('auditActionFilter')?.value || 'all';
-  const currentCoachOnly = !!document.getElementById('auditCurrentCoachOnly')?.checked;
-
-  if (!body || !status) return;
-
-  let rows = [...auditLogs];
-  if (filter !== 'all') {
-    rows = rows.filter((row) => __getAuditActionGroup(row.action) === filter);
-  }
-  if (currentCoachOnly) {
-    rows = rows.filter((row) => __auditMatchesCurrentCoach(row));
-  }
-
-  status.textContent = `${rows.length} action(s) affichée(s)`;
-
-  if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="5" class="audit-empty">Aucune action trouvée.</td></tr>';
-    return;
-  }
-
-  body.innerHTML = rows.map((row) => {
-    const actor = row.actor_email || row.actor_uid || '—';
-    const target = row.target_email || row.target_user_id || row.entity_id || '—';
-    return `
-      <tr>
-        <td>${__escapeHtml(__formatAuditDateTime(row.created_at))}</td>
-        <td><span class="audit-badge">${__escapeHtml(row.action || '—')}</span></td>
-        <td>${__escapeHtml(actor)}</td>
-        <td>${__escapeHtml(target)}</td>
-        <td>${__formatAuditDetails(row)}</td>
-      </tr>
-    `;
-  }).join('');
+  return __auditController.renderAuditLogs();
 }
 
 async function loadAuditLogs() {
-  const status = document.getElementById('auditLogsStatus');
-  if (status) status.textContent = 'Chargement…';
-
-  const res = await __restSelect('audit_logs', {
-    order: { column: 'created_at', direction: 'desc' },
-    limit: 250,
-  });
-
-  if (res.error) {
-    if (status) status.textContent = `Erreur : ${res.error.message}`;
-    auditLogs = [];
-    renderAuditLogs();
-    return;
-  }
-
-  auditLogs = (res.data || []).map((row) => ({
-    ...row,
-    metadata: row.metadata && typeof row.metadata === 'object' ? row.metadata : {},
-  }));
-  renderAuditLogs();
+  return await __auditController.loadAuditLogs();
 }
 
 async function openAuditLogsModal() {
-  if (!__isAdminForUi()) {
-    alert("Seul l'administrateur peut consulter l'historique.");
-    return;
-  }
-
-  document.getElementById('auditLogsModal')?.classList.add('active');
-  await loadAuditLogs();
+  return await __auditController.openAuditLogsModal();
 }
 
 // ===== Holiday data (dynamically fetched, with static fallback) =====
+const __holidayService = createHolidayService({
+  publicFallback: publicHolidaysFallback,
+  schoolFallback: schoolHolidaysFallback,
+  fetchImpl: globalThis.fetch?.bind(globalThis),
+  logger: console,
+});
 
-// Static fallback data per year (used if API calls fail)
-const __publicHolidaysFallback = {
-  2025: {
-    "2025-01-01": "Jour de l'An",
-    "2025-04-21": "Lundi de Pâques",
-    "2025-05-01": "Fête du Travail",
-    "2025-05-08": "Victoire 1945",
-    "2025-05-29": "Ascension",
-    "2025-06-09": "Lundi de Pentecôte",
-    "2025-07-14": "Fête Nationale",
-    "2025-08-15": "Assomption",
-    "2025-11-01": "Toussaint",
-    "2025-11-11": "Armistice",
-    "2025-12-25": "Noël"
-  },
-  2026: {
-    "2026-01-01": "Jour de l'An",
-    "2026-04-06": "Lundi de Pâques",
-    "2026-05-01": "Fête du Travail",
-    "2026-05-08": "Victoire 1945",
-    "2026-05-14": "Ascension",
-    "2026-05-25": "Lundi de Pentecôte",
-    "2026-07-14": "Fête Nationale",
-    "2026-08-15": "Assomption",
-    "2026-11-01": "Toussaint",
-    "2026-11-11": "Armistice",
-    "2026-12-25": "Noël"
-  },
-  2027: {
-    "2027-01-01": "Jour de l'An",
-    "2027-03-29": "Lundi de Pâques",
-    "2027-05-01": "Fête du Travail",
-    "2027-05-08": "Victoire 1945",
-    "2027-05-06": "Ascension",
-    "2027-05-17": "Lundi de Pentecôte",
-    "2027-07-14": "Fête Nationale",
-    "2027-08-15": "Assomption",
-    "2027-11-01": "Toussaint",
-    "2027-11-11": "Armistice",
-    "2027-12-25": "Noël"
-  }
-};
-
-const __schoolHolidaysFallback = {
-  2025: [
-    { start: "2025-02-22", end: "2025-03-09", name: "Vacances d'Hiver" },
-    { start: "2025-04-19", end: "2025-05-04", name: "Vacances de Printemps" },
-    { start: "2025-07-05", end: "2025-09-01", name: "Vacances d'Été" },
-    { start: "2025-10-18", end: "2025-11-03", name: "Vacances de Toussaint" },
-    { start: "2025-12-20", end: "2026-01-05", name: "Vacances de Noël" }
-  ],
-  2026: [
-    { start: "2026-02-14", end: "2026-03-02", name: "Vacances d'Hiver" },
-    { start: "2026-04-11", end: "2026-04-27", name: "Vacances de Printemps" },
-    { start: "2026-07-04", end: "2026-08-31", name: "Vacances d'Été" },
-    { start: "2026-10-17", end: "2026-11-02", name: "Vacances de Toussaint" },
-    { start: "2026-12-19", end: "2027-01-04", name: "Vacances de Noël" }
-  ],
-  2027: [
-    { start: "2027-02-13", end: "2027-03-01", name: "Vacances d'Hiver" },
-    { start: "2027-04-10", end: "2027-04-26", name: "Vacances de Printemps" },
-    { start: "2027-07-03", end: "2027-08-31", name: "Vacances d'Été" },
-    { start: "2027-10-23", end: "2027-11-08", name: "Vacances de Toussaint" },
-    { start: "2027-12-18", end: "2028-01-03", name: "Vacances de Noël" }
-  ]
-};
-
-// Runtime caches (in-memory per session, keyed by year)
-const __publicHolidaysCache = {};
-const __schoolHolidaysCache = {};
-
-async function fetchPublicHolidays(year) {
-  if (__publicHolidaysCache[year]) return __publicHolidaysCache[year];
-  try {
-    const res = await globalThis.fetch(
-      `https://date.nager.at/api/v3/PublicHolidays/${year}/FR`,
-      { signal: AbortSignal.timeout(5000) }
-    );
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    const map = {};
-    for (const h of data) {
-      map[h.date] = h.localName || h.name;
-    }
-    __publicHolidaysCache[year] = map;
-    return map;
-  } catch (e) {
-    console.warn(`fetchPublicHolidays(${year}) failed, using fallback:`, e.message);
-    const fallback = __publicHolidaysFallback[year] || {};
-    __publicHolidaysCache[year] = fallback;
-    return fallback;
-  }
-}
-
-async function fetchSchoolHolidays(year) {
-  if (__schoolHolidaysCache[year]) return __schoolHolidaysCache[year];
-  try {
-    // French government open data API for school holidays (zone B = Grand Est region)
-    const startDate = `${year - 1}-09-01`;
-    const endDate = `${year + 1}-08-31`;
-    const params = new URLSearchParams({
-      where: `zones="Zone B" AND start_date<="${endDate}" AND end_date>="${startDate}"`,
-      limit: "50",
-      timezone: "Europe/Paris"
-    });
-    const url = `https://data.education.gouv.fr/api/explore/v2.1/catalog/datasets/fr-en-calendrier-scolaire/records?${params}`;
-    const res = await globalThis.fetch(url, { signal: AbortSignal.timeout(5000) });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-    const seen = new Set();
-    const holidays = (json.results || []).map(r => ({
-      start: r.start_date ? r.start_date.slice(0, 10) : "",
-      end: r.end_date ? r.end_date.slice(0, 10) : "",
-      name: r.description || r.population || "Vacances scolaires"
-    })).filter((h) => {
-      if (!h.start || !h.end) return false;
-      const key = `${h.start}|${h.end}|${h.name}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    }).sort((a, b) => a.start.localeCompare(b.start));
-    if (holidays.length === 0) throw new Error("API returned empty holidays, using fallback data");
-    __schoolHolidaysCache[year] = holidays;
-    return holidays;
-  } catch (e) {
-    console.warn(`fetchSchoolHolidays(${year}) failed, using fallback:`, e.message);
-    const fallback = __schoolHolidaysFallback[year] || __schoolHolidaysFallback[2026];
-    __schoolHolidaysCache[year] = fallback;
-    return fallback;
-  }
-}
+const fetchPublicHolidays = __holidayService.fetchPublicHolidays;
+const fetchSchoolHolidays = __holidayService.fetchSchoolHolidays;
 
 // Current year's holiday data (populated when calendar renders)
 let publicHolidays = {};
 let schoolHolidays = [];
+
+function setupEnvironmentBanner() {
+  const envBanner = document.getElementById('envBanner');
+  if (!envBanner) return;
+
+  if (__effectiveEnv !== 'dev') {
+    envBanner.style.display = 'none';
+    return;
+  }
+
+  envBanner.textContent = `🧪 ENVIRONNEMENT DEV — ${supabaseUrl}`;
+  envBanner.style.display = 'block';
+}
 
 // ===== Init =====
 async function debugSession() {
@@ -1065,6 +363,7 @@ async function debugSession() {
 
 document.addEventListener("DOMContentLoaded", () => {
   console.log('DEBUG DOMContentLoaded');
+  setupEnvironmentBanner();
   setupPWA();
   setupAuthListeners();
   debugSession();
@@ -1077,60 +376,18 @@ document.addEventListener("DOMContentLoaded", () => {
 let __adminCache = { userId: null, value: null, atMs: 0 };
 let __adminInFlight = null;
 
-function __isAdminViaLocalClaims() {
-  const tokenAdmin = __hasAdminClaim(currentAccessToken);
-  const currentUserAdmin = currentUser?.app_metadata?.is_admin === true || currentUser?.app_metadata?.is_admin === 'true';
-  const sessionUserAdmin = currentSession?.user?.app_metadata?.is_admin === true || currentSession?.user?.app_metadata?.is_admin === 'true';
-  return !!(tokenAdmin || currentUserAdmin || sessionUserAdmin);
-}
-
-async function __isAdminViaRest() {
-  if (!currentUser) return false;
-  if (!currentAccessToken) return false;
-
-  const url = `${supabaseUrl}/rest/v1/rpc/is_admin`;
-  const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-  const timeoutMs = 10000;
-  const timeoutId = controller ? setTimeout(() => {
-    try { controller.abort(); } catch {}
-  }, timeoutMs) : null;
-
-  try {
-    const res = await globalThis.fetch(url, {
-      method: 'POST',
-      headers: {
-        apikey: supabaseKey,
-        Authorization: `Bearer ${currentAccessToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: '{}',
-      signal: controller?.signal
-    });
-
-    const text = await res.text();
-    let json;
-    try { json = text ? JSON.parse(text) : null; } catch { json = null; }
-
-    if (!res.ok) {
-      const message = (json && (json.message || json.error_description || json.error))
-        ? (json.message || json.error_description || json.error)
-        : (text || `${res.status} ${res.statusText}`);
-      throw new Error(`is_admin REST failed: ${message}`);
-    }
-
-    return !!json;
-  } finally {
-    if (timeoutId) clearTimeout(timeoutId);
-  }
-}
-
 async function isCurrentUserAdminDB() {
   if (!currentUser) {
     console.log('DEBUG no currentUser');
     return false;
   }
 
-  const localAdmin = __isAdminViaLocalClaims();
+  const localAdmin = isAdminViaLocalClaims({
+    accessToken: currentAccessToken,
+    currentUser,
+    currentSession,
+    hasAdminClaim: __hasAdminClaim,
+  });
 
   const ttlMs = 5 * 60 * 1000;
   if (__adminCache.userId === currentUser.id && typeof __adminCache.value === 'boolean' && (Date.now() - __adminCache.atMs) < ttlMs) {
@@ -1146,7 +403,13 @@ async function isCurrentUserAdminDB() {
   }
 
   __adminInFlight = (async () => {
-    let value = await __isAdminViaRest();
+    let value = await isAdminViaRest({
+      supabaseUrl,
+      supabaseKey,
+      accessToken: currentAccessToken,
+      currentUser,
+      fetchImpl: globalThis.fetch?.bind(globalThis),
+    });
     if (!value && localAdmin) {
       console.warn('DEBUG is_admin REST returned false, using local admin claim fallback');
       value = true;
@@ -1302,7 +565,12 @@ function setupAuthListeners() {
     if (event === 'SIGNED_IN' && __inviteFlowActive && session?.user) {
       document.getElementById("invitePasswordModal").classList.add("active");
       // Use onclick assignment so repeated firings replace the handler cleanly.
-      document.getElementById("inviteSetPasswordBtn").onclick = async () => {
+      const inviteSetPasswordBtn = document.getElementById("inviteSetPasswordBtn");
+      if (!inviteSetPasswordBtn) {
+        console.warn('WARN missing element: #inviteSetPasswordBtn');
+        return;
+      }
+      inviteSetPasswordBtn.onclick = async () => {
         const newPass = document.getElementById("inviteNewPasswordInput").value;
         const confirmPass = document.getElementById("inviteConfirmPasswordInput").value;
         if (!newPass) { alert("Veuillez saisir un mot de passe."); return; }
@@ -1331,7 +599,12 @@ function setupAuthListeners() {
     if (event === 'PASSWORD_RECOVERY') {
       document.getElementById("passwordResetModal").classList.add("active");
       // Use onclick assignment (not addEventListener) so re-fires replace the handler cleanly.
-      document.getElementById("updatePasswordBtn").onclick = async () => {
+      const updatePasswordBtn = document.getElementById("updatePasswordBtn");
+      if (!updatePasswordBtn) {
+        console.warn('WARN missing element: #updatePasswordBtn');
+        return;
+      }
+      updatePasswordBtn.onclick = async () => {
         const newPass = document.getElementById("newPasswordInput").value;
         const confirmPass = document.getElementById("confirmPasswordInput").value;
         if (!newPass) { alert("Veuillez saisir un nouveau mot de passe."); return; }
@@ -1648,8 +921,29 @@ async function toggleFreezeMonth() {
 
 // ===== Event listeners =====
 function setupEventListeners() {
+  const bindClick = (id, handler) => {
+    const el = document.getElementById(id);
+    if (!el) {
+      console.warn(`WARN missing element for click binding: #${id}`);
+      return null;
+    }
+    el.onclick = handler;
+    return el;
+  };
+
+  const bindChange = (id, handler) => {
+    const el = document.getElementById(id);
+    if (!el) {
+      console.warn(`WARN missing element for change binding: #${id}`);
+      return null;
+    }
+    el.onchange = handler;
+    return el;
+  };
+
   // Set month picker to the current month
-  document.getElementById("monthSelect").value = currentMonth;
+  const monthSelectEl = document.getElementById("monthSelect");
+  if (monthSelectEl) monthSelectEl.value = currentMonth;
 
   // App-level logout button (in the header)
   const logoutBtnApp = document.getElementById("logoutBtnApp");
@@ -1673,7 +967,7 @@ function setupEventListeners() {
     });
   }
 
-  document.getElementById("addCoachBtn").onclick = () => {
+  bindClick("addCoachBtn", () => {
     editMode = false;
     editingCoachId = null;
     clearCoachForm();
@@ -1683,9 +977,9 @@ function setupEventListeners() {
     document.getElementById("inviteCoach").style.display = "none";
     document.getElementById("deleteCoach").style.display = "none";
     document.getElementById("coachModal").classList.add("active");
-  };
+  });
 
-  document.getElementById("editCoachBtn").onclick = () => {
+  bindClick("editCoachBtn", () => {
     if (!currentCoach) {
       alert("Veuillez sélectionner un profil.");
       return;
@@ -1709,21 +1003,21 @@ function setupEventListeners() {
     updateCoachFormProfileUI(currentCoach);
     document.getElementById("coachModal").classList.add("active");
     document.getElementById("deleteCoach").style.display = "inline-block";
-  };
+  });
 
-  document.getElementById("saveCoach").onclick = saveCoach;
-  document.getElementById("inviteCoach").onclick = async () => {
+  bindClick("saveCoach", saveCoach);
+  bindClick("inviteCoach", async () => {
     const email = __normalizeEmail(document.getElementById("coachEmail").value);
     if (!email) {
       alert("Veuillez renseigner l'adresse e-mail du profil.");
       return;
     }
     await inviteCoach(email);
-  };
-  document.getElementById("coachProfileType").onchange = (e) => {
+  });
+  bindChange("coachProfileType", (e) => {
     updateCoachFormProfileUI(e.target.value);
-  };
-  document.getElementById("inviteAdminBtn").onclick = async () => {
+  });
+  bindClick("inviteAdminBtn", async () => {
     const rawEmail = globalThis.prompt("Adresse e-mail du nouvel administrateur :", "");
     if (rawEmail == null) return;
 
@@ -1734,8 +1028,8 @@ function setupEventListeners() {
     }
 
     await inviteAdmin(email);
-  };
-  document.getElementById("cancelCoach").onclick = () => {
+  });
+  bindClick("cancelCoach", () => {
     document.getElementById("coachModal").classList.remove("active");
     clearCoachForm();
     editMode = false;
@@ -1743,11 +1037,11 @@ function setupEventListeners() {
     document.getElementById("deleteCoach").style.display = "none";
     document.getElementById("inviteCoach").style.display = "none";
     updateCoachFormProfileUI("coach");
-  };
+  });
 
-  document.getElementById("deleteCoach").onclick = deleteCoach;
+  bindClick("deleteCoach", deleteCoach);
 
-  document.getElementById("coachModal").onclick = (e) => {
+  bindClick("coachModal", (e) => {
     if (e.target.id === "coachModal") {
       document.getElementById("coachModal").classList.remove("active");
       clearCoachForm();
@@ -1756,78 +1050,77 @@ function setupEventListeners() {
       document.getElementById("inviteCoach").style.display = "none";
       updateCoachFormProfileUI("coach");
     }
-  };
+  });
 
-  document.getElementById("dayModal").onclick = (e) => {
+  bindClick("dayModal", (e) => {
     if (e.target.id === "dayModal") {
       document.getElementById("dayModal").classList.remove("active");
     }
-  };
+  });
 
-  document.getElementById("helpBtn").onclick = () => {
+  bindClick("helpBtn", () => {
     document.getElementById("helpModal").classList.add("active");
-  };
+  });
 
-  document.getElementById("auditLogsBtn").onclick = openAuditLogsModal;
+  bindClick("auditLogsBtn", openAuditLogsModal);
 
-  document.getElementById("refreshAuditLogsBtn").onclick = loadAuditLogs;
+  bindClick("refreshAuditLogsBtn", loadAuditLogs);
 
-  document.getElementById("auditActionFilter").onchange = renderAuditLogs;
-  document.getElementById("auditCurrentCoachOnly").onchange = renderAuditLogs;
+  bindChange("auditActionFilter", renderAuditLogs);
+  bindChange("auditCurrentCoachOnly", renderAuditLogs);
 
-  document.getElementById("closeAuditLogs").onclick = () => {
+  bindClick("closeAuditLogs", () => {
     document.getElementById("auditLogsModal").classList.remove("active");
-  };
+  });
 
-  document.getElementById("closeHelp").onclick = () => {
+  bindClick("closeHelp", () => {
     document.getElementById("helpModal").classList.remove("active");
-  };
+  });
 
-  document.getElementById("helpModal").onclick = (e) => {
+  bindClick("helpModal", (e) => {
     if (e.target.id === "helpModal") {
       document.getElementById("helpModal").classList.remove("active");
     }
-  };
+  });
 
-  document.getElementById("auditLogsModal").onclick = (e) => {
+  bindClick("auditLogsModal", (e) => {
     if (e.target.id === "auditLogsModal") {
       document.getElementById("auditLogsModal").classList.remove("active");
     }
-  };
+  });
 
-  document.getElementById("coachSelect").onchange = (e) => {
+  bindChange("coachSelect", (e) => {
     currentCoach = coaches.find((c) => c.id === e.target.value) || null;
     updateCurrentProfileUI();
     updateCalendar();
     updateSummary();
     renderAuditLogs();
-  };
+  });
 
-  document.getElementById("monthSelect").onchange = (e) => {
+  bindChange("monthSelect", (e) => {
     currentMonth = __normalizeMonth(e.target.value);
     updateCalendar();
     updateSummary();
     updateFreezeUI();
     renderAuditLogs();
-  };
+  });
 
-  document.getElementById("competitionDay").onchange = (e) => {
+  bindChange("competitionDay", (e) => {
     document.getElementById("travelGroup").style.display = e.target.checked
       ? "block"
       : "none";
-  };
+  });
 
-  document.getElementById("saveDay").onclick = saveDay;
-  document.getElementById("deleteDay").onclick = deleteDay;
-  document.getElementById("cancelDay").onclick = () => {
+  bindClick("saveDay", saveDay);
+  bindClick("deleteDay", deleteDay);
+  bindClick("cancelDay", () => {
     document.getElementById("dayModal").classList.remove("active");
-  };
+  });
 
-  document.getElementById("exportBtn").onclick = exportDeclarationXLS;
-  document.getElementById("timesheetBtn").onclick = exportTimesheetHTML;
-  document.getElementById("backupBtn").onclick = exportBackupJSON;
+  bindClick("timesheetBtn", exportTimesheetHTML);
+  bindClick("backupBtn", exportBackupJSON);
 
-  document.getElementById("importBtn").onclick = () => {
+  bindClick("importBtn", () => {
     const fileInput = document.getElementById("importFile");
     const file = fileInput.files[0];
     if (!file) {
@@ -1844,10 +1137,10 @@ function setupEventListeners() {
       }
     };
     reader.readAsText(file);
-  };
+  });
 
-  document.getElementById("mileageBtn").onclick = exportExpenseHTML;
-  document.getElementById("freezeBtn").onclick = toggleFreezeMonth;
+  bindClick("mileageBtn", exportExpenseHTML);
+  bindClick("freezeBtn", toggleFreezeMonth);
 }
 
 // ===== Coach management =====
@@ -1866,6 +1159,10 @@ function clearCoachForm() {
 
 function loadCoaches() {
   const select = document.getElementById("coachSelect");
+  if (!select) {
+    updateCurrentProfileUI();
+    return;
+  }
   const hasCoaches = Array.isArray(coaches) && coaches.length > 0;
   const hasSingleCoach = hasCoaches && coaches.length === 1;
   const ownCoach =
@@ -1875,7 +1172,7 @@ function loadCoaches() {
   const fallbackCoach = ownCoach || (hasCoaches ? coaches[0] : null);
   const shouldAutoSelectDisabledCoach = select.disabled && fallbackCoach;
   const shouldAutoSelectCoach =
-    !currentCoach && (hasSingleCoach || shouldAutoSelectDisabledCoach);
+    !currentCoach && (hasSingleCoach || shouldAutoSelectDisabledCoach || !!fallbackCoach);
   select.innerHTML = '<option value="">-- Sélectionner --</option>';
 
   coaches.forEach((coach) => {
@@ -2452,7 +1749,12 @@ function __isAdminForUi() {
   if (__adminCache.userId === currentUser?.id && __adminCache.value === true) {
     return true;
   }
-  return __isAdminViaLocalClaims();
+  return isAdminViaLocalClaims({
+    accessToken: currentAccessToken,
+    currentUser,
+    currentSession,
+    hasAdminClaim: __hasAdminClaim,
+  });
 }
 
 async function handleDayClick(dateStr) {
@@ -2900,7 +2202,8 @@ function updateSummary() {
     document.getElementById("tollPayment").textContent = "€0.00";
     document.getElementById("hotelPayment").textContent = "€0.00";
     document.getElementById("purchasePayment").textContent = "€0.00";
-    document.getElementById("totalPayment").textContent = "€0.00";
+    document.getElementById("urssafTotalPayment").textContent = "€0.00";
+    document.getElementById("reimbursementTotalPayment").textContent = "€0.00";
     return;
   }
 
@@ -2928,7 +2231,8 @@ function updateSummary() {
   const trainingPayment = isVolunteer ? 0 : totalHours * currentCoach.hourly_rate;
   const compPayment = isVolunteer ? 0 : compDays * currentCoach.daily_allowance;
   const kmPayment = mileageBreakdown.totalAmount;
-  const totalPayment = trainingPayment + compPayment + kmPayment + tollPayment + hotelPayment + purchasePayment;
+  const urssafTotalPayment = trainingPayment + compPayment;
+  const reimbursementTotalPayment = kmPayment + tollPayment + hotelPayment + purchasePayment;
 
   document.getElementById("totalHours").textContent = totalHours.toFixed(1);
   document.getElementById(
@@ -2949,35 +2253,17 @@ function updateSummary() {
   document.getElementById("hotelPayment").textContent = `€${hotelPayment.toFixed(2)}`;
   document.getElementById("purchasePayment").textContent = `€${purchasePayment.toFixed(2)}`;
   document.getElementById(
-    "totalPayment"
-  ).textContent = `€${totalPayment.toFixed(2)}`;
+    "urssafTotalPayment"
+  ).textContent = `€${urssafTotalPayment.toFixed(2)}`;
+  document.getElementById(
+    "reimbursementTotalPayment"
+  ).textContent = `€${reimbursementTotalPayment.toFixed(2)}`;
 }
 
-function numberDisplay(value, digits = 0) {
-  return Number(value || 0).toFixed(digits).replace('.', ',');
-}
-
-function currencyDisplay(value) {
-  return `${numberDisplay(value, 2)} €`;
-}
-
-async function __loadExcelJs() {
-  if (!window.__excelJsModulePromise) {
-    window.__excelJsModulePromise = import('https://esm.sh/exceljs@4.4.0');
-  }
-
-  const module = await window.__excelJsModulePromise;
-  return module?.default || module;
-}
-
-async function __blobToDataUrl(blob) {
-  return await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(reader.error || new Error('Impossible de lire le logo.'));
-    reader.readAsDataURL(blob);
-  });
-}
+const __loadExcelJs = loadExcelJs;
+const __blobToDataUrl = blobToDataUrl;
+const __isStandaloneApp = isStandaloneApp;
+const __downloadBlob = downloadBlob;
 
 async function exportDeclarationXLS() {
   if (!currentCoach || !currentMonth) {
@@ -3241,19 +2527,6 @@ async function exportDeclarationXLS() {
   });
 }
 
-function __isStandaloneApp() {
-  return window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
-}
-
-function __downloadBlob(blob, fileName) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = fileName;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
 function __closeMileagePreviewModal() {
   const modal = document.getElementById('mileagePreviewModal');
   if (modal) modal.classList.remove('active');
@@ -3307,11 +2580,11 @@ function updateCurrentProfileUI() {
     if (el) el.style.display = isVolunteer ? "none" : "";
   });
 
-  const totalLabel = document.getElementById("totalPaymentLabel");
-  if (totalLabel) totalLabel.textContent = isVolunteer ? "Total remboursable" : "Paiement total";
+  const urssafTotalItem = document.getElementById("summaryUrssafTotalItem");
+  if (urssafTotalItem) urssafTotalItem.style.display = isVolunteer ? "none" : "";
 
-  const exportBtn = document.getElementById("exportBtn");
-  if (exportBtn) exportBtn.style.display = isVolunteer ? "none" : "";
+  const reimbursementLabel = document.getElementById("reimbursementTotalLabel");
+  if (reimbursementLabel) reimbursementLabel.textContent = isVolunteer ? "Total à rembourser" : "Remboursement frais";
 
   const trainingHoursGroup = document.getElementById("trainingHoursGroup");
   if (trainingHoursGroup) trainingHoursGroup.style.display = isVolunteer ? "none" : "";
@@ -3445,9 +2718,11 @@ function exportExpenseHTML() {
   }
 
   @media print {
-    @page { size: A4 portrait; margin: 8mm; }
+    @page { size: A4 portrait; margin: 15mm; }
     * {
       box-shadow: none !important;
+      text-shadow: none !important;
+      filter: none !important;
     }
     html, body {
       width: 194mm;
@@ -3463,10 +2738,13 @@ function exportExpenseHTML() {
       margin: 0;
       width: 194mm;
       max-width: 194mm;
+      display: flex;
       border-radius: 0;
     }
     .page-inner {
       padding: 0;
+      display: flex;
+      flex-direction: column;
     }
     .header,
     .header-brand {
@@ -3502,7 +2780,7 @@ function exportExpenseHTML() {
   body { 
     margin: 0;
     padding: 10px;
-    background: #eef3f9;
+    background: #ffffff;
     color: #243447;
     font-family: Inter, Arial, sans-serif;
   }
@@ -3510,16 +2788,21 @@ function exportExpenseHTML() {
   .page-shell {
     width: 194mm;
     max-width: 194mm;
+    min-height: 245mm;
     margin: 0 auto;
     background: #ffffff;
-    border: 1px solid #d8e2ef;
+    border: none;
     border-radius: 12px;
-    box-shadow: 0 10px 28px rgba(15, 52, 96, 0.10);
+    box-shadow: none;
+    display: flex;
     overflow: hidden;
   }
 
   .page-inner {
-    padding: 14px 16px 16px;
+    padding: 8px 12px 12px;
+    min-height: 245mm;
+    display: flex;
+    flex-direction: column;
   }
 
   .print-button {
@@ -3532,7 +2815,7 @@ function exportExpenseHTML() {
     cursor: pointer;
     font-size: 0.82rem;
     font-weight: 700;
-    box-shadow: 0 6px 16px rgba(20, 93, 160, 0.22);
+    box-shadow: none;
   }
 
   .header { 
@@ -3567,17 +2850,20 @@ function exportExpenseHTML() {
     max-height: 40px;
   }
   
-  .header-text h1 {
-    margin: 0 0 4px;
-    font-size: 1.1rem;
-    color: #0f3460;
-  }
+  .header-text {
+      text-align: center;
+    }
+    .header-text h1 {
+      margin: 0 0 4px;
+      font-size: 1.1rem;
+      color: #0f3460;
+    }
   
-  .header-text p { 
-    margin: 1px 0;
-    color: #526274;
-    font-size: 0.72rem;
-  }
+    .header-text p { 
+      margin: 1px 0;
+      color: #526274;
+      font-size: 0.72rem;
+    }
 
   .document-badge {
     text-align: right;
@@ -3805,7 +3091,8 @@ function exportExpenseHTML() {
   }
   
   .signature { 
-    margin-top: 40px; 
+    margin-top: auto;
+    padding-top: 20px;
     display: grid; 
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px;
@@ -3879,8 +3166,10 @@ function exportExpenseHTML() {
           </div>
           <div class="header-text">
             <h1>Judo Club de Cattenom-Rodemack</h1>
-            <p>Association RA1026</p>
-            <p>Dojo communautaire – 57570 Cattenom</p>
+            <p>Dojo Communautaire</p>
+            <p>3 rue St Exupery</p>
+            <p>57570 Cattenom</p>
+            <p>SIRET 30157248300024</p>
             <p>📧 judoclubcattenom@gmail.com – 📞 06 62 62 53 13</p>
           </div>
         </div>
@@ -4022,7 +3311,6 @@ ${rows
 `;
 
   const fileName = `note_frais_${currentCoach.name}_${currentMonth}.html`;
-  const blob = new Blob([html], { type: "text/html;charset=utf-8;" });
 
   __logAuditEvent('export.expense_html', 'export', {
     entityId: `${currentCoach.id}-${currentMonth}`,
@@ -4043,8 +3331,6 @@ ${rows
     return;
   }
 
-  __downloadBlob(blob, fileName);
-
   const newWindow = window.open('', '_blank');
   if (newWindow) {
     newWindow.document.write(html);
@@ -4064,6 +3350,12 @@ function exportTimesheetHTML() {
 
   const rows = [];
   let totalHours = 0;
+  let competitionDays = 0;
+  let totalCompetitionAllowance = 0;
+  let totalTrainingAmount = 0;
+  const hourlyRate = Number(currentCoach.hourly_rate) || 0;
+  const dailyAllowance = Number(currentCoach.daily_allowance) || 0;
+  let totalAmount = 0;
 
   Object.keys(timeData)
     .filter((key) => key.startsWith(`${currentCoach.id}-${year}-${month}`))
@@ -4071,18 +3363,33 @@ function exportTimesheetHTML() {
     .forEach((key) => {
       const date = key.split("-").slice(-3).join("-");
       const data = timeData[key];
-      if ((data.hours || 0) > 0) {
-        totalHours += data.hours;
+      const hours = Number(data.hours) || 0;
+      const competition = !!data.competition;
+
+      if (hours > 0 || competition) {
+        const trainingAmount = hours * hourlyRate;
+        const competitionAllowance = competition ? dailyAllowance : 0;
+        const lineTotal = trainingAmount + competitionAllowance;
+
+        totalHours += hours;
+        totalTrainingAmount += trainingAmount;
+        if (competition) competitionDays += 1;
+        totalCompetitionAllowance += competitionAllowance;
+        totalAmount += lineTotal;
+
         rows.push({
           date,
-          hours: data.hours,
-          dayData: data
+          hours,
+          competition,
+          trainingAmount,
+          competitionAllowance,
+          lineTotal,
         });
       }
     });
 
-  if (totalHours === 0) {
-    alert("Aucune heure d'entraînement saisie pour ce mois.");
+  if (!rows.length) {
+    alert("Aucune heure d'entraînement ni compétition saisie pour ce mois.");
     return;
   }
 
@@ -4090,8 +3397,6 @@ function exportTimesheetHTML() {
   const coachDisplayName = __getCoachDisplayName(currentCoach) || currentCoach.name;
   const profileLabel = __getProfileLabel(currentCoach, { capitalized: true });
   const signatureLabel = __isVolunteerProfile(currentCoach) ? 'Signature du bénévole' : 'Signature du salarié';
-  const hourlyRate = currentCoach.rate || 0;
-  const totalAmount = totalHours * hourlyRate;
 
   const html = `<!DOCTYPE html>
 <html lang="fr">
@@ -4103,30 +3408,35 @@ function exportTimesheetHTML() {
   * { box-sizing: border-box; }
   @media print {
     @page { size: A4 portrait; margin: 8mm; }
-    * { box-shadow: none !important; }
+    * { box-shadow: none !important; text-shadow: none !important; filter: none !important; }
     html, body {
       width: 194mm; margin: 0; background: white;
       -webkit-print-color-adjust: exact; print-color-adjust: exact;
     }
     .no-print { display: none; }
-    .page-shell { box-shadow: none; border: none; margin: 0; width: 194mm; max-width: 194mm; border-radius: 0; }
-    .page-inner { padding: 0; }
-    .header, .header-brand { display: flex !important; flex-direction: row !important; align-items: flex-start !important; justify-content: space-between !important; }
+    .page-shell { box-shadow: none; border: none; margin: 0; width: 194mm; max-width: 194mm; display: flex; border-radius: 0; }
+    .page-inner { padding: 0; display: flex; flex-direction: column; }
+    .header, .header-brand {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      gap: 12px !important;
+    }
     .document-badge { text-align: right !important; min-width: 180px !important; }
     .info-grid, .summary-grid, .signature { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
     .info-row { grid-template-columns: 120px 1fr !important; }
     .summary-card.total { grid-column: 1 / -1 !important; }
   }
-  body { margin: 0; padding: 10px; background: #eef3f9; color: #243447; font-family: Inter, Arial, sans-serif; }
-  .page-shell { width: 194mm; max-width: 194mm; margin: 0 auto; background: #ffffff; border: 1px solid #d8e2ef; border-radius: 12px; box-shadow: 0 10px 28px rgba(15, 52, 96, 0.10); overflow: hidden; }
-  .page-inner { padding: 14px 16px 16px; }
-  .print-button { margin: 0 0 10px; padding: 8px 14px; background: linear-gradient(135deg, #0f3460, #145da0); color: white; border: none; border-radius: 999px; cursor: pointer; font-size: 0.82rem; font-weight: 700; box-shadow: 0 6px 16px rgba(20, 93, 160, 0.22); }
+  body { margin: 0; padding: 10px; background: #ffffff; color: #243447; font-family: Inter, Arial, sans-serif; }
+  .page-shell { width: 194mm; max-width: 194mm; min-height: 245mm; margin: 0 auto; background: #ffffff; border: none; border-radius: 12px; box-shadow: none; display: flex; overflow: hidden; }
+  .page-inner { padding: 14px 16px 16px; min-height: 245mm; display: flex; flex-direction: column; }
+  .print-button { margin: 0 0 10px; padding: 8px 14px; background: linear-gradient(135deg, #0f3460, #145da0); color: white; border: none; border-radius: 999px; cursor: pointer; font-size: 0.82rem; font-weight: 700; box-shadow: none; }
   .header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; border-bottom: 2px solid #d8e2ef; padding-bottom: 10px; margin-bottom: 10px; }
   .header-brand { display: flex; align-items: center; gap: 12px; }
   .header-logo { width: 54px; height: 54px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 12px; background: #f5f8fc; border: 1px solid #d8e2ef; }
   .header-logo img { max-width: 40px; max-height: 40px; }
-  .header-text h1 { margin: 0 0 4px; font-size: 1.1rem; color: #0f3460; }
-  .header-text p { margin: 1px 0; color: #526274; font-size: 0.72rem; }
+  /* Removed duplicate .header-text h1 and .header-text p rules to ensure centering applies globally */
   .document-badge { text-align: right; min-width: 180px; }
   .document-badge .label { display: inline-block; padding: 5px 10px; border-radius: 999px; background: #eaf2ff; color: #145da0; font-weight: 700; font-size: 0.68rem; letter-spacing: 0.03em; text-transform: uppercase; }
   .document-badge h2 { margin: 6px 0 2px; font-size: 1rem; color: #0f3460; }
@@ -4154,12 +3464,14 @@ function exportTimesheetHTML() {
   tbody tr:nth-child(even) { background: #f9fbfe; }
   .amount, .number { text-align: right; font-variant-numeric: tabular-nums; }
   .total-row td { font-weight: 800; background: #edf4ff; color: #0f3460; border-bottom: none; }
-  .signature { margin-top: 40px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; page-break-inside: avoid; }
+  .signature { margin-top: auto; padding-top: 20px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; page-break-inside: avoid; }
   .signature > div { min-height: 46px; border-top: 2px solid #243447; padding-top: 6px; text-align: center; font-weight: 600; font-size: 0.7rem; }
-  th:nth-child(1), td:nth-child(1) { width: 25%; }
-  th:nth-child(2), td:nth-child(2) { width: 25%; }
-  th:nth-child(3), td:nth-child(3) { width: 25%; }
-  th:nth-child(4), td:nth-child(4) { width: 25%; }
+  th:nth-child(1), td:nth-child(1) { width: 16%; }
+  th:nth-child(2), td:nth-child(2) { width: 14%; }
+  th:nth-child(3), td:nth-child(3) { width: 14%; }
+  th:nth-child(4), td:nth-child(4) { width: 18%; }
+  th:nth-child(5), td:nth-child(5) { width: 18%; }
+  th:nth-child(6), td:nth-child(6) { width: 20%; }
 </style>
 </head>
 <body>
@@ -4172,11 +3484,15 @@ function exportTimesheetHTML() {
       <div class="header">
         <div class="header-brand">
           <div class="header-logo">
-            <img src="${logoUrl}" alt="Logo" crossorigin="anonymous">
+            <img src="${logoUrl}" alt="Judo Club Cattenom-Rodemack" />
           </div>
           <div class="header-text">
             <h1>Judo Club de Cattenom-Rodemack</h1>
-            <p>Association loi 1901</p>
+            <p>Dojo Communautaire</p>
+            <p>3 rue St Exupery</p>
+            <p>57570 Cattenom</p>
+            <p>SIRET 30157248300024</p>
+            <p>📧 judoclubcattenom@gmail.com – 📞 06 62 62 53 13</p>
           </div>
         </div>
         <div class="document-badge">
@@ -4200,6 +3516,7 @@ function exportTimesheetHTML() {
           <div class="info-list">
             <div class="info-row"><span class="label">Mois / Année</span><span class="value">${month}/${year}</span></div>
             <div class="info-row"><span class="label">Taux horaire</span><span class="value">${hourlyRate.toFixed(2)} €</span></div>
+            <div class="info-row"><span class="label">Indemnité compétition</span><span class="value">${dailyAllowance.toFixed(2)} €</span></div>
           </div>
         </div>
       </div>
@@ -4211,6 +3528,14 @@ function exportTimesheetHTML() {
             <span class="label">Total Heures</span>
             <span class="value">${totalHours}</span>
           </div>
+          <div class="summary-card">
+            <span class="label">Jours compétition</span>
+            <span class="value">${competitionDays}</span>
+          </div>
+          <div class="summary-card">
+            <span class="label">Indemnités compétition</span>
+            <span class="value">${totalCompetitionAllowance.toFixed(2)} €</span>
+          </div>
           <div class="summary-card total">
             <span class="label">Total à payer</span>
             <span class="value">${totalAmount.toFixed(2)} €</span>
@@ -4219,7 +3544,7 @@ function exportTimesheetHTML() {
       </div>
 
       <div class="details-section">
-        <h3>Détail des heures d'entraînement</h3>
+        <h3>Détail des heures et compétitions</h3>
         <div class="table-wrap">
           <table>
             <thead>
@@ -4227,7 +3552,9 @@ function exportTimesheetHTML() {
                 <th>Date</th>
                 <th class="number">Durée (heures)</th>
                 <th class="amount">Taux</th>
-                <th class="amount">Montant (€)</th>
+                <th class="amount">Montant heures (€)</th>
+                <th class="amount">Indemnité compétition (€)</th>
+                <th class="amount">Total ligne (€)</th>
               </tr>
             </thead>
             <tbody>
@@ -4236,13 +3563,17 @@ function exportTimesheetHTML() {
                   <td>${r.date}</td>
                   <td class="number">${r.hours}</td>
                   <td class="amount">${hourlyRate.toFixed(2)} €</td>
-                  <td class="amount">${(r.hours * hourlyRate).toFixed(2)}</td>
+                  <td class="amount">${r.trainingAmount.toFixed(2)}</td>
+                  <td class="amount">${r.competitionAllowance.toFixed(2)}</td>
+                  <td class="amount">${r.lineTotal.toFixed(2)}</td>
                 </tr>
               `).join("")}
               <tr class="total-row">
                 <td>Total</td>
                 <td class="number">${totalHours}</td>
                 <td class="amount">-</td>
+                <td class="amount">${totalTrainingAmount.toFixed(2)}</td>
+                <td class="amount">${totalCompetitionAllowance.toFixed(2)}</td>
                 <td class="amount">${totalAmount.toFixed(2)}</td>
               </tr>
             </tbody>

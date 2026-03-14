@@ -120,6 +120,26 @@ judo-coach-tracker/
 - A modern web browser (Chrome, Firefox, Edge, Safari)
 - A Supabase project (for authentication and data)
 
+### Supabase CLI on Windows
+
+If `supabase` is not recognized in PowerShell, use the repo-local wrapper commands:
+
+```bash
+npm run sb:version
+npm run sb -- login
+npm run sb -- link -- --project-ref nkzsjyzhpvivfgslzltn
+npm run sb -- db push -- --project-ref nkzsjyzhpvivfgslzltn
+npm run sb:db:push:dev
+npm run sb:db:push:prod
+npm run sb:config:push:dev
+npm run sb:config:push:prod
+npm run sb:functions:deploy:dev
+npm run sb:functions:deploy:prod
+```
+
+This uses `npx supabase` under the hood and does not require a global Supabase CLI install.
+You can also call the CLI directly with `npx supabase ...`.
+
 ### Running Locally
 
 Because the application uses ES6 modules, it must be served over HTTP (not opened directly as a file). Use any static file server:
@@ -133,6 +153,94 @@ npx http-server public -p 8000
 ```
 
 Then open `http://localhost:8000/` in your browser.
+
+### Remote Supabase dev environment (recommended)
+
+The app now auto-selects environment by hostname:
+
+- `localhost` / `127.0.0.1` -> `dev`
+- any `dev` subdomain/host (for example `dev.your-domain.tld`, `dev-your-app.vercel.app`) -> `dev`
+- all other hosts -> `prod`
+
+`dev` is configured to target the remote Supabase dev project:
+
+- URL: `https://nkzsjyzhpvivfgslzltn.supabase.co`
+- Publishable key: `sb_publishable_lHFJ9uxG0ZgkCeONR3PXyA_Jf8Lx_p_`
+
+Use these commands to apply backend changes to that dev project:
+
+```bash
+supabase login
+supabase link --project-ref nkzsjyzhpvivfgslzltn
+supabase db push --project-ref nkzsjyzhpvivfgslzltn
+supabase config push --project-ref nkzsjyzhpvivfgslzltn
+```
+
+Safe npm wrappers are available for both environments:
+
+```bash
+# Database schema migrations
+npm run sb:db:push:dev
+npm run sb:db:push:prod
+
+# Auth URL configuration (site_url + redirects)
+npm run sb:config:push:dev
+npm run sb:config:push:prod
+
+# Edge Functions
+npm run sb:functions:deploy:dev
+npm run sb:functions:deploy:prod
+```
+
+`sb:config:push:*` temporarily applies `supabase/config.<env>.toml`, runs the push, then restores `supabase/config.toml` automatically.
+This prevents accidental cross-environment `site_url` overwrites.
+
+If needed, you can still override dev credentials from the browser using localStorage keys `jct.dev.supabase.url` and `jct.dev.supabase.key`.
+
+You can manually force an environment from any URL:
+
+- `?env=dev` forces `dev`
+- `?env=prod` forces `prod`
+- `?env=auto` clears the force override and returns to hostname-based auto mode
+
+Note: `?env=dev` / `?env=prod` are persisted in localStorage (`jct.env.override`) until you use `?env=auto`.
+
+### Daily environment switch (quick routine)
+
+Use this sequence to avoid mixing frontend code, backend project, and host:
+
+```bash
+# DEV work
+
+git switch dev
+npm run env:dev
+# open: https://jccattenom-dev.cantarero.fr/
+
+# PROD release/check
+
+git switch main
+npm run env:prod
+# open: https://jccattenom.cantarero.fr/
+## All-in-one environment commands
+
+For most cases, use these single commands to update everything for dev or prod:
+
+```bash
+# DEV
+npm run env:dev
+
+# PROD
+npm run env:prod
+```
+
+These run DB migrations, config push, and function deploy in sequence for the selected environment.
+```
+
+Frontend runtime selection is automatic by host:
+
+- `https://jccattenom-dev.cantarero.fr` -> dev Supabase
+- `https://jccattenom.cantarero.fr` -> prod Supabase
+- `?env=dev|prod|auto` is still available for manual override/testing
 
 ### Deployment
 
@@ -199,6 +307,15 @@ The workflow authenticates with Supabase using a personal access token stored as
 After adding the secret, re-run the failed workflow from the **Actions** tab (select the run → **Re-run all jobs**) or push a change to `supabase/functions/` to trigger a fresh deploy.
 
 > **Note**: without this secret the deploy step will fail with *"Access token not provided"*.
+
+Manual deploy shortcuts are also available:
+
+```bash
+npm run sb:functions:deploy:dev
+npm run sb:functions:deploy:prod
+```
+
+These commands deploy `invite-coach`, `invite-admin`, `delete-coach-user`, and `alert-admin` to the selected project.
 
 ---
 

@@ -1,4 +1,17 @@
 {
+  "scripts": {
+    "sb": "npx supabase",
+    "sb:version": "npx supabase --version",
+    "sb:db:push:dev": "npx supabase db push --project-ref nkzsjyzhpvivfgslzltn",
+    "sb:db:push:prod": "npx supabase db push --project-ref ajbpzueanpeukozjhkiv",
+    "sb:config:push:dev": "node scripts/supabase-config-push.mjs dev",
+    "sb:config:push:prod": "node scripts/supabase-config-push.mjs prod",
+    "sb:functions:deploy:dev": "node scripts/supabase-functions-deploy.mjs dev",
+    "sb:functions:deploy:prod": "node scripts/supabase-functions-deploy.mjs prod"
+    ,
+    "env:dev": "npm run sb:db:push:dev && npm run sb:config:push:dev && npm run sb:functions:deploy:dev",
+    "env:prod": "npm run sb:db:push:prod && npm run sb:config:push:prod && npm run sb:functions:deploy:prod"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.98.0",
     "acorn": "^8.16.0"

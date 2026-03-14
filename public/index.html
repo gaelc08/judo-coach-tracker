@@ -13,9 +13,10 @@
     <link rel="icon" href="logo-jcc.png">
     <link rel="apple-touch-icon" href="logo-jcc.png">
     <title>Judo Club de Cattenom-Rodemack – Gestion des intervenants et frais</title>
-    <link rel="stylesheet" href="style.css?v=2026-03-13-features-1">
+    <link rel="stylesheet" href="style.css?v=2026-03-14-export-style-3">
   </head>
 <body>
+  <div id="envBanner" class="env-banner" style="display:none"></div>
 
   <!-- Auth area -->
   <div id="authContainer" class="auth-container">
@@ -137,18 +138,21 @@
             <span class="label">Remboursement achats</span>
             <span class="value" id="purchasePayment">€0,00</span>
           </div>
+          <div class="summary-item total" id="summaryUrssafTotalItem">
+            <span class="label" id="urssafTotalLabel">Salaire</span>
+            <span class="value" id="urssafTotalPayment">€0,00</span>
+          </div>
           <div class="summary-item total">
-            <span class="label" id="totalPaymentLabel">Paiement total</span>
-            <span class="value" id="totalPayment">€0,00</span>
+            <span class="label" id="reimbursementTotalLabel">Remboursement frais</span>
+            <span class="value" id="reimbursementTotalPayment">€0,00</span>
           </div>
         </div>
       </div>
 
       <div class="actions card">
-        <button id="exportBtn" class="btn-primary">📊 Exporter déclaration (XLSX)</button>
         <button id="timesheetBtn" class="btn-primary">🗓 Exporter relevé d'heures</button>
-        <button id="mileageBtn" class="btn-secondary">🧾 Exporter note de frais</button>
-        <button id="backupBtn" class="btn-secondary admin-only" style="display:none">💾 Exporter backup JSON</button>
+        <button id="mileageBtn" class="btn-primary">🧾 Exporter note de frais</button>
+        <button id="backupBtn" class="btn-primary admin-only" style="display:none">💾 Exporter backup JSON</button>
         <div id="importGroup" class="import-group" style="display:none">
           <input id="importFile" type="file" accept=".json">
           <button id="importBtn" class="btn-secondary">📥 Importer JSON</button>
@@ -388,7 +392,7 @@
       <div class="help-section">
         <h3>📤 Exports</h3>
         <ul>
-          <li><strong>Exporter déclaration salaire (XLSX)</strong> – génère un vrai fichier Excel avec le logo du club, les heures prestées et les indemnités forfaitaires des jours de compétition. Il peut ensuite être imprimé en PDF.</li>
+          <li><strong>Exporter relevé d'heures</strong> – génère un document imprimable qui inclut les heures d'entraînement et les indemnités forfaitaires des jours de compétition.</li>
           <li><strong>Exporter note de frais</strong> – génère un document HTML imprimable récapitulant les remboursements kilométriques, les péages, les frais d'hôtel et les achats du mois (utilisez la fonction d'impression du navigateur pour le convertir en PDF).</li>
           <li><strong>Exporter backup JSON</strong> – enregistre une sauvegarde de vos données du mois dans un fichier JSON.</li>
         </ul>
@@ -455,7 +459,7 @@
     </div>
   </div>
 
-  <script type="module" src="app-modular.js?v=2026-03-13-features-2"></script>
+  <script type="module" src="app-modular.js?v=2026-03-14-export-style-3"></script>
 </body>
 </html>
 
