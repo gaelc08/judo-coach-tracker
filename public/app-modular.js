@@ -4,8 +4,27 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 // ----- Supabase config -----
-const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
-const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
+// Production project
+const __PROD_URL = 'https://ajbpzueanpeukozjhkiv.supabase.co';
+const __PROD_KEY = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
+
+// Dev project — accessed by appending ?env=dev to the URL
+// Fill in the URL and anon key for your dedicated dev Supabase project.
+const __DEV_URL = 'https://<dev-project-id>.supabase.co';
+const __DEV_KEY = '<dev-anon-key>';
+
+const __isDevEnv = new URLSearchParams(window.location.search).get('env') === 'dev';
+const supabaseUrl = __isDevEnv ? __DEV_URL : __PROD_URL;
+const supabaseKey = __isDevEnv ? __DEV_KEY : __PROD_KEY;
+if (__isDevEnv) {
+  if (__DEV_URL.includes('<') || __DEV_KEY.includes('<')) {
+    console.error('⛔ DEV env requested but dev credentials are still placeholders — update __DEV_URL and __DEV_KEY in app-modular.js');
+  } else {
+    console.warn('⚠️ DEV environment active — connected to dev Supabase project:', __DEV_URL);
+  }
+  const banner = document.getElementById('devEnvBanner');
+  if (banner) banner.style.display = 'block';
+}
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
 const __BUILD_ID = '2026-03-13-features-2';

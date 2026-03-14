@@ -137,7 +137,7 @@ Then open `http://localhost:8000/` in your browser.
 
 ### Connecting to your dev environment
 
-This section explains how to point the frontend at your **remote Supabase dev project** (already provisioned) so you can develop and test without touching the production database.
+This section explains how to use the **remote Supabase dev project** (already provisioned) so you can develop and test without touching the production database.
 
 #### 1. Get your dev project credentials
 
@@ -145,29 +145,41 @@ This section explains how to point the frontend at your **remote Supabase dev pr
 2. Go to **Project Settings** → **API** (sometimes labelled **Data API**).
 3. Copy the **Project URL** and the **anon / public** key.
 
-#### 2. Point the frontend at your dev Supabase project
+#### 2. Fill in the dev credentials in `public/app-modular.js`
 
-The app reads the Supabase URL and anon key from two constants at the top of `public/app-modular.js`.  Replace them with the dev project values you copied above:
+Near the top of `public/app-modular.js`, two constants hold the dev project's URL and anon key.  Replace the placeholder values with what you copied above:
 
 ```js
-// ── Dev project ─────────────────────────────────────────────────────────────
-const supabaseUrl = 'https://<dev-project-id>.supabase.co';
-const supabaseKey = '<dev-anon-key>';
+// Dev project — accessed by appending ?env=dev to the URL
+const __DEV_URL = 'https://<dev-project-id>.supabase.co';
+const __DEV_KEY = '<dev-anon-key>';
 ```
 
-**Recommended workflow to avoid accidentally committing dev credentials:**
+These credentials are the public **anon** key, so it is safe to commit them.
 
-```bash
-# Stash the dev config before switching back to production:
-git stash push -m "dev-supabase-config" public/app-modular.js
+#### 3. Access the app in dev mode
 
-# Restore dev config whenever you return to dev work:
-git stash pop
+Append `?env=dev` to any URL of the deployed (or locally served) app:
+
+```
+# Production deployment
+https://jccattenom.cantarero.fr/?env=dev
+
+# GitHub Pages
+https://gaelc08.github.io/judo-coach-tracker/?env=dev
+
+# Local static server
+http://localhost:8000/?env=dev
 ```
 
-Alternatively, always check `git diff public/app-modular.js` before committing — if it shows the dev URL, run `git restore public/app-modular.js` to discard the dev values.
+When active, the app:
+- Connects to the dev Supabase project instead of production.
+- Shows a yellow banner at the top of the page: **⚠️ Environnement de développement**.
+- Logs a warning in the browser console.
 
-#### 3. Apply the database migrations to your dev project
+Remove `?env=dev` from the URL (or navigate to the root) to switch back to the production project.
+
+#### 4. Apply the database migrations to your dev project
 
 Install the [Supabase CLI](https://supabase.com/docs/guides/cli) if you haven't already:
 
@@ -189,27 +201,16 @@ The project ref is the part of your dev project URL before `.supabase.co` (e.g. 
 
 > **Tip:** you can also apply migrations one-by-one via the Supabase SQL editor — Dashboard → SQL Editor → paste the file contents → Run.
 
-#### 4. Allow your local frontend in the dev project's redirect URLs
+#### 5. Allow the app origins in the dev project's redirect URLs
 
-Auth emails (password reset, invitation) check that the redirect URL is in the allow-list.  Add your local dev origin to the **dev** project:
+Auth emails (password reset, invitation) check that the redirect URL is in the allow-list.  Add any origin you use with dev mode to the **dev** project:
 
 1. Open the [Supabase dashboard](https://app.supabase.com) → your **dev** project → **Authentication** → **URL Configuration**.
-2. Under **Redirect URLs**, add:
+2. Under **Redirect URLs**, add every origin you serve the app from, e.g.:
+   - `https://jccattenom.cantarero.fr`
+   - `https://gaelc08.github.io/judo-coach-tracker`
    - `http://localhost:8000`
-   - `http://localhost:8000/`
 3. Save.
-
-#### 5. Serve the frontend
-
-```bash
-# Using Python
-cd public && python -m http.server 8000
-
-# Using Node.js
-npx http-server public -p 8000
-```
-
-Open `http://localhost:8000/` in your browser.  The app now talks to your remote dev Supabase project.  You can inspect and manage data directly in the Supabase dashboard for your dev project.
 
 ### Deployment
 
