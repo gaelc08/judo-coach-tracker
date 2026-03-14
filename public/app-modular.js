@@ -3430,8 +3430,7 @@ function exportTimesheetHTML() {
   .header-brand { display: flex; align-items: center; gap: 12px; }
   .header-logo { width: 54px; height: 54px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 12px; background: #f5f8fc; border: 1px solid #d8e2ef; }
   .header-logo img { max-width: 40px; max-height: 40px; }
-  .header-text h1 { margin: 0 0 4px; font-size: 1.1rem; color: #0f3460; }
-  .header-text p { margin: 1px 0; color: #526274; font-size: 0.72rem; }
+  /* Removed duplicate .header-text h1 and .header-text p rules to ensure centering applies globally */
   .document-badge { text-align: right; min-width: 180px; }
   .document-badge .label { display: inline-block; padding: 5px 10px; border-radius: 999px; background: #eaf2ff; color: #145da0; font-weight: 700; font-size: 0.68rem; letter-spacing: 0.03em; text-transform: uppercase; }
   .document-badge h2 { margin: 6px 0 2px; font-size: 1rem; color: #0f3460; }
