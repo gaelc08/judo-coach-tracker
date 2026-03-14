@@ -2738,13 +2738,11 @@ function exportExpenseHTML() {
       margin: 0;
       width: 194mm;
       max-width: 194mm;
-      min-height: 281mm;
       display: flex;
       border-radius: 0;
     }
     .page-inner {
       padding: 0;
-      min-height: 281mm;
       display: flex;
       flex-direction: column;
     }
@@ -3308,7 +3306,6 @@ ${rows
 `;
 
   const fileName = `note_frais_${currentCoach.name}_${currentMonth}.html`;
-  const blob = new Blob([html], { type: "text/html;charset=utf-8;" });
 
   __logAuditEvent('export.expense_html', 'export', {
     entityId: `${currentCoach.id}-${currentMonth}`,
@@ -3328,8 +3325,6 @@ ${rows
     __showMileagePreviewModal(html, fileName);
     return;
   }
-
-  __downloadBlob(blob, fileName);
 
   const newWindow = window.open('', '_blank');
   if (newWindow) {
@@ -3414,8 +3409,8 @@ function exportTimesheetHTML() {
       -webkit-print-color-adjust: exact; print-color-adjust: exact;
     }
     .no-print { display: none; }
-    .page-shell { box-shadow: none; border: none; margin: 0; width: 194mm; max-width: 194mm; min-height: 281mm; display: flex; border-radius: 0; }
-    .page-inner { padding: 0; min-height: 281mm; display: flex; flex-direction: column; }
+    .page-shell { box-shadow: none; border: none; margin: 0; width: 194mm; max-width: 194mm; display: flex; border-radius: 0; }
+    .page-inner { padding: 0; display: flex; flex-direction: column; }
     .header, .header-brand { display: flex !important; flex-direction: row !important; align-items: flex-start !important; justify-content: space-between !important; }
     .document-badge { text-align: right !important; min-width: 180px !important; }
     .info-grid, .summary-grid, .signature { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
