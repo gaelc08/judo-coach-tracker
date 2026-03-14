@@ -4,8 +4,34 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 // ----- Supabase config -----
-const supabaseUrl = 'https://ajbpzueanpeukozjhkiv.supabase.co';
-const supabaseKey = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
+const PROD_SUPABASE_URL = 'https://ajbpzueanpeukozjhkiv.supabase.co';
+const PROD_SUPABASE_KEY = 'sb_publishable_efac8Xr0Gyfy1J6uFt_X1Q_Z5hB1pe9';
+
+const DEV_SUPABASE_URL = 'http://127.0.0.1:54321';
+const DEV_SUPABASE_KEY = null;
+
+const __isLocalHost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+const __envOverride = (new URLSearchParams(window.location.search).get('env') || '').toLowerCase();
+const __effectiveEnv = __envOverride === 'prod'
+  ? 'prod'
+  : ((__envOverride === 'dev' || __isLocalHost) ? 'dev' : 'prod');
+
+const __localDevUrlOverride = window.localStorage.getItem('jct.dev.supabase.url');
+const __localDevKeyOverride = window.localStorage.getItem('jct.dev.supabase.key');
+
+const supabaseUrl = __effectiveEnv === 'dev'
+  ? (__localDevUrlOverride || DEV_SUPABASE_URL || PROD_SUPABASE_URL)
+  : PROD_SUPABASE_URL;
+
+const supabaseKey = __effectiveEnv === 'dev'
+  ? (__localDevKeyOverride || DEV_SUPABASE_KEY || PROD_SUPABASE_KEY)
+  : PROD_SUPABASE_KEY;
+
+if (__effectiveEnv === 'dev' && !__localDevKeyOverride && !DEV_SUPABASE_KEY) {
+  console.warn('DEBUG dev env active without jct.dev.supabase.key override; fallback key in use.');
+}
+
+console.log('DEBUG env:', __effectiveEnv, 'supabase:', supabaseUrl);
 
 // Bump this string when deploying to confirm the browser loaded the latest JS.
 const __BUILD_ID = '2026-03-13-features-2';
