@@ -1,0 +1,27 @@
+project_id = "ajbpzueanpeukozjhkiv"
+
+[auth]
+# Production environment URL used in auth e-mails when no redirectTo is provided.
+site_url = "https://jccattenom.cantarero.fr/"
+
+# Allowed post-auth redirect URLs for prod project.
+additional_redirect_urls = [
+  "http://localhost:8000",
+  "http://localhost:8000/",
+  "http://127.0.0.1:8000",
+  "http://127.0.0.1:8000/",
+  "https://jccattenom-dev.cantarero.fr",
+  "https://jccattenom-dev.cantarero.fr/",
+  "https://gaelc08.github.io/judo-coach-tracker/?env=dev",
+  "https://gaelc08.github.io/judo-coach-tracker/?env=prod",
+  "https://jccattenom.cantarero.fr",
+  "https://jccattenom.cantarero.fr/",
+  "https://gaelc08.github.io/judo-coach-tracker",
+  "https://gaelc08.github.io/judo-coach-tracker/"
+]
+
+[functions.app]
+verify_jwt = false
+
+[functions.invite-coach]
+verify_jwt = false
