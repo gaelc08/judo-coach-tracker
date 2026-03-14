@@ -6,6 +6,7 @@ import { BUILD_ID as __BUILD_ID, effectiveEnv as __effectiveEnv, supabaseKey, su
 import { auditMatchesCurrentCoach, formatAuditDateTime, formatAuditDetails, getAuditActionGroup } from './modules/audit-ui.js';
 import { isAdminViaLocalClaims, isAdminViaRest } from './modules/auth-admin.js';
 import { createAuthNoHangLock, createAuthStorage, detectInviteFlowFromUrlHash } from './modules/auth-runtime.js';
+import { blobToDataUrl, downloadBlob, isStandaloneApp, loadExcelJs } from './modules/export-runtime.js';
 import { publicHolidaysFallback, schoolHolidaysFallback } from './modules/holidays-data.js';
 import { createHolidayService } from './modules/holidays-service.js';
 import { createInviteDebugTools } from './modules/invite-debug.js';
@@ -2258,23 +2259,10 @@ function currencyDisplay(value) {
   return `${numberDisplay(value, 2)} €`;
 }
 
-async function __loadExcelJs() {
-  if (!window.__excelJsModulePromise) {
-    window.__excelJsModulePromise = import('https://esm.sh/exceljs@4.4.0');
-  }
-
-  const module = await window.__excelJsModulePromise;
-  return module?.default || module;
-}
-
-async function __blobToDataUrl(blob) {
-  return await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(reader.error || new Error('Impossible de lire le logo.'));
-    reader.readAsDataURL(blob);
-  });
-}
+const __loadExcelJs = loadExcelJs;
+const __blobToDataUrl = blobToDataUrl;
+const __isStandaloneApp = isStandaloneApp;
+const __downloadBlob = downloadBlob;
 
 async function exportDeclarationXLS() {
   if (!currentCoach || !currentMonth) {
@@ -2536,19 +2524,6 @@ async function exportDeclarationXLS() {
       total_amount: grandTotal,
     },
   });
-}
-
-function __isStandaloneApp() {
-  return window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
-}
-
-function __downloadBlob(blob, fileName) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = fileName;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function __closeMileagePreviewModal() {
