@@ -2850,17 +2850,20 @@ function exportExpenseHTML() {
     max-height: 40px;
   }
   
-  .header-text h1 {
-    margin: 0 0 4px;
-    font-size: 1.1rem;
-    color: #0f3460;
-  }
+  .header-text {
+      text-align: center;
+    }
+    .header-text h1 {
+      margin: 0 0 4px;
+      font-size: 1.1rem;
+      color: #0f3460;
+    }
   
-  .header-text p { 
-    margin: 1px 0;
-    color: #526274;
-    font-size: 0.72rem;
-  }
+    .header-text p { 
+      margin: 1px 0;
+      color: #526274;
+      font-size: 0.72rem;
+    }
 
   .document-badge {
     text-align: right;
