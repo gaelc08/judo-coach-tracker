@@ -137,9 +137,39 @@ Then open `http://localhost:8000/` in your browser.
 
 ### Connecting to your dev environment
 
-This section explains how to spin up a **fully local** development stack (Supabase + frontend) so you can develop and test without touching the production database.
+This section explains how to point the frontend at your **remote Supabase dev project** (already provisioned) so you can develop and test without touching the production database.
 
-#### 1. Install the Supabase CLI
+#### 1. Get your dev project credentials
+
+1. Open the [Supabase dashboard](https://app.supabase.com) and select your **dev** project.
+2. Go to **Project Settings** → **API** (sometimes labelled **Data API**).
+3. Copy the **Project URL** and the **anon / public** key.
+
+#### 2. Point the frontend at your dev Supabase project
+
+The app reads the Supabase URL and anon key from two constants at the top of `public/app-modular.js`.  Replace them with the dev project values you copied above:
+
+```js
+// ── Dev project ─────────────────────────────────────────────────────────────
+const supabaseUrl = 'https://<dev-project-id>.supabase.co';
+const supabaseKey = '<dev-anon-key>';
+```
+
+**Recommended workflow to avoid accidentally committing dev credentials:**
+
+```bash
+# Stash the dev config before switching back to production:
+git stash push -m "dev-supabase-config" public/app-modular.js
+
+# Restore dev config whenever you return to dev work:
+git stash pop
+```
+
+Alternatively, always check `git diff public/app-modular.js` before committing — if it shows the dev URL, run `git restore public/app-modular.js` to discard the dev values.
+
+#### 3. Apply the database migrations to your dev project
+
+Install the [Supabase CLI](https://supabase.com/docs/guides/cli) if you haven't already:
 
 ```bash
 # macOS / Linux (Homebrew)
@@ -147,98 +177,29 @@ brew install supabase/tap/supabase
 
 # npm (any platform)
 npm install -g supabase
-
-# Verify
-supabase --version
 ```
 
-> The CLI also requires [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or any Docker-compatible runtime) to be running.
-
-#### 2. Start the local Supabase stack
-
-From the root of this repository:
+Then push all migrations from `supabase/migrations/` to your remote dev project in one command:
 
 ```bash
-supabase start
+supabase db push --project-ref <dev-project-ref>
 ```
 
-This pulls the required Docker images (first run only) and starts a local Supabase instance.  When it finishes you will see output similar to:
+The project ref is the part of your dev project URL before `.supabase.co` (e.g. `abcdefghijklmnop`).  Re-run this command whenever new migrations are added.
 
-```
-Started supabase local development setup.
+> **Tip:** you can also apply migrations one-by-one via the Supabase SQL editor — Dashboard → SQL Editor → paste the file contents → Run.
 
-         API URL: http://127.0.0.1:54321
-     GraphQL URL: http://127.0.0.1:54321/graphql/v1
-  S3 Storage URL: http://127.0.0.1:54321/storage/v1/s3
-          DB URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
-      Studio URL: http://127.0.0.1:54323
-    Inbucket URL: http://127.0.0.1:54324
-      JWT secret: super-secret-jwt-token-with-at-least-32-characters-long
-        anon key: <local-anon-key>
-service_role key: <local-service-role-key>
-```
+#### 4. Allow your local frontend in the dev project's redirect URLs
 
-You can retrieve these values at any time with:
+Auth emails (password reset, invitation) check that the redirect URL is in the allow-list.  Add your local dev origin to the **dev** project:
 
-```bash
-supabase status
-```
+1. Open the [Supabase dashboard](https://app.supabase.com) → your **dev** project → **Authentication** → **URL Configuration**.
+2. Under **Redirect URLs**, add:
+   - `http://localhost:8000`
+   - `http://localhost:8000/`
+3. Save.
 
-> **Supabase Studio** (`http://127.0.0.1:54323`) gives you a full dashboard for the local database — Auth users, table editor, SQL editor, Storage, and more.
->
-> **Inbucket** (`http://127.0.0.1:54324`) is a local mail sink that captures all emails sent by Supabase Auth (invitations, password resets, etc.) so you can inspect them without a real email provider.
-
-#### 3. Apply the database migrations
-
-```bash
-supabase db reset
-```
-
-This resets the local database and re-applies every migration in `supabase/migrations/` in order, giving you an up-to-date local schema.  Run it again whenever new migrations are added.
-
-#### 4. Point the frontend at your local Supabase
-
-The app reads the Supabase URL and anon key from two constants at the top of `public/app-modular.js`.  For local development, replace them with the **local** values printed by `supabase status`:
-
-```js
-// ── Local dev ───────────────────────────────────────────────────────────────
-const supabaseUrl = 'http://127.0.0.1:54321';
-const supabaseKey = '<local-anon-key>';   // copy from `supabase status`
-```
-
-**Recommended workflow to avoid accidentally committing local credentials:**
-
-```bash
-# 1. Stash the local change before switching back to production:
-git stash push -m "local-supabase-config" public/app-modular.js
-
-# 2. Work against production as usual.
-
-# 3. Reapply local config whenever you return to local dev:
-git stash pop
-```
-
-Alternatively, always check `git diff public/app-modular.js` before committing — if it shows the local URL, run `git restore public/app-modular.js` to discard the local values.
-
-#### 5. Add `localhost` to the Supabase redirect URLs
-
-Auth emails (password reset, invitation) include a redirect URL.  For local testing, add `http://localhost:8000` to the list in `supabase/config.toml`:
-
-```toml
-additional_redirect_urls = [
-  "http://localhost:8000",
-  "http://127.0.0.1:8000",
-  # … existing production URLs …
-]
-```
-
-Then push the config to your local instance:
-
-```bash
-supabase config push --local
-```
-
-#### 6. Serve the frontend
+#### 5. Serve the frontend
 
 ```bash
 # Using Python
@@ -248,21 +209,7 @@ cd public && python -m http.server 8000
 npx http-server public -p 8000
 ```
 
-Open `http://localhost:8000/` in your browser.  The app now talks to your local Supabase instance.  Log in via Supabase Studio (`http://127.0.0.1:54323` → Authentication → Users) to create test users.
-
-#### 7. Stop the local stack
-
-When you are done:
-
-```bash
-supabase stop
-```
-
-Add `--no-backup` to skip saving the local database state:
-
-```bash
-supabase stop --no-backup
-```
+Open `http://localhost:8000/` in your browser.  The app now talks to your remote dev Supabase project.  You can inspect and manage data directly in the Supabase dashboard for your dev project.
 
 ### Deployment
 
