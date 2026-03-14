@@ -3163,8 +3163,9 @@ function exportExpenseHTML() {
           </div>
           <div class="header-text">
             <h1>Judo Club de Cattenom-Rodemack</h1>
-            <p>Association RA1026</p>
-            <p>Dojo communautaire – 57570 Cattenom</p>
+            <p>Dojo Communautaire</p>
+            <p>3 rue St Exupery</p>
+            <p>57570 Cattenom</p>
             <p>📧 judoclubcattenom@gmail.com – 📞 06 62 62 53 13</p>
           </div>
         </div>
