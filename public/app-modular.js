@@ -1086,7 +1086,6 @@ function setupEventListeners() {
     document.getElementById("dayModal").classList.remove("active");
   };
 
-  document.getElementById("exportBtn").onclick = exportDeclarationXLS;
   document.getElementById("timesheetBtn").onclick = exportTimesheetHTML;
   document.getElementById("backupBtn").onclick = exportBackupJSON;
 
@@ -2552,9 +2551,6 @@ function updateCurrentProfileUI() {
   const reimbursementLabel = document.getElementById("reimbursementTotalLabel");
   if (reimbursementLabel) reimbursementLabel.textContent = isVolunteer ? "Total à rembourser" : "Remboursement frais";
 
-  const exportBtn = document.getElementById("exportBtn");
-  if (exportBtn) exportBtn.style.display = isVolunteer ? "none" : "";
-
   const trainingHoursGroup = document.getElementById("trainingHoursGroup");
   if (trainingHoursGroup) trainingHoursGroup.style.display = isVolunteer ? "none" : "";
 }
@@ -2756,7 +2752,7 @@ function exportExpenseHTML() {
     background: #ffffff;
     border: 1px solid #d8e2ef;
     border-radius: 12px;
-    box-shadow: 0 10px 28px rgba(15, 52, 96, 0.10);
+    box-shadow: none;
     overflow: hidden;
   }
 
@@ -2774,7 +2770,7 @@ function exportExpenseHTML() {
     cursor: pointer;
     font-size: 0.82rem;
     font-weight: 700;
-    box-shadow: 0 6px 16px rgba(20, 93, 160, 0.22);
+    box-shadow: none;
   }
 
   .header { 
@@ -3306,6 +3302,12 @@ function exportTimesheetHTML() {
 
   const rows = [];
   let totalHours = 0;
+  let competitionDays = 0;
+  let totalCompetitionAllowance = 0;
+  let totalTrainingAmount = 0;
+  const hourlyRate = Number(currentCoach.hourly_rate) || 0;
+  const dailyAllowance = Number(currentCoach.daily_allowance) || 0;
+  let totalAmount = 0;
 
   Object.keys(timeData)
     .filter((key) => key.startsWith(`${currentCoach.id}-${year}-${month}`))
@@ -3313,18 +3315,33 @@ function exportTimesheetHTML() {
     .forEach((key) => {
       const date = key.split("-").slice(-3).join("-");
       const data = timeData[key];
-      if ((data.hours || 0) > 0) {
-        totalHours += data.hours;
+      const hours = Number(data.hours) || 0;
+      const competition = !!data.competition;
+
+      if (hours > 0 || competition) {
+        const trainingAmount = hours * hourlyRate;
+        const competitionAllowance = competition ? dailyAllowance : 0;
+        const lineTotal = trainingAmount + competitionAllowance;
+
+        totalHours += hours;
+        totalTrainingAmount += trainingAmount;
+        if (competition) competitionDays += 1;
+        totalCompetitionAllowance += competitionAllowance;
+        totalAmount += lineTotal;
+
         rows.push({
           date,
-          hours: data.hours,
-          dayData: data
+          hours,
+          competition,
+          trainingAmount,
+          competitionAllowance,
+          lineTotal,
         });
       }
     });
 
-  if (totalHours === 0) {
-    alert("Aucune heure d'entraînement saisie pour ce mois.");
+  if (!rows.length) {
+    alert("Aucune heure d'entraînement ni compétition saisie pour ce mois.");
     return;
   }
 
@@ -3332,8 +3349,6 @@ function exportTimesheetHTML() {
   const coachDisplayName = __getCoachDisplayName(currentCoach) || currentCoach.name;
   const profileLabel = __getProfileLabel(currentCoach, { capitalized: true });
   const signatureLabel = __isVolunteerProfile(currentCoach) ? 'Signature du bénévole' : 'Signature du salarié';
-  const hourlyRate = currentCoach.rate || 0;
-  const totalAmount = totalHours * hourlyRate;
 
   const html = `<!DOCTYPE html>
 <html lang="fr">
@@ -3360,9 +3375,9 @@ function exportTimesheetHTML() {
     .summary-card.total { grid-column: 1 / -1 !important; }
   }
   body { margin: 0; padding: 10px; background: #eef3f9; color: #243447; font-family: Inter, Arial, sans-serif; }
-  .page-shell { width: 194mm; max-width: 194mm; margin: 0 auto; background: #ffffff; border: 1px solid #d8e2ef; border-radius: 12px; box-shadow: 0 10px 28px rgba(15, 52, 96, 0.10); overflow: hidden; }
+  .page-shell { width: 194mm; max-width: 194mm; margin: 0 auto; background: #ffffff; border: 1px solid #d8e2ef; border-radius: 12px; box-shadow: none; overflow: hidden; }
   .page-inner { padding: 14px 16px 16px; }
-  .print-button { margin: 0 0 10px; padding: 8px 14px; background: linear-gradient(135deg, #0f3460, #145da0); color: white; border: none; border-radius: 999px; cursor: pointer; font-size: 0.82rem; font-weight: 700; box-shadow: 0 6px 16px rgba(20, 93, 160, 0.22); }
+  .print-button { margin: 0 0 10px; padding: 8px 14px; background: linear-gradient(135deg, #0f3460, #145da0); color: white; border: none; border-radius: 999px; cursor: pointer; font-size: 0.82rem; font-weight: 700; box-shadow: none; }
   .header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; border-bottom: 2px solid #d8e2ef; padding-bottom: 10px; margin-bottom: 10px; }
   .header-brand { display: flex; align-items: center; gap: 12px; }
   .header-logo { width: 54px; height: 54px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 12px; background: #f5f8fc; border: 1px solid #d8e2ef; }
@@ -3398,10 +3413,12 @@ function exportTimesheetHTML() {
   .total-row td { font-weight: 800; background: #edf4ff; color: #0f3460; border-bottom: none; }
   .signature { margin-top: 40px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; page-break-inside: avoid; }
   .signature > div { min-height: 46px; border-top: 2px solid #243447; padding-top: 6px; text-align: center; font-weight: 600; font-size: 0.7rem; }
-  th:nth-child(1), td:nth-child(1) { width: 25%; }
-  th:nth-child(2), td:nth-child(2) { width: 25%; }
-  th:nth-child(3), td:nth-child(3) { width: 25%; }
-  th:nth-child(4), td:nth-child(4) { width: 25%; }
+  th:nth-child(1), td:nth-child(1) { width: 16%; }
+  th:nth-child(2), td:nth-child(2) { width: 14%; }
+  th:nth-child(3), td:nth-child(3) { width: 14%; }
+  th:nth-child(4), td:nth-child(4) { width: 18%; }
+  th:nth-child(5), td:nth-child(5) { width: 18%; }
+  th:nth-child(6), td:nth-child(6) { width: 20%; }
 </style>
 </head>
 <body>
@@ -3442,6 +3459,7 @@ function exportTimesheetHTML() {
           <div class="info-list">
             <div class="info-row"><span class="label">Mois / Année</span><span class="value">${month}/${year}</span></div>
             <div class="info-row"><span class="label">Taux horaire</span><span class="value">${hourlyRate.toFixed(2)} €</span></div>
+            <div class="info-row"><span class="label">Indemnité compétition</span><span class="value">${dailyAllowance.toFixed(2)} €</span></div>
           </div>
         </div>
       </div>
@@ -3453,6 +3471,14 @@ function exportTimesheetHTML() {
             <span class="label">Total Heures</span>
             <span class="value">${totalHours}</span>
           </div>
+          <div class="summary-card">
+            <span class="label">Jours compétition</span>
+            <span class="value">${competitionDays}</span>
+          </div>
+          <div class="summary-card">
+            <span class="label">Indemnités compétition</span>
+            <span class="value">${totalCompetitionAllowance.toFixed(2)} €</span>
+          </div>
           <div class="summary-card total">
             <span class="label">Total à payer</span>
             <span class="value">${totalAmount.toFixed(2)} €</span>
@@ -3461,7 +3487,7 @@ function exportTimesheetHTML() {
       </div>
 
       <div class="details-section">
-        <h3>Détail des heures d'entraînement</h3>
+        <h3>Détail des heures et compétitions</h3>
         <div class="table-wrap">
           <table>
             <thead>
@@ -3469,7 +3495,9 @@ function exportTimesheetHTML() {
                 <th>Date</th>
                 <th class="number">Durée (heures)</th>
                 <th class="amount">Taux</th>
-                <th class="amount">Montant (€)</th>
+                <th class="amount">Montant heures (€)</th>
+                <th class="amount">Indemnité compétition (€)</th>
+                <th class="amount">Total ligne (€)</th>
               </tr>
             </thead>
             <tbody>
@@ -3478,13 +3506,17 @@ function exportTimesheetHTML() {
                   <td>${r.date}</td>
                   <td class="number">${r.hours}</td>
                   <td class="amount">${hourlyRate.toFixed(2)} €</td>
-                  <td class="amount">${(r.hours * hourlyRate).toFixed(2)}</td>
+                  <td class="amount">${r.trainingAmount.toFixed(2)}</td>
+                  <td class="amount">${r.competitionAllowance.toFixed(2)}</td>
+                  <td class="amount">${r.lineTotal.toFixed(2)}</td>
                 </tr>
               `).join("")}
               <tr class="total-row">
                 <td>Total</td>
                 <td class="number">${totalHours}</td>
                 <td class="amount">-</td>
+                <td class="amount">${totalTrainingAmount.toFixed(2)}</td>
+                <td class="amount">${totalCompetitionAllowance.toFixed(2)}</td>
                 <td class="amount">${totalAmount.toFixed(2)}</td>
               </tr>
             </tbody>
