@@ -2601,6 +2601,12 @@ function updateCurrentProfileUI() {
 
   const reimbursementLabel = document.getElementById("reimbursementTotalLabel");
   if (reimbursementLabel) reimbursementLabel.textContent = isVolunteer ? "Total à rembourser" : "Remboursement frais";
+<<<<<<< HEAD
+=======
+
+  const exportBtn = document.getElementById("exportBtn");
+  if (exportBtn) exportBtn.style.display = isVolunteer ? "none" : "";
+>>>>>>> 91c3cf4 (Adjust summary labels for salary and reimbursements)
 
   const trainingHoursGroup = document.getElementById("trainingHoursGroup");
   if (trainingHoursGroup) trainingHoursGroup.style.display = isVolunteer ? "none" : "";

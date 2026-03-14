@@ -1,29 +1,28 @@
 
 
-
 # Judo Coach Tracker
 
-Web application for the Judo Club de Cattenom-Rodemack to manage coach activities, expenses, and club administration.
+Modern web app for the Judo Club de Cattenom-Rodemack to manage coach activities, expenses, and club administration.
 
 ---
 
 ## Features
 
 ### For Coaches
-- Log training, competitions, and travel in a calendar
-- Track mileage, tolls, and upload receipts
-- View summaries for hours, competitions, kilometers, and payments
+- Log training, competitions, and travel in a monthly calendar
+- Track mileage, tolls, and upload receipts (photo/PDF)
+- View instant summaries for hours, competitions, kilometers, and payments
 - Export timesheets, mileage reports, or backups
 
 ### For Administrators
-- Manage coach profiles
-- Set rates for hours, competitions, mileage
+- Add, edit, or remove coach profiles
+- Set hourly, competition, and mileage rates
 - View/export any coach’s data
 - Receive notifications and review audit logs
 
 ---
 
-## How to Use
+## Usage
 
 1. Log in with your email and password (admins invite new users)
 2. Click a calendar day to add hours, competitions, or travel
@@ -47,10 +46,10 @@ Web application for the Judo Club de Cattenom-Rodemack to manage coach activitie
 
 ## Technical Overview
 
-- Static SPA (HTML, CSS, ES6 JS modules), no build step
+- 100% static SPA (HTML, CSS, ES6 JS modules), no build step
 - Supabase (Postgres, Auth, Storage, Edge Functions) for backend
-- Hosted on GitHub Pages
-- PWA: installable, offline support
+- Static hosting on GitHub Pages
+- PWA: installable, offline support via service worker
 - Row-Level Security (RLS) in Supabase; admin actions via Edge Functions
 - REST API for user/admin management
 - Audit logging for sensitive actions
@@ -60,7 +59,7 @@ Web application for the Judo Club de Cattenom-Rodemack to manage coach activitie
 ## Repository Structure
 
 - `public/` — Static frontend (HTML, JS, CSS, PWA, modules)
-- `supabase/` — Config, SQL migrations, Edge Functions
+- `supabase/` — Config, SQL migrations, Edge Functions (TypeScript)
 - `docs/` — Documentation
 - `.github/workflows/` — CI/CD for deploys
 - `scripts/` — Admin/dev helper scripts

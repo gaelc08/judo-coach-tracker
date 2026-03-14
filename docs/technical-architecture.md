@@ -1,17 +1,16 @@
 
 
-
 # Technical Architecture
 
-This document describes the technical architecture of the Judo Coach Tracker for the Judo Club de Cattenom-Rodemack.
+This document describes the technical architecture of the Judo Coach Tracker for the Judo Club de Cattenom-Rodemack. For developers and maintainers.
 
 ---
 
 ## System Overview
 
-- Static SPA (HTML, CSS, ES6 JS modules), no build step
+- 100% static SPA (HTML, CSS, ES6 JS modules), no build step
 - Supabase (Postgres, Auth, Storage, Edge Functions) for backend
-- Hosted on GitHub Pages
+- Static hosting on GitHub Pages
 - PWA: service worker for offline/installable support
 - Row-Level Security (RLS) in Supabase; admin actions via Edge Functions
 
@@ -56,7 +55,7 @@ flowchart TD
 ## Repository Structure
 
 - `public/` — Static frontend (HTML, JS, CSS, PWA, modules)
-- `supabase/` — Config, SQL migrations, Edge Functions
+- `supabase/` — Config, SQL migrations, Edge Functions (TypeScript)
 - `docs/` — Documentation
 - `.github/workflows/` — CI/CD for deploys
 - `scripts/` — Admin/dev helper scripts
