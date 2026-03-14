@@ -2851,19 +2851,22 @@ function exportExpenseHTML() {
   }
   
   .header-text {
-      text-align: center;
-    }
-    .header-text h1 {
-      margin: 0 0 4px;
-      font-size: 1.1rem;
-      color: #0f3460;
-    }
-  
-    .header-text p { 
-      margin: 1px 0;
-      color: #526274;
-      font-size: 0.72rem;
-    }
+    text-align: center;
+    font-size: 0.72rem;
+    line-height: 1.2;
+  }
+  .header-text h1 {
+    margin: 0 0 4px;
+    font-size: 1.1rem;
+    color: #0f3460;
+    line-height: 1.1;
+  }
+  .header-text p {
+    margin: 1px 0;
+    color: #526274;
+    font-size: 0.72rem;
+    line-height: 1.2;
+  }
 
   .document-badge {
     text-align: right;
