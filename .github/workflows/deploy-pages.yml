@@ -17,9 +17,6 @@ concurrency:
 
 jobs:
   deploy:
-    environment:
-      name: ${{ github.ref_name == 'dev' && 'dev' || 'github-pages' }}
-      url: ${{ github.ref_name == 'dev' && 'https://jccattenom-dev.cantarero.fr/' || steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     environment:
       name: ${{ github.ref_name == 'dev' && 'dev' || 'github-pages' }}
