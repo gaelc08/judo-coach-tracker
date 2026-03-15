@@ -2023,6 +2023,15 @@ async function saveDay() {
     }
   }
 
+  const missingJustifs = [];
+  if (peage > 0 && !justificationUrl) missingJustifs.push('péage');
+  if (hotel > 0 && !hotelJustificationUrl) missingJustifs.push('hôtel');
+  if (achat > 0 && !achatJustificationUrl) missingJustifs.push('achat');
+  if (missingJustifs.length > 0) {
+    alert(`Justificatif obligatoire pour : ${missingJustifs.join(', ')}. Veuillez joindre les justificatifs manquants.`);
+    return;
+  }
+
   if (hours === 0 && !competition && km === 0 && !description && peage === 0 && hotel === 0 && achat === 0) {
     if (existing && existing.id) {
       const { error } = await supabase.from('time_data').delete().eq('id', existing.id);
