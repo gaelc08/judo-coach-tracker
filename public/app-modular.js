@@ -2919,7 +2919,7 @@ function exportExpenseHTML() {
   
   .header-brand {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 12px;
   }
   
@@ -2927,8 +2927,9 @@ function exportExpenseHTML() {
     width: 160px;
     height: 160px;
     flex: 0 0 auto;
-    display: grid;
-    place-items: center;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
   }
   
   .header-logo img { 
@@ -3522,13 +3523,13 @@ function exportTimesheetHTML() {
     .summary-card.total { grid-column: 1 / -1 !important; }
   }
   body { margin: 0; padding: 10px; background: #eef3f9; color: #243447; font-family: Inter, Arial, sans-serif; }
-  .page-shell { width: 194mm; max-width: 194mm; min-height: 245mm; margin: 0 auto; background: #ffffff; border: 1px solid #d8e2ef; border-radius: 12px; box-shadow: none; display: flex; overflow: hidden; }
+  .page-shell { width: 194mm; max-width: 194mm; min-height: 245mm; margin: 0 auto; background: #ffffff; border: none; border-radius: 0; box-shadow: none; display: flex; overflow: hidden; }
   .page-inner { padding: 14px 16px 16px; min-height: 245mm; display: flex; flex-direction: column; }
   .print-button { margin: 0 0 10px; padding: 8px 14px; background: linear-gradient(135deg, #0f3460, #145da0); color: white; border: none; border-radius: 999px; cursor: pointer; font-size: 0.82rem; font-weight: 700; box-shadow: none; }
   .close-button { margin-left: 8px; background: linear-gradient(135deg, #c0392b, #922b21); }
   .header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; border-bottom: 2px solid #d8e2ef; padding-bottom: 10px; margin-bottom: 10px; }
-  .header-brand { display: flex; align-items: center; gap: 12px; }
-  .header-logo { width: 160px; height: 160px; flex: 0 0 auto; display: grid; place-items: center; }
+  .header-brand { display: flex; align-items: flex-start; gap: 12px; }
+  .header-logo { width: 160px; height: 160px; flex: 0 0 auto; display: flex; align-items: flex-start; justify-content: center; }
   .header-logo img { max-width: 144px; max-height: 144px; }
   .header-text { text-align: center; }
   .header-text h1 { margin: 0 0 4px; font-size: 1.1rem; color: #0f3460; }

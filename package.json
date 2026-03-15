@@ -2,6 +2,8 @@
   "scripts": {
     "sb": "npx supabase",
     "sb:version": "npx supabase --version",
+    "version:bump": "node scripts/bump-app-version.mjs",
+    "hooks:install": "git config core.hooksPath .githooks",
     "sb:db:push:dev": "npx supabase db push --project-ref nkzsjyzhpvivfgslzltn",
     "sb:db:push:prod": "npx supabase db push --project-ref ajbpzueanpeukozjhkiv",
     "sb:config:push:dev": "node scripts/supabase-config-push.mjs dev",
