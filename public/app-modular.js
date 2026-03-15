@@ -2924,16 +2924,16 @@ function exportExpenseHTML() {
   }
   
   .header-logo {
-    width: 80px;
-    height: 80px;
+    width: 160px;
+    height: 160px;
     flex: 0 0 auto;
     display: grid;
     place-items: center;
   }
   
   .header-logo img { 
-    max-width: 72px;
-    max-height: 72px;
+    max-width: 144px;
+    max-height: 144px;
   }
   
   .header-text {
@@ -3528,8 +3528,8 @@ function exportTimesheetHTML() {
   .close-button { margin-left: 8px; background: linear-gradient(135deg, #c0392b, #922b21); }
   .header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; border-bottom: 2px solid #d8e2ef; padding-bottom: 10px; margin-bottom: 10px; }
   .header-brand { display: flex; align-items: center; gap: 12px; }
-  .header-logo { width: 80px; height: 80px; flex: 0 0 auto; display: grid; place-items: center; }
-  .header-logo img { max-width: 72px; max-height: 72px; }
+  .header-logo { width: 160px; height: 160px; flex: 0 0 auto; display: grid; place-items: center; }
+  .header-logo img { max-width: 144px; max-height: 144px; }
   .header-text { text-align: center; }
   .header-text h1 { margin: 0 0 4px; font-size: 1.1rem; color: #0f3460; }
   .header-text p { margin: 1px 0; color: #526274; font-size: 0.72rem; }
