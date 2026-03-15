@@ -2601,18 +2601,13 @@ function updateCurrentProfileUI() {
 
   const reimbursementLabel = document.getElementById("reimbursementTotalLabel");
   if (reimbursementLabel) reimbursementLabel.textContent = isVolunteer ? "Total à rembourser" : "Remboursement frais";
-<<<<<<< HEAD
-=======
-
   const exportBtn = document.getElementById("exportBtn");
   if (exportBtn) exportBtn.style.display = isVolunteer ? "none" : "";
->>>>>>> 91c3cf4 (Adjust summary labels for salary and reimbursements)
-
   const trainingHoursGroup = document.getElementById("trainingHoursGroup");
   if (trainingHoursGroup) trainingHoursGroup.style.display = isVolunteer ? "none" : "";
 }
 
-function __showMileagePreviewModal(html, fileName) {
+function __showMileagePreviewModal(html, fileName, downloadHtml = html) {
   let modal = document.getElementById('mileagePreviewModal');
   if (!modal) {
     modal = document.createElement('div');
@@ -2642,8 +2637,19 @@ function __showMileagePreviewModal(html, fileName) {
   const printBtn = modal.querySelector('#previewPrintBtn');
   const downloadBtn = modal.querySelector('#previewDownloadBtn');
 
+  if (printBtn) {
+    printBtn.disabled = true;
+  }
+
   if (iframe) {
+    iframe.onload = () => {
+      if (printBtn) {
+        printBtn.disabled = false;
+      }
+    };
     iframe.srcdoc = html;
+  } else if (printBtn) {
+    printBtn.disabled = false;
   }
 
   if (printBtn) {
@@ -2659,7 +2665,7 @@ function __showMileagePreviewModal(html, fileName) {
 
   if (downloadBtn) {
     downloadBtn.onclick = () => {
-      const blob = new Blob([html], { type: 'text/html;charset=utf-8;' });
+      const blob = new Blob([downloadHtml], { type: 'text/html;charset=utf-8;' });
       __downloadBlob(blob, fileName);
     };
   }
@@ -2726,14 +2732,56 @@ function exportExpenseHTML() {
   const totalPurchaseAmount = rows.reduce((sum, row) => sum + (row.purchaseAmount || 0), 0);
   const totalMileageKm = rows.reduce((sum, row) => sum + (Number(row.km) || 0), 0);
   const mileageScaleDescription = __getMileageScaleDescription(currentCoach.fiscal_power);
+  const escapeExpenseText = (value, fallback = '') => __escapeHtml(value || fallback);
+  const sanitizeExpenseUrl = (value) => {
+    if (!value) return '';
+    try {
+      const parsedUrl = new URL(String(value), window.location.href);
+      const protocol = parsedUrl.protocol.toLowerCase();
+      if (protocol !== 'http:' && protocol !== 'https:') return '';
+      return __escapeHtml(parsedUrl.href);
+    } catch {
+      return '';
+    }
+  };
+  const buildExpenseJustificationLinks = (row) => {
+    const links = [];
+    const tollUrl = sanitizeExpenseUrl(row.justificationUrl);
+    const hotelUrl = sanitizeExpenseUrl(row.hotelJustificationUrl);
+    const purchaseUrl = sanitizeExpenseUrl(row.achatJustificationUrl);
 
-  const html = `
+    if (tollUrl) links.push(`<a href="${tollUrl}" target="_blank" rel="noopener noreferrer">Péage</a>`);
+    if (hotelUrl) links.push(`<a href="${hotelUrl}" target="_blank" rel="noopener noreferrer">Hôtel</a>`);
+    if (purchaseUrl) links.push(`<a href="${purchaseUrl}" target="_blank" rel="noopener noreferrer">Achat</a>`);
+
+    return links.length
+      ? `<div class="justif-links">${links.join('')}</div>`
+      : '<span class="meta-line">Aucun justificatif</span>';
+  };
+  const safeCoachName = escapeExpenseText(currentCoach.name);
+  const safeCoachDisplayName = escapeExpenseText(coachDisplayName, 'Non renseigné');
+  const safeAddress = escapeExpenseText(currentCoach.address, 'Non renseignée');
+  const safeProfileLabel = escapeExpenseText(profileLabel);
+  const safeVehicle = escapeExpenseText(currentCoach.vehicle, 'Non renseigné');
+  const safeFiscalPower = escapeExpenseText(currentCoach.fiscal_power, 'Non renseignée');
+  const safeMileageScaleDescription = escapeExpenseText(mileageScaleDescription);
+  const safeSignatureLabel = escapeExpenseText(signatureLabel);
+  const usePreviewModal = __isStandaloneApp();
+  const renderExpenseHtml = ({ embeddedPreview = false, includeCloseButton = true } = {}) => {
+    const expenseDocumentControls = embeddedPreview
+      ? ''
+      : `
+      <button class="print-button no-print" onclick="window.print()">🖨️ Imprimer / Enregistrer en PDF</button>
+      ${includeCloseButton ? '<button class="print-button close-button no-print" onclick="window.close()">✖ Fermer</button>' : ''}
+    `;
+
+    return `
 <!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Note de frais - ${currentCoach.name} - ${month}/${year}</title>
+<title>Note de frais - ${safeCoachName} - ${month}/${year}</title>
 <style>
   * {
     box-sizing: border-box;
@@ -2811,13 +2859,13 @@ function exportExpenseHTML() {
   }
 
   .page-shell {
-    width: 194mm;
-    max-width: 194mm;
-    min-height: 245mm;
+    width: ${embeddedPreview ? '100%' : '194mm'};
+    max-width: ${embeddedPreview ? '100%' : '194mm'};
+    min-height: ${embeddedPreview ? '0' : '245mm'};
     margin: 0 auto;
     background: #ffffff;
     border: none;
-    border-radius: 12px;
+    border-radius: ${embeddedPreview ? '0' : '12px'};
     box-shadow: none;
     display: flex;
     overflow: hidden;
@@ -2825,7 +2873,7 @@ function exportExpenseHTML() {
 
   .page-inner {
     padding: 8px 12px 12px;
-    min-height: 245mm;
+    min-height: ${embeddedPreview ? '0' : '245mm'};
     display: flex;
     flex-direction: column;
   }
@@ -3184,8 +3232,7 @@ function exportExpenseHTML() {
 <body>
   <div class="page-shell">
     <div class="page-inner">
-      <button class="print-button no-print" onclick="window.print()">🖨️ Imprimer / Enregistrer en PDF</button>
-      <button class="print-button close-button no-print" onclick="window.close()">✖ Fermer</button>
+      ${expenseDocumentControls}
 
       <div class="header">
         <div class="header-brand">
@@ -3210,9 +3257,9 @@ function exportExpenseHTML() {
         <section class="info-card">
           <h3>Informations du demandeur</h3>
           <div class="info-list">
-            <div class="info-row"><span class="label">Nom et prénom</span><span class="value">${coachDisplayName || "Non renseigné"}</span></div>
-            <div class="info-row"><span class="label">Adresse</span><span class="value">${currentCoach.address || "Non renseignée"}</span></div>
-            <div class="info-row"><span class="label">Poste</span><span class="value">${profileLabel}</span></div>
+            <div class="info-row"><span class="label">Nom et prénom</span><span class="value">${safeCoachDisplayName}</span></div>
+            <div class="info-row"><span class="label">Adresse</span><span class="value">${safeAddress}</span></div>
+            <div class="info-row"><span class="label">Poste</span><span class="value">${safeProfileLabel}</span></div>
             <div class="info-row"><span class="label">Date d'édition</span><span class="value">${today}</span></div>
           </div>
         </section>
@@ -3220,9 +3267,9 @@ function exportExpenseHTML() {
         <section class="info-card">
           <h3>Informations véhicule</h3>
           <div class="info-list">
-            <div class="info-row"><span class="label">Véhicule</span><span class="value">${currentCoach.vehicle || "Non renseigné"}</span></div>
-            <div class="info-row"><span class="label">Puissance fiscale</span><span class="value">${currentCoach.fiscal_power || "Non renseignée"} CV</span></div>
-            <div class="info-row"><span class="label">Barème appliqué</span><span class="value">${mileageScaleDescription}</span></div>
+            <div class="info-row"><span class="label">Véhicule</span><span class="value">${safeVehicle}</span></div>
+            <div class="info-row"><span class="label">Puissance fiscale</span><span class="value">${safeFiscalPower} CV</span></div>
+            <div class="info-row"><span class="label">Barème appliqué</span><span class="value">${safeMileageScaleDescription}</span></div>
             <div class="info-row"><span class="label">Mois concerné</span><span class="value">${month}/${year}</span></div>
           </div>
         </section>
@@ -3273,22 +3320,21 @@ function exportExpenseHTML() {
     <tbody>
 ${rows
   .map(
-    (r) => `
+    (r) => {
+      const safeDate = escapeExpenseText(r.date);
+      const safeDescription = escapeExpenseText(r.description, 'Déplacement judo');
+      const safeDeparture = escapeExpenseText(r.departurePlace, '-');
+      const safeArrival = escapeExpenseText(r.arrivalPlace, '-');
+      const justificationLinks = buildExpenseJustificationLinks(r);
+
+      return `
       <tr>
-        <td>${r.date}</td>
+        <td>${safeDate}</td>
         <td>
           <div class="expense-cell">
-            <strong>${r.description || "Déplacement judo"}</strong>
-            <span class="route-line">${r.departurePlace || "-"} → ${r.arrivalPlace || "-"}</span>
-            ${[
-              r.justificationUrl ? `<a href="${r.justificationUrl}" target="_blank" rel="noopener noreferrer">Péage</a>` : '',
-              r.hotelJustificationUrl ? `<a href="${r.hotelJustificationUrl}" target="_blank" rel="noopener noreferrer">Hôtel</a>` : '',
-              r.achatJustificationUrl ? `<a href="${r.achatJustificationUrl}" target="_blank" rel="noopener noreferrer">Achat</a>` : ''
-            ].filter(Boolean).length ? `<div class="justif-links">${[
-              r.justificationUrl ? `<a href="${r.justificationUrl}" target="_blank" rel="noopener noreferrer">Péage</a>` : '',
-              r.hotelJustificationUrl ? `<a href="${r.hotelJustificationUrl}" target="_blank" rel="noopener noreferrer">Hôtel</a>` : '',
-              r.achatJustificationUrl ? `<a href="${r.achatJustificationUrl}" target="_blank" rel="noopener noreferrer">Achat</a>` : ''
-            ].filter(Boolean).join('')}</div>` : '<span class="meta-line">Aucun justificatif</span>'}
+            <strong>${safeDescription}</strong>
+            <span class="route-line">${safeDeparture} → ${safeArrival}</span>
+            ${justificationLinks}
           </div>
         </td>
         <td class="number">${r.km}</td>
@@ -3301,7 +3347,8 @@ ${rows
         <td class="amount">${r.amount
           .toFixed(2)
           .replace(".", ",")} €</td>
-      </tr>`
+      </tr>`;
+    }
   )
   .join("")}
       <tr class="total-row">
@@ -3322,8 +3369,8 @@ ${rows
 
       <div class="signature">
         <div>
-          <strong>${signatureLabel}</strong><br><br><br>
-          ${coachDisplayName || currentCoach.name}
+          <strong>${safeSignatureLabel}</strong><br><br><br>
+          ${safeCoachDisplayName}
         </div>
         <div>
           <strong>Signature de l'employeur</strong><br><br><br>
@@ -3335,6 +3382,11 @@ ${rows
 </body>
 </html>
 `;
+  };
+
+  const html = renderExpenseHtml({ embeddedPreview: usePreviewModal, includeCloseButton: false });
+  const downloadHtml = renderExpenseHtml({ embeddedPreview: false, includeCloseButton: false });
+  const windowHtml = renderExpenseHtml({ embeddedPreview: false, includeCloseButton: true });
 
   const fileName = `note_frais_${currentCoach.name}_${currentMonth}.html`;
 
@@ -3352,16 +3404,20 @@ ${rows
     },
   });
 
-  if (__isStandaloneApp()) {
-    __showMileagePreviewModal(html, fileName);
+  if (usePreviewModal) {
+    __showMileagePreviewModal(html, fileName, downloadHtml);
     return;
   }
 
   const newWindow = window.open('', '_blank');
   if (newWindow) {
-    newWindow.document.write(html);
+    newWindow.document.write(windowHtml);
     newWindow.document.close();
+    return;
   }
+
+  alert("La fenêtre d'export a été bloquée par le navigateur. Le document HTML va être téléchargé à la place.");
+  __downloadBlob(new Blob([downloadHtml], { type: 'text/html;charset=utf-8;' }), fileName);
 }
 
 
@@ -3454,8 +3510,8 @@ function exportTimesheetHTML() {
     .info-row { grid-template-columns: 120px 1fr !important; }
     .summary-card.total { grid-column: 1 / -1 !important; }
   }
-  body { margin: 0; padding: 10px; background: #ffffff; color: #243447; font-family: Inter, Arial, sans-serif; }
-  .page-shell { width: 194mm; max-width: 194mm; min-height: 245mm; margin: 0 auto; background: #ffffff; border: none; border-radius: 12px; box-shadow: none; display: flex; overflow: hidden; }
+  body { margin: 0; padding: 10px; background: #eef3f9; color: #243447; font-family: Inter, Arial, sans-serif; }
+  .page-shell { width: 194mm; max-width: 194mm; min-height: 245mm; margin: 0 auto; background: #ffffff; border: 1px solid #d8e2ef; border-radius: 12px; box-shadow: none; display: flex; overflow: hidden; }
   .page-inner { padding: 14px 16px 16px; min-height: 245mm; display: flex; flex-direction: column; }
   .print-button { margin: 0 0 10px; padding: 8px 14px; background: linear-gradient(135deg, #0f3460, #145da0); color: white; border: none; border-radius: 999px; cursor: pointer; font-size: 0.82rem; font-weight: 700; box-shadow: none; }
   .close-button { margin-left: 8px; background: linear-gradient(135deg, #c0392b, #922b21); }
