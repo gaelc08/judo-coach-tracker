@@ -1337,3 +1337,15 @@ button, .btn-primary, .btn-secondary, .btn-danger {
     padding: 8px 10px;
   }
 }
+
+/* ===== Version badge ===== */
+.app-version {
+  position: fixed;
+  bottom: 8px;
+  right: 12px;
+  font-size: 0.7rem;
+  color: var(--gray-400, #aab4be);
+  pointer-events: none;
+  z-index: 9999;
+  user-select: none;
+}
