@@ -1204,6 +1204,57 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   padding: 14px 16px;
 }
 
+.help-version-card {
+  margin-top: 20px;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, rgba(15, 52, 96, 0.08), rgba(230, 57, 70, 0.08));
+  border: 1px solid var(--gray-200);
+}
+
+.help-version-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--gray-700);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.help-version-value {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.help-version-label {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--judo-navy);
+}
+
+.help-version-date,
+.help-version-build {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.help-version-date {
+  background: rgba(15, 52, 96, 0.12);
+  color: var(--judo-navy);
+}
+
+.help-version-build {
+  background: rgba(230, 57, 70, 0.14);
+  color: var(--judo-red);
+}
+
 .modal-content-audit {
   width: min(96vw, 1200px);
   max-width: min(96vw, 1200px);

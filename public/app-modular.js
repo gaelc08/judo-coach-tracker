@@ -2,7 +2,7 @@
 // Uses Supabase JS SDK
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { BUILD_ID as __BUILD_ID, effectiveEnv as __effectiveEnv, supabaseKey, supabaseUrl } from './modules/env.js';
+import { BUILD_ID as __BUILD_ID, VERSION_DATE as __VERSION_DATE, VERSION_INCREMENT as __VERSION_INCREMENT, effectiveEnv as __effectiveEnv, supabaseKey, supabaseUrl } from './modules/env.js';
 import { auditMatchesCurrentCoach, formatAuditDateTime, formatAuditDetails, getAuditActionGroup } from './modules/audit-ui.js';
 import { isAdminViaLocalClaims, isAdminViaRest } from './modules/auth-admin.js';
 import { createAuditController } from './modules/audit-controller.js';
@@ -353,6 +353,16 @@ function setupVersionBadge() {
   el.textContent = `v${__BUILD_ID}`;
 }
 
+function setupHelpVersion() {
+  const el = document.getElementById('helpVersion');
+  if (!el) return;
+  el.innerHTML = `
+    <span class="help-version-label">Version</span>
+    <span class="help-version-date">${__VERSION_DATE}</span>
+    <span class="help-version-build">#${__VERSION_INCREMENT}</span>
+  `;
+}
+
 // ===== Init =====
 async function debugSession() {
   try {
@@ -371,6 +381,7 @@ document.addEventListener("DOMContentLoaded", () => {
   console.log('DEBUG DOMContentLoaded');
   setupEnvironmentBanner();
   setupVersionBadge();
+  setupHelpVersion();
   setupPWA();
   setupAuthListeners();
   debugSession();

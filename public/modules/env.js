@@ -43,7 +43,9 @@ export const supabaseKey = effectiveEnv === 'dev'
   ? (localDevKeyOverride || DEV_SUPABASE_KEY || PROD_SUPABASE_KEY)
   : PROD_SUPABASE_KEY;
 
-export const BUILD_ID = '2026-03-14-host-env-1';
+export const VERSION_DATE = '2026-03-15';
+export const VERSION_INCREMENT = '01';
+export const BUILD_ID = `${VERSION_DATE}-r${VERSION_INCREMENT}`;
 
 if (effectiveEnv === 'dev' && !localDevKeyOverride) {
   console.info('DEBUG dev env active using remote dev Supabase project defaults.');
