@@ -3541,8 +3541,8 @@ function exportExpenseHTML() {
   }
   
   .header-logo {
-    width: 54px;
-    height: 54px;
+    width: 80px;
+    height: 80px;
     flex: 0 0 auto;
     display: grid;
     place-items: center;
@@ -3552,8 +3552,8 @@ function exportExpenseHTML() {
   }
   
   .header-logo img { 
-    max-width: 40px;
-    max-height: 40px;
+    max-width: 72px;
+    max-height: 72px;
   }
   
   .header-text h1 {
@@ -4112,8 +4112,8 @@ function exportTimesheetHTML() {
   .print-button { margin: 0 0 10px; padding: 8px 14px; background: linear-gradient(135deg, #0f3460, #145da0); color: white; border: none; border-radius: 999px; cursor: pointer; font-size: 0.82rem; font-weight: 700; box-shadow: 0 6px 16px rgba(20, 93, 160, 0.22); }
   .header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; border-bottom: 2px solid #d8e2ef; padding-bottom: 10px; margin-bottom: 10px; }
   .header-brand { display: flex; align-items: center; gap: 12px; }
-  .header-logo { width: 54px; height: 54px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 12px; background: #f5f8fc; border: 1px solid #d8e2ef; }
-  .header-logo img { max-width: 40px; max-height: 40px; }
+  .header-logo { width: 80px; height: 80px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 12px; background: #f5f8fc; border: 1px solid #d8e2ef; }
+  .header-logo img { max-width: 72px; max-height: 72px; }
   .header-text h1 { margin: 0 0 4px; font-size: 1.1rem; color: #0f3460; }
   .header-text p { margin: 1px 0; color: #526274; font-size: 0.72rem; }
   .document-badge { text-align: right; min-width: 180px; }
