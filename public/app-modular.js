@@ -347,6 +347,12 @@ function setupEnvironmentBanner() {
   envBanner.style.display = 'block';
 }
 
+function setupVersionBadge() {
+  const el = document.getElementById('appVersion');
+  if (!el) return;
+  el.textContent = `v${__BUILD_ID}`;
+}
+
 // ===== Init =====
 async function debugSession() {
   try {
@@ -364,6 +370,7 @@ async function debugSession() {
 document.addEventListener("DOMContentLoaded", () => {
   console.log('DEBUG DOMContentLoaded');
   setupEnvironmentBanner();
+  setupVersionBadge();
   setupPWA();
   setupAuthListeners();
   debugSession();
