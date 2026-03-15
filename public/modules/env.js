@@ -6,6 +6,7 @@ const DEV_SUPABASE_KEY = 'sb_publishable_lHFJ9uxG0ZgkCeONR3PXyA_Jf8Lx_p_';
 
 const hostname = (window.location.hostname || '').toLowerCase();
 const isLocalHost = ['localhost', '127.0.0.1'].includes(hostname);
+// isDevHost: reserved for future dev-prefixed staging domains (e.g. dev.example.com)
 const isDevHost = hostname === 'dev' || hostname.startsWith('dev.') || hostname.startsWith('dev-');
 const ENV_OVERRIDE_KEY = 'jct.env.override';
 const envParam = (new URLSearchParams(window.location.search).get('env') || '').toLowerCase();

@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: ["main", "dev"]
+    branches: ["main"]
   # Allow manual trigger from the Actions tab
   workflow_dispatch:
 
@@ -17,13 +17,10 @@ concurrency:
 
 jobs:
   deploy:
-    environment:
-      name: ${{ github.ref_name == 'dev' && 'dev' || 'github-pages' }}
-      url: ${{ github.ref_name == 'dev' && 'https://jccattenom-dev.cantarero.fr/' || steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     environment:
-      name: ${{ github.ref_name == 'dev' && 'dev' || 'github-pages' }}
-      url: ${{ github.ref_name == 'dev' && 'https://jccattenom-dev.cantarero.fr/' || steps.deployment.outputs.page_url }}
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4

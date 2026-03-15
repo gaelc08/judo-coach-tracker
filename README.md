@@ -199,9 +199,9 @@ If needed, you can still override dev credentials from the browser using localSt
 
 You can manually force an environment from any URL:
 
-- `?env=dev` forces `dev`
+- `?env=dev` forces `dev` (persisted in localStorage)
 - `?env=prod` forces `prod`
-- `?env=auto` clears the force override and returns to hostname-based auto mode
+- `?env=auto` clears the override and returns to the default (prod on the live app, dev on localhost)
 
 Note: `?env=dev` / `?env=prod` are persisted in localStorage (`jct.env.override`) until you use `?env=auto`.
 
@@ -214,13 +214,15 @@ Use this sequence to avoid mixing frontend code, backend project, and host:
 
 git switch dev
 npm run env:dev
-# open: https://jccattenom-dev.cantarero.fr/
+# Test at: https://jccattenom.cantarero.fr/?env=dev
 
 # PROD release/check
 
 git switch main
 npm run env:prod
 # open: https://jccattenom.cantarero.fr/
+```
+
 ## All-in-one environment commands
 
 For most cases, use these single commands to update everything for dev or prod:
@@ -234,13 +236,14 @@ npm run env:prod
 ```
 
 These run DB migrations, config push, and function deploy in sequence for the selected environment.
-```
 
-Frontend runtime selection is automatic by host:
+Frontend runtime selection — the same app URL is used for both environments:
 
-- `https://jccattenom-dev.cantarero.fr` -> dev Supabase
-- `https://jccattenom.cantarero.fr` -> prod Supabase
-- `?env=dev|prod|auto` is still available for manual override/testing
+- `https://jccattenom.cantarero.fr/` → prod Supabase (default)
+- `https://jccattenom.cantarero.fr/?env=dev` → dev Supabase
+- `?env=prod` forces prod, `?env=auto` clears the override and returns to the default
+
+> **Tip:** `?env=dev` is persisted in `localStorage` (`jct.env.override`) so you only need to add it once per browser. Use `?env=auto` to go back to prod.
 
 ### Deployment
 
@@ -346,6 +349,7 @@ Supabase embeds its configured **Site URL** into every auth email it sends (incl
 3. Under **Redirect URLs**, add every additional origin the app may be served from, e.g.:
    - `https://gaelc08.github.io/judo-coach-tracker`
    - `https://gaelc08.github.io/judo-coach-tracker/`
+   - `https://gaelc08.github.io/judo-coach-tracker/?env=dev` (for dev Supabase testing via URL param)
 4. Save.
 
 These values are mirrored in `supabase/config.toml` (`[auth]` section) so that the Supabase CLI can push them:
