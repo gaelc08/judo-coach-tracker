@@ -2727,6 +2727,7 @@ function exportExpenseHTML() {
     html, body {
       width: 194mm;
       margin: 0;
+      padding: 0;
       background: white;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
@@ -2738,11 +2739,13 @@ function exportExpenseHTML() {
       margin: 0;
       width: 194mm;
       max-width: 194mm;
+      min-height: 0 !important;
       display: flex;
       border-radius: 0;
     }
     .page-inner {
       padding: 0;
+      min-height: 0 !important;
       display: flex;
       flex-direction: column;
     }
@@ -3171,12 +3174,10 @@ function exportExpenseHTML() {
             <img src="${logoUrl}" alt="Judo Club Cattenom-Rodemack" />
           </div>
           <div class="header-text">
-            <h1>Judo Club de Cattenom-Rodemack</h1>
-            <p>Dojo Communautaire</p>
-            <p>3 rue St Exupery</p>
+            <h1>Judo Club de Cattenom Rodemack</h1>
+            <p>Maison des arts martiaux</p>
             <p>57570 Cattenom</p>
-            <p>SIRET 30157248300024</p>
-            <p>📧 judoclubcattenom@gmail.com – 📞 06 62 62 53 13</p>
+            <p>judoclubcattenom@gmail.com</p>
           </div>
         </div>
         <div class="document-badge">
@@ -3416,12 +3417,12 @@ function exportTimesheetHTML() {
     @page { size: A4 portrait; margin: 8mm; }
     * { box-shadow: none !important; text-shadow: none !important; filter: none !important; }
     html, body {
-      width: 194mm; margin: 0; background: white;
+      width: 194mm; margin: 0; padding: 0; background: white;
       -webkit-print-color-adjust: exact; print-color-adjust: exact;
     }
     .no-print { display: none; }
-    .page-shell { box-shadow: none; border: none; margin: 0; width: 194mm; max-width: 194mm; display: flex; border-radius: 0; }
-    .page-inner { padding: 0; display: flex; flex-direction: column; }
+    .page-shell { box-shadow: none; border: none; margin: 0; width: 194mm; max-width: 194mm; min-height: 0 !important; display: flex; border-radius: 0; }
+    .page-inner { padding: 0; min-height: 0 !important; display: flex; flex-direction: column; }
     .header, .header-brand {
       display: flex !important;
       flex-direction: row !important;
@@ -3495,12 +3496,10 @@ function exportTimesheetHTML() {
             <img src="${logoUrl}" alt="Judo Club Cattenom-Rodemack" />
           </div>
           <div class="header-text">
-            <h1>Judo Club de Cattenom-Rodemack</h1>
-            <p>Dojo Communautaire</p>
-            <p>3 rue St Exupery</p>
+            <h1>Judo Club de Cattenom Rodemack</h1>
+            <p>Maison des arts martiaux</p>
             <p>57570 Cattenom</p>
-            <p>SIRET 30157248300024</p>
-            <p>📧 judoclubcattenom@gmail.com – 📞 06 62 62 53 13</p>
+            <p>judoclubcattenom@gmail.com</p>
           </div>
         </div>
         <div class="document-badge">
