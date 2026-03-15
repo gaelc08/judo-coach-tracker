@@ -2818,6 +2818,11 @@ function exportExpenseHTML() {
     box-shadow: none;
   }
 
+  .close-button {
+    margin-left: 8px;
+    background: linear-gradient(135deg, #c0392b, #922b21);
+  }
+
   .header { 
     display: flex; 
     align-items: flex-start;
@@ -3158,6 +3163,7 @@ function exportExpenseHTML() {
   <div class="page-shell">
     <div class="page-inner">
       <button class="print-button no-print" onclick="window.print()">🖨️ Imprimer / Enregistrer en PDF</button>
+      <button class="print-button close-button no-print" onclick="window.close()">✖ Fermer</button>
 
       <div class="header">
         <div class="header-brand">
@@ -3432,6 +3438,7 @@ function exportTimesheetHTML() {
   .page-shell { width: 194mm; max-width: 194mm; min-height: 245mm; margin: 0 auto; background: #ffffff; border: none; border-radius: 12px; box-shadow: none; display: flex; overflow: hidden; }
   .page-inner { padding: 14px 16px 16px; min-height: 245mm; display: flex; flex-direction: column; }
   .print-button { margin: 0 0 10px; padding: 8px 14px; background: linear-gradient(135deg, #0f3460, #145da0); color: white; border: none; border-radius: 999px; cursor: pointer; font-size: 0.82rem; font-weight: 700; box-shadow: none; }
+  .close-button { margin-left: 8px; background: linear-gradient(135deg, #c0392b, #922b21); }
   .header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; border-bottom: 2px solid #d8e2ef; padding-bottom: 10px; margin-bottom: 10px; }
   .header-brand { display: flex; align-items: center; gap: 12px; }
   .header-logo { width: 54px; height: 54px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 12px; background: #f5f8fc; border: 1px solid #d8e2ef; }
@@ -3477,6 +3484,7 @@ function exportTimesheetHTML() {
 <body>
   <div class="no-print" style="margin-bottom: 10px; text-align: center;">
     <button class="print-button" onclick="window.print()">🖨 Imprimer / Enregistrer en PDF</button>
+    <button class="print-button close-button" onclick="window.close()">✖ Fermer</button>
   </div>
   
   <div class="page-shell">
