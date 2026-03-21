@@ -340,6 +340,27 @@ async function renderHelloAssoSection() {
       ? `Dernière synchronisation : ${new Date(lastSync).toLocaleString('fr-FR')}`
       : 'Jamais synchronisé';
 
+    // Compute FFJ judo category from year of birth.
+    // Season reference: competition year starts in September, so use current year.
+    // FFJ categories 2025/2026: year of birth determines category.
+    function getFfjCategory(dateOfBirth) {
+      if (!dateOfBirth) return null;
+      // Try to extract year from various formats: DD/MM/YYYY, YYYY-MM-DD, DD-MM-YYYY
+      const yearMatch = String(dateOfBirth).match(/(?:^|\D)(\d{4})(?:\D|$)/);
+      if (!yearMatch) return null;
+      const year = parseInt(yearMatch[1], 10);
+      if (isNaN(year)) return null;
+      // FFJ categories based on birth year for season 2025/2026
+      if (year >= 2022) return 'Baby Judo (≤3 ans)';
+      if (year >= 2020) return 'Mini-Poussin';
+      if (year >= 2018) return 'Poussin';
+      if (year >= 2016) return 'Benjamin';
+      if (year >= 2014) return 'Minime';
+      if (year >= 2012) return 'Cadet';
+      if (year >= 2010) return 'Junior';
+      return 'Senior';
+    }
+
     // Helper to build a member table for a given group
     function buildMemberTable(group, showCategory = false) {
       if (group.length === 0) return '<p class="audit-status">Aucun adhérent.</p>';
@@ -350,8 +371,9 @@ async function renderHelloAssoSection() {
         const date = m.membership_date
           ? new Date(m.membership_date).toLocaleDateString('fr-FR')
           : '—';
+        const ffjCategory = showCategory ? getFfjCategory(m.date_of_birth) : null;
         const categoryCell = showCategory
-          ? `<td>${__escapeHtml(m.judo_category ?? '—')}</td>`
+          ? `<td>${__escapeHtml(ffjCategory ?? m.judo_category ?? '—')}</td>`
           : '';
         const dob = m.date_of_birth ? __escapeHtml(m.date_of_birth) : '—';
         return `<tr>
@@ -391,11 +413,14 @@ async function renderHelloAssoSection() {
       const taiso = sorted.filter((m) => m.discipline === 'taiso');
       const other = sorted.filter((m) => !['judo','iaido','taiso'].includes(m.discipline));
 
-      // Sort judo by category order
-      const categoryOrder = ['Baby Judo', 'Mini-Poussin/Poussin', 'Benjamin/Minime', 'Cadet/Junior/Senior'];
+      // Sort judo by FFJ category (from date_of_birth if available, else from judo_category)
+      const ffjOrder = ['Baby Judo (≤3 ans)', 'Mini-Poussin', 'Poussin', 'Benjamin', 'Minime', 'Cadet', 'Junior', 'Senior'];
+      const legacyOrder = ['Baby Judo', 'Mini-Poussin/Poussin', 'Benjamin/Minime', 'Cadet/Junior/Senior'];
       judo.sort((a, b) => {
-        const ia = categoryOrder.indexOf(a.judo_category ?? '');
-        const ib = categoryOrder.indexOf(b.judo_category ?? '');
+        const catA = getFfjCategory(a.date_of_birth) ?? a.judo_category ?? '';
+        const catB = getFfjCategory(b.date_of_birth) ?? b.judo_category ?? '';
+        const ia = ffjOrder.indexOf(catA) !== -1 ? ffjOrder.indexOf(catA) : legacyOrder.indexOf(catA) * 2;
+        const ib = ffjOrder.indexOf(catB) !== -1 ? ffjOrder.indexOf(catB) : legacyOrder.indexOf(catB) * 2;
         if (ia !== ib) return ia - ib;
         return (a.last_name ?? '').localeCompare(b.last_name ?? '', 'fr');
       });
