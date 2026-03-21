@@ -55,9 +55,11 @@ const __supabaseFetchDebugWrapped = async (input, init = {}) => {
   if (isSupabase && !init.signal && typeof AbortController !== 'undefined') {
     controller = new AbortController();
     finalInit = { ...init, signal: controller.signal };
+    // Use a longer timeout for Edge Function calls (e.g. HelloAsso sync can take time)
+    const fetchTimeoutMs = String(url).includes('/functions/v1/') ? 60000 : 15000;
     timeoutId = setTimeout(() => {
       try { controller.abort(); } catch {}
-    }, 15000);
+    }, fetchTimeoutMs);
   }
 
   try {
