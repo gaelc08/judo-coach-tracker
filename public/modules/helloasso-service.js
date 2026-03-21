@@ -1,0 +1,32 @@
+/**
+ * HelloAsso member sync service.
+ * Provides functions to trigger server-side sync and read synced member data.
+ */
+
+export async function syncHelloAssoMembers(supabase) {
+  const { data, error } = await supabase.functions.invoke('sync-helloasso', {
+    method: 'POST',
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function getHelloAssoMembers(supabase) {
+  const { data, error } = await supabase
+    .from('helloasso_members')
+    .select('*')
+    .order('last_name', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function getLastSyncTime(supabase) {
+  const { data, error } = await supabase
+    .from('helloasso_members')
+    .select('synced_at')
+    .order('synced_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) return null;
+  return data?.synced_at ?? null;
+}

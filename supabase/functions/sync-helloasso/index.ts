@@ -1,0 +1,257 @@
+/**
+ * Supabase Edge Function — sync-helloasso
+ *
+ * Triggered by an admin to pull all members and payments from the HelloAsso API
+ * and upsert them into the `helloasso_members` table.
+ *
+ * Authorization: Bearer <admin JWT>
+ *
+ * Deployment
+ * ----------
+ * supabase functions deploy sync-helloasso --project-ref <your-project-ref>
+ *
+ * Required secrets (set via `supabase secrets set`):
+ *   HELLOASSO_CLIENT_ID
+ *   HELLOASSO_CLIENT_SECRET
+ */
+
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+function jsonResponse(body: Record<string, unknown>, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
+}
+
+// ---- HelloAsso helpers ----
+
+async function getHelloAssoToken(clientId: string, clientSecret: string): Promise<string> {
+  const res = await fetch('https://api.helloasso.com/oauth2/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: clientId,
+      client_secret: clientSecret,
+    }),
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`HelloAsso token error ${res.status}: ${text}`)
+  }
+  const json = await res.json()
+  return json.access_token as string
+}
+
+type HelloAssoPage<T> = {
+  data: T[]
+  pagination?: {
+    continuationToken?: string
+    totalCount?: number
+  }
+}
+
+async function fetchAllPages<T>(
+  baseUrl: string,
+  token: string,
+  params: Record<string, string> = {}
+): Promise<T[]> {
+  const results: T[] = []
+  let continuationToken: string | undefined = undefined
+
+  do {
+    const url = new URL(baseUrl)
+    for (const [k, v] of Object.entries(params)) {
+      url.searchParams.set(k, v)
+    }
+    if (continuationToken) {
+      url.searchParams.set('continuationToken', continuationToken)
+    }
+
+    const res = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      throw new Error(`HelloAsso fetch error ${res.status} for ${url}: ${text}`)
+    }
+
+    const page: HelloAssoPage<T> = await res.json()
+    results.push(...(page.data ?? []))
+    continuationToken = page.pagination?.continuationToken
+  } while (continuationToken)
+
+  return results
+}
+
+// ---- Main handler ----
+
+Deno.serve(async (req: Request): Promise<Response> => {
+  const requestId = crypto.randomUUID()
+
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
+  if (req.method !== 'POST') {
+    return jsonResponse({ error: 'Method not allowed', requestId }, 405)
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    const helloAssoClientId = Deno.env.get('HELLOASSO_CLIENT_ID')
+    const helloAssoClientSecret = Deno.env.get('HELLOASSO_CLIENT_SECRET')
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error('DEBUG sync-helloasso missing Supabase configuration:', { requestId })
+      return jsonResponse({ error: 'Server configuration error (Supabase)', requestId }, 500)
+    }
+
+    if (!helloAssoClientId || !helloAssoClientSecret) {
+      console.error('DEBUG sync-helloasso missing HelloAsso credentials:', { requestId })
+      return jsonResponse({ error: 'Server configuration error (HelloAsso credentials not set)', requestId }, 500)
+    }
+
+    // Create an admin client (service role — never exposed to the browser)
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    })
+
+    // Verify the caller is authenticated
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      return jsonResponse({ error: 'Missing Authorization header', requestId }, 401)
+    }
+
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token)
+    if (userError || !user) {
+      console.warn('DEBUG sync-helloasso auth failed:', { requestId, error: userError?.message })
+      return jsonResponse({ error: 'Unauthorized', requestId }, 401)
+    }
+
+    // Only admins may trigger sync
+    const { data: adminCheck, error: adminError } = await supabaseAdmin
+      .rpc('is_admin', {}, { headers: { Authorization: `Bearer ${token}` } })
+      .single()
+
+    // Fallback: check app_metadata directly if RPC fails or returns false
+    const isAdminByMeta = user.app_metadata?.is_admin === true || user.app_metadata?.is_admin === 'true'
+    const isAdmin = (adminCheck === true) || isAdminByMeta
+
+    if (!isAdmin) {
+      console.warn('DEBUG sync-helloasso forbidden:', { requestId, userId: user.id, adminCheck, adminError: adminError?.message })
+      return jsonResponse({ error: 'Forbidden: admin only', requestId }, 403)
+    }
+
+    console.log('DEBUG sync-helloasso start:', { requestId, userId: user.id })
+
+    // ---- Get HelloAsso OAuth token ----
+    const haToken = await getHelloAssoToken(helloAssoClientId, helloAssoClientSecret)
+
+    const ORG = 'judo-club-cattenom-rodemack'
+
+    // ---- Fetch all members ----
+    type HaMember = {
+      id?: number | string
+      firstName?: string
+      lastName?: string
+      email?: string
+      dateOfBirth?: string
+      [key: string]: unknown
+    }
+    const members = await fetchAllPages<HaMember>(
+      `https://api.helloasso.com/v5/organizations/${ORG}/members`,
+      haToken,
+    )
+    console.log('DEBUG sync-helloasso members fetched:', members.length)
+
+    // ---- Fetch all payments for the membership form ----
+    type HaPayment = {
+      order?: {
+        payer?: {
+          email?: string
+        }
+      }
+      amount?: number
+      date?: string
+      state?: string
+      [key: string]: unknown
+    }
+    const payments = await fetchAllPages<HaPayment>(
+      `https://api.helloasso.com/v5/organizations/${ORG}/forms/Membership/adhesion-2025-2026-sport/payments`,
+      haToken,
+    )
+    console.log('DEBUG sync-helloasso payments fetched:', payments.length)
+
+    // Build email → payment map (first payment wins if duplicates)
+    const paymentByEmail = new Map<string, HaPayment>()
+    for (const p of payments) {
+      const email = p.order?.payer?.email?.toLowerCase()
+      if (email && !paymentByEmail.has(email)) {
+        paymentByEmail.set(email, p)
+      }
+    }
+
+    // ---- Build upsert rows ----
+    const rows = members.map((m) => {
+      const emailKey = m.email?.toLowerCase()
+      const payment = emailKey ? paymentByEmail.get(emailKey) : undefined
+      return {
+        helloasso_id: String(m.id ?? ''),
+        first_name: m.firstName ?? null,
+        last_name: m.lastName ?? null,
+        email: m.email ?? null,
+        date_of_birth: m.dateOfBirth ?? null,
+        membership_amount: payment?.amount != null ? payment.amount / 100 : null,
+        membership_date: payment?.date ?? null,
+        membership_state: payment?.state ?? null,
+        raw_data: m,
+        synced_at: new Date().toISOString(),
+      }
+    })
+
+    // ---- Upsert into helloasso_members ----
+    const { error: upsertError } = await supabaseAdmin
+      .from('helloasso_members')
+      .upsert(rows, { onConflict: 'helloasso_id' })
+
+    if (upsertError) {
+      console.error('DEBUG sync-helloasso upsert error:', { requestId, error: upsertError.message })
+      return jsonResponse({ error: `Upsert failed: ${upsertError.message}`, requestId }, 500)
+    }
+
+    const syncedAt = new Date().toISOString()
+
+    // ---- Insert audit log ----
+    const { error: auditError } = await supabaseAdmin.from('audit_logs').insert({
+      actor_uid: user.id,
+      actor_email: user.email ?? null,
+      action: 'helloasso_sync',
+      entity_type: 'helloasso_members',
+      entity_id: null,
+      target_user_id: null,
+      target_email: null,
+      metadata: { count: rows.length, synced_at: syncedAt, requestId },
+    })
+
+    if (auditError) {
+      console.warn('DEBUG sync-helloasso audit log failed:', auditError.message)
+    }
+
+    console.log('DEBUG sync-helloasso success:', { requestId, count: rows.length, syncedAt })
+    return jsonResponse({ count: rows.length, synced_at: syncedAt, requestId }, 200)
+  } catch (e) {
+    console.error('DEBUG sync-helloasso unexpected error:', { requestId, error: String(e) })
+    return jsonResponse({ error: String(e), requestId }, 500)
+  }
+})

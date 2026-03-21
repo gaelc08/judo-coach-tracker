@@ -16,6 +16,7 @@ import { calculateAnnualMileageAmount, formatNumberFr, getLegacyKmRateFromFiscal
 import { findExistingProfileByEmail, getCoachDisplayName, getCurrentUserDisplayName, getProfileLabel, getProfileType, isVolunteerProfile } from './modules/profile-utils.js';
 import { setupPWA } from './modules/pwa.js';
 import { createRestGateway } from './modules/rest-gateway.js';
+import { syncHelloAssoMembers, getHelloAssoMembers, getLastSyncTime } from './modules/helloasso-service.js';
 import {
   __decodeJwtPayload,
   __describeJwt,
@@ -317,6 +318,98 @@ async function loadAuditLogs() {
 
 async function openAuditLogsModal() {
   return await __auditController.openAuditLogsModal();
+}
+
+// ===== HelloAsso members =====
+
+async function renderHelloAssoSection() {
+  const contentEl = document.getElementById('helloAssoContent');
+  if (!contentEl) return;
+
+  contentEl.innerHTML = '<p>Chargement…</p>';
+
+  try {
+    const [lastSync, members] = await Promise.all([
+      getLastSyncTime(supabase),
+      getHelloAssoMembers(supabase),
+    ]);
+
+    const syncInfo = lastSync
+      ? `Dernière synchronisation : ${new Date(lastSync).toLocaleString('fr-FR')}`
+      : 'Jamais synchronisé';
+
+    let tableHtml = '';
+    if (members.length === 0) {
+      tableHtml = '<p class="audit-status">Aucun membre synchronisé. Cliquez sur Synchroniser.</p>';
+    } else {
+      const rows = members.map((m) => {
+        const amount = m.membership_amount != null
+          ? `${Number(m.membership_amount).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €`
+          : '—';
+        const date = m.membership_date
+          ? new Date(m.membership_date).toLocaleDateString('fr-FR')
+          : '—';
+        const state = m.membership_state ?? '—';
+        return `<tr>
+          <td>${__escapeHtml(m.first_name ?? '')}</td>
+          <td>${__escapeHtml(m.last_name ?? '')}</td>
+          <td>${__escapeHtml(m.email ?? '')}</td>
+          <td>${amount}</td>
+          <td>${date}</td>
+          <td>${__escapeHtml(state)}</td>
+        </tr>`;
+      }).join('');
+
+      tableHtml = `
+        <div class="audit-table-wrap">
+          <table class="audit-table">
+            <thead>
+              <tr>
+                <th>Prénom</th>
+                <th>Nom</th>
+                <th>Email</th>
+                <th>Montant (€)</th>
+                <th>Date adhésion</th>
+                <th>Statut</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+    }
+
+    contentEl.innerHTML = `
+      <div class="audit-toolbar">
+        <span class="audit-status">${__escapeHtml(syncInfo)}</span>
+        <button id="syncHelloAssoBtn" class="btn-secondary">🔄 Synchroniser</button>
+      </div>
+      ${tableHtml}`;
+
+    const syncBtn = document.getElementById('syncHelloAssoBtn');
+    if (syncBtn) {
+      syncBtn.onclick = async () => {
+        syncBtn.disabled = true;
+        syncBtn.textContent = '⏳ Synchronisation…';
+        try {
+          const result = await syncHelloAssoMembers(supabase);
+          console.log('DEBUG sync-helloasso result:', result);
+        } catch (e) {
+          console.error('DEBUG sync-helloasso error:', e);
+          alert(`Erreur lors de la synchronisation : ${e.message || e}`);
+        } finally {
+          await renderHelloAssoSection();
+        }
+      };
+    }
+  } catch (e) {
+    console.error('DEBUG renderHelloAssoSection error:', e);
+    contentEl.innerHTML = `<p class="audit-status">Erreur : ${__escapeHtml(String(e))}</p>`;
+  }
+}
+
+async function openHelloAssoModal() {
+  document.getElementById('helloAssoModal').classList.add('active');
+  await renderHelloAssoSection();
 }
 
 // ===== Holiday data (dynamically fetched, with static fallback) =====
@@ -660,6 +753,7 @@ function setupAuthListeners() {
         document.getElementById("inviteAdminBtn").style.display = "inline-block";
         document.getElementById("freezeBtn").style.display = "inline-block";
         document.getElementById("auditLogsBtn").style.display = "inline-block";
+        document.getElementById("helloAssoBtn").style.display = "inline-block";
         document.getElementById("importGroup").style.display = "flex";
         document.getElementById("backupBtn").style.display = "inline-block";
       } else {
@@ -668,6 +762,7 @@ function setupAuthListeners() {
         document.getElementById("inviteAdminBtn").style.display = "none";
         document.getElementById("freezeBtn").style.display = "none";
         document.getElementById("auditLogsBtn").style.display = "none";
+        document.getElementById("helloAssoBtn").style.display = "none";
         document.getElementById("importGroup").style.display = "none";
         document.getElementById("backupBtn").style.display = "none";
       }
@@ -1081,6 +1176,18 @@ function setupEventListeners() {
   });
 
   bindClick("auditLogsBtn", openAuditLogsModal);
+
+  bindClick("helloAssoBtn", openHelloAssoModal);
+
+  bindClick("closeHelloAsso", () => {
+    document.getElementById("helloAssoModal").classList.remove("active");
+  });
+
+  bindClick("helloAssoModal", (e) => {
+    if (e.target.id === "helloAssoModal") {
+      document.getElementById("helloAssoModal").classList.remove("active");
+    }
+  });
 
   bindClick("refreshAuditLogsBtn", loadAuditLogs);
 
