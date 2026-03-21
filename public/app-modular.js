@@ -16,7 +16,7 @@ import { calculateAnnualMileageAmount, formatNumberFr, getLegacyKmRateFromFiscal
 import { findExistingProfileByEmail, getCoachDisplayName, getCurrentUserDisplayName, getProfileLabel, getProfileType, isVolunteerProfile } from './modules/profile-utils.js';
 import { setupPWA } from './modules/pwa.js';
 import { createRestGateway } from './modules/rest-gateway.js';
-import { syncHelloAssoMembers, getHelloAssoMembers, getLastSyncTime } from './modules/helloasso-service.js';
+import { syncHelloAssoMembers, getHelloAssoMembers, getLastSyncTime, parseHelloAssoCsv, importHelloAssoCsvData } from './modules/helloasso-service.js';
 import {
   __decodeJwtPayload,
   __describeJwt,
@@ -353,11 +353,13 @@ async function renderHelloAssoSection() {
         const categoryCell = showCategory
           ? `<td>${__escapeHtml(m.judo_category ?? '—')}</td>`
           : '';
+        const dob = m.date_of_birth ? __escapeHtml(m.date_of_birth) : '—';
         return `<tr>
           <td>${__escapeHtml(m.first_name ?? '')}</td>
           <td>${__escapeHtml(m.last_name ?? '')}</td>
           <td>${__escapeHtml(m.email ?? '')}</td>
           ${categoryCell}
+          <td>${dob}</td>
           <td>${amount}</td>
           <td>${date}</td>
         </tr>`;
@@ -369,7 +371,7 @@ async function renderHelloAssoSection() {
             <thead><tr>
               <th>Prénom</th><th>Nom</th><th>Email</th>
               ${categoryHeader}
-              <th>Montant (€)</th><th>Date adhésion</th>
+              <th>Naissance</th><th>Montant (€)</th><th>Date adhésion</th>
             </tr></thead>
             <tbody>${rows}</tbody>
           </table>
@@ -413,6 +415,10 @@ async function renderHelloAssoSection() {
       <div class="audit-toolbar">
         <span class="audit-status">${__escapeHtml(syncInfo)}</span>
         <button id="syncHelloAssoBtn" class="btn-secondary">🔄 Synchroniser</button>
+        <label class="btn-secondary" style="cursor:pointer;margin-left:0.5rem" title="Importer un export CSV HelloAsso pour enrichir les dates de naissance">
+          📂 Importer CSV
+          <input type="file" id="helloAssoCsvInput" accept=".csv" style="display:none">
+        </label>
       </div>
       ${tableHtml}`;
 
@@ -430,6 +436,35 @@ async function renderHelloAssoSection() {
         } finally {
           await renderHelloAssoSection();
         }
+      };
+    }
+
+    const csvInput = document.getElementById('helloAssoCsvInput');
+    if (csvInput) {
+      csvInput.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          const rows = parseHelloAssoCsv(text);
+          if (rows.length === 0) {
+            alert('Aucune donnée trouvée dans le CSV. Vérifiez le format du fichier.');
+            return;
+          }
+          const withDob = rows.filter((r) => r.date_of_birth);
+          if (withDob.length === 0) {
+            alert('Le CSV ne contient pas de colonne "date de naissance". Vérifiez les colonnes exportées depuis HelloAsso.');
+            return;
+          }
+          const { updated, notFound } = await importHelloAssoCsvData(supabase, withDob);
+          let msg = `✅ ${updated} date(s) de naissance importée(s).`;
+          if (notFound.length > 0) msg += `\n⚠️ ${notFound.length} email(s) non trouvé(s) dans la base.`;
+          alert(msg);
+          await renderHelloAssoSection();
+        } catch (err) {
+          alert(`Erreur lors de l'import CSV : ${err.message || err}`);
+        }
+        csvInput.value = '';
       };
     }
   } catch (e) {
