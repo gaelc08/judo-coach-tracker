@@ -405,7 +405,7 @@ async function renderHelloAssoSection() {
         ${buildMemberTable(iaido, false)}
         <h3>🤸 Taïso (${taiso.length})</h3>
         ${buildMemberTable(taiso, false)}
-        ${other.length > 0 ? `<h3>Autres (${other.length})</h3>${buildMemberTable(other, false)}` : ''}
+        
       `;
     }
 
