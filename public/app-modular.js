@@ -351,14 +351,14 @@ async function renderHelloAssoSection() {
       const year = parseInt(yearMatch[1], 10);
       if (isNaN(year)) return null;
       // FFJ categories based on birth year for season 2025/2026
-      if (year >= 2022) return 'Baby Judo (≤3 ans)';
-      if (year >= 2020) return 'Mini-Poussin';
-      if (year >= 2018) return 'Poussin';
-      if (year >= 2016) return 'Benjamin';
-      if (year >= 2014) return 'Minime';
-      if (year >= 2012) return 'Cadet';
-      if (year >= 2010) return 'Junior';
-      return 'Senior';
+      if (year >= 2021) return 'Baby Judo';       // 2021-2022
+      if (year >= 2019) return 'Mini-Poussin';    // 2019-2020
+      if (year >= 2017) return 'Poussin';         // 2017-2018
+      if (year >= 2015) return 'Benjamin';        // 2015-2016
+      if (year >= 2013) return 'Minime';          // 2013-2014
+      if (year >= 2011) return 'Cadet';           // 2011-2012
+      if (year >= 2008) return 'Junior';          // 2008-2009-2010
+      return 'Senior';                            // ≤ 2007
     }
 
     // Helper to build a member table for a given group
@@ -414,7 +414,7 @@ async function renderHelloAssoSection() {
       const other = sorted.filter((m) => !['judo','iaido','taiso'].includes(m.discipline));
 
       // Sort judo by FFJ category (from date_of_birth if available, else from judo_category)
-      const ffjOrder = ['Baby Judo (≤3 ans)', 'Mini-Poussin', 'Poussin', 'Benjamin', 'Minime', 'Cadet', 'Junior', 'Senior'];
+      const ffjOrder = ['Baby Judo', 'Mini-Poussin', 'Poussin', 'Benjamin', 'Minime', 'Cadet', 'Junior', 'Senior'];
       const legacyOrder = ['Baby Judo', 'Mini-Poussin/Poussin', 'Benjamin/Minime', 'Cadet/Junior/Senior'];
       judo.sort((a, b) => {
         const catA = getFfjCategory(a.date_of_birth) ?? a.judo_category ?? '';
