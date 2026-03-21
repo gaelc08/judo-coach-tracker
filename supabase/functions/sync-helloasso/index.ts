@@ -161,62 +161,40 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const ORG = 'judo-club-cattenom-rodemack'
 
-    // ---- Fetch all members ----
-    type HaMember = {
+    // ---- Fetch all membership items (adhérents) ----
+    // The /members endpoint is not available for this API key; use /forms/.../items instead.
+    type HaItem = {
       id?: number | string
-      firstName?: string
-      lastName?: string
-      email?: string
-      dateOfBirth?: string
-      [key: string]: unknown
-    }
-    const members = await fetchAllPages<HaMember>(
-      `https://api.helloasso.com/v5/organizations/${ORG}/members`,
-      haToken,
-    )
-    console.log('DEBUG sync-helloasso members fetched:', members.length)
-
-    // ---- Fetch all payments for the membership form ----
-    type HaPayment = {
-      order?: {
-        payer?: {
-          email?: string
-        }
-      }
+      payer?: { email?: string; firstName?: string; lastName?: string }
+      user?: { firstName?: string; lastName?: string }
+      payments?: Array<{ amount?: number; date?: string; state?: string }>
+      order?: { date?: string; id?: number }
       amount?: number
-      date?: string
       state?: string
       [key: string]: unknown
     }
-    const payments = await fetchAllPages<HaPayment>(
-      `https://api.helloasso.com/v5/organizations/${ORG}/forms/Membership/adhesion-2025-2026-sport/payments`,
+    const items = await fetchAllPages<HaItem>(
+      `https://api.helloasso.com/v5/organizations/${ORG}/forms/Membership/adhesion-2025-2026-sport/items`,
       haToken,
     )
-    console.log('DEBUG sync-helloasso payments fetched:', payments.length)
+    console.log('DEBUG sync-helloasso items fetched:', items.length)
 
-    // Build email → payment map (first payment wins if duplicates)
-    const paymentByEmail = new Map<string, HaPayment>()
-    for (const p of payments) {
-      const email = p.order?.payer?.email?.toLowerCase()
-      if (email && !paymentByEmail.has(email)) {
-        paymentByEmail.set(email, p)
-      }
-    }
-
-    // ---- Build upsert rows ----
-    const rows = members.map((m) => {
-      const emailKey = m.email?.toLowerCase()
-      const payment = emailKey ? paymentByEmail.get(emailKey) : undefined
+    // ---- Build upsert rows from items ----
+    const rows = items.map((item) => {
+      const payer = item.payer ?? {}
+      const user = item.user ?? {}
+      const firstPayment = (item.payments ?? [])[0]
+      const amountCentimes = item.amount ?? firstPayment?.amount
       return {
-        helloasso_id: String(m.id ?? ''),
-        first_name: m.firstName ?? null,
-        last_name: m.lastName ?? null,
-        email: m.email ?? null,
-        date_of_birth: m.dateOfBirth ?? null,
-        membership_amount: payment?.amount != null ? payment.amount / 100 : null,
-        membership_date: payment?.date ?? null,
-        membership_state: payment?.state ?? null,
-        raw_data: m,
+        helloasso_id: String(item.id ?? ''),
+        first_name: user.firstName ?? payer.firstName ?? null,
+        last_name: user.lastName ?? payer.lastName ?? null,
+        email: payer.email ?? null,
+        date_of_birth: null,
+        membership_amount: amountCentimes != null ? amountCentimes / 100 : null,
+        membership_date: item.order?.date ?? firstPayment?.date ?? null,
+        membership_state: item.state ?? firstPayment?.state ?? null,
+        raw_data: item as Record<string, unknown>,
         synced_at: new Date().toISOString(),
       }
     })
