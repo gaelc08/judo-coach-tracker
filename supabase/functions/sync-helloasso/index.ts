@@ -84,7 +84,13 @@ async function fetchAllPages<T>(
     }
 
     const page: HelloAssoPage<T> = await res.json()
-    results.push(...(page.data ?? []))
+    const items = page.data ?? []
+    results.push(...items)
+
+    // Stop if the page is empty — HelloAsso can return a continuationToken
+    // even when there is no more data, causing an infinite loop.
+    if (items.length === 0) break
+
     continuationToken = page.pagination?.continuationToken
   } while (continuationToken)
 
