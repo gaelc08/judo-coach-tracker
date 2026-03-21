@@ -133,30 +133,42 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token)
-    if (userError || !user) {
-      console.warn('DEBUG sync-helloasso auth failed:', { requestId, error: userError?.message })
-      return jsonResponse({ error: 'Unauthorized', requestId }, 401)
+
+    // Accept service_role JWT directly (used by trusted server-side callers)
+    let actorUid: string | null = null
+    let actorEmail: string | null = null
+
+    if (token === serviceRoleKey) {
+      // Trusted service-role call
+      actorUid = 'service_role'
+      actorEmail = null
+    } else {
+      // Regular user JWT — verify and check admin
+      const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token)
+      if (userError || !user) {
+        console.warn('DEBUG sync-helloasso auth failed:', { requestId, error: userError?.message })
+        return jsonResponse({ error: 'Unauthorized', requestId }, 401)
+      }
+
+      // Check admin via user-context client
+      const supabaseUser = createClient(supabaseUrl, serviceRoleKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+        global: { headers: { Authorization: `Bearer ${token}` } },
+      })
+      const { data: adminCheck } = await supabaseUser.rpc('is_admin')
+      const isAdminByMeta = user.app_metadata?.is_admin === true || user.app_metadata?.is_admin === 'true'
+      const isAdmin = (adminCheck === true) || isAdminByMeta
+
+      if (!isAdmin) {
+        console.warn('DEBUG sync-helloasso forbidden:', { requestId, userId: user.id })
+        return jsonResponse({ error: 'Forbidden: admin only', requestId }, 403)
+      }
+
+      actorUid = user.id
+      actorEmail = user.email ?? null
     }
 
-    // Only admins may trigger sync
-    // Use a user-context client (with the caller's JWT) to call is_admin so RLS applies correctly
-    const supabaseUser = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-      global: { headers: { Authorization: `Bearer ${token}` } },
-    })
-    const { data: adminCheck, error: adminError } = await supabaseUser.rpc('is_admin')
-
-    // Fallback: check app_metadata directly if RPC fails or returns false
-    const isAdminByMeta = user.app_metadata?.is_admin === true || user.app_metadata?.is_admin === 'true'
-    const isAdmin = (adminCheck === true) || isAdminByMeta
-
-    if (!isAdmin) {
-      console.warn('DEBUG sync-helloasso forbidden:', { requestId, userId: user.id, adminCheck, adminError: adminError?.message })
-      return jsonResponse({ error: 'Forbidden: admin only', requestId }, 403)
-    }
-
-    console.log('DEBUG sync-helloasso start:', { requestId, userId: user.id })
+    console.log('DEBUG sync-helloasso start:', { requestId, actorUid })
 
     // ---- Get HelloAsso OAuth token ----
     const haToken = await getHelloAssoToken(helloAssoClientId, helloAssoClientSecret)
@@ -237,8 +249,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     // ---- Insert audit log ----
     const { error: auditError } = await supabaseAdmin.from('audit_logs').insert({
-      actor_uid: user.id,
-      actor_email: user.email ?? null,
+      actor_uid: actorUid === 'service_role' ? '00000000-0000-0000-0000-000000000000' : actorUid,
+      actor_email: actorEmail,
       action: 'helloasso_sync',
       entity_type: 'helloasso_members',
       entity_id: null,
