@@ -140,9 +140,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     // Only admins may trigger sync
-    const { data: adminCheck, error: adminError } = await supabaseAdmin
-      .rpc('is_admin', {}, { headers: { Authorization: `Bearer ${token}` } })
-      .single()
+    // Use a user-context client (with the caller's JWT) to call is_admin so RLS applies correctly
+    const supabaseUser = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    })
+    const { data: adminCheck, error: adminError } = await supabaseUser.rpc('is_admin')
 
     // Fallback: check app_metadata directly if RPC fails or returns false
     const isAdminByMeta = user.app_metadata?.is_admin === true || user.app_metadata?.is_admin === 'true'
