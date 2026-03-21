@@ -340,44 +340,73 @@ async function renderHelloAssoSection() {
       ? `Dernière synchronisation : ${new Date(lastSync).toLocaleString('fr-FR')}`
       : 'Jamais synchronisé';
 
-    let tableHtml = '';
-    if (members.length === 0) {
-      tableHtml = '<p class="audit-status">Aucun membre synchronisé. Cliquez sur Synchroniser.</p>';
-    } else {
-      const rows = members.map((m) => {
+    // Helper to build a member table for a given group
+    function buildMemberTable(group, showCategory = false) {
+      if (group.length === 0) return '<p class="audit-status">Aucun adhérent.</p>';
+      const rows = group.map((m) => {
         const amount = m.membership_amount != null
           ? `${Number(m.membership_amount).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €`
           : '—';
         const date = m.membership_date
           ? new Date(m.membership_date).toLocaleDateString('fr-FR')
           : '—';
-        const state = m.membership_state ?? '—';
+        const categoryCell = showCategory
+          ? `<td>${__escapeHtml(m.judo_category ?? '—')}</td>`
+          : '';
         return `<tr>
           <td>${__escapeHtml(m.first_name ?? '')}</td>
           <td>${__escapeHtml(m.last_name ?? '')}</td>
           <td>${__escapeHtml(m.email ?? '')}</td>
+          ${categoryCell}
           <td>${amount}</td>
           <td>${date}</td>
-          <td>${__escapeHtml(state)}</td>
         </tr>`;
       }).join('');
-
-      tableHtml = `
+      const categoryHeader = showCategory ? '<th>Catégorie</th>' : '';
+      return `
         <div class="audit-table-wrap">
           <table class="audit-table">
-            <thead>
-              <tr>
-                <th>Prénom</th>
-                <th>Nom</th>
-                <th>Email</th>
-                <th>Montant (€)</th>
-                <th>Date adhésion</th>
-                <th>Statut</th>
-              </tr>
-            </thead>
+            <thead><tr>
+              <th>Prénom</th><th>Nom</th><th>Email</th>
+              ${categoryHeader}
+              <th>Montant (€)</th><th>Date adhésion</th>
+            </tr></thead>
             <tbody>${rows}</tbody>
           </table>
         </div>`;
+    }
+
+    let tableHtml = '';
+    if (members.length === 0) {
+      tableHtml = '<p class="audit-status">Aucun membre synchronisé. Cliquez sur Synchroniser.</p>';
+    } else {
+      // Sort by last name
+      const sorted = [...members].sort((a, b) =>
+        (a.last_name ?? '').localeCompare(b.last_name ?? '', 'fr'));
+
+      const judo = sorted.filter((m) => m.discipline === 'judo');
+      const iaido = sorted.filter((m) => m.discipline === 'iaido');
+      const taiso = sorted.filter((m) => m.discipline === 'taiso');
+      const other = sorted.filter((m) => !['judo','iaido','taiso'].includes(m.discipline));
+
+      // Sort judo by category order
+      const categoryOrder = ['Baby Judo', 'Mini-Poussin/Poussin', 'Benjamin/Minime', 'Cadet/Junior/Senior'];
+      judo.sort((a, b) => {
+        const ia = categoryOrder.indexOf(a.judo_category ?? '');
+        const ib = categoryOrder.indexOf(b.judo_category ?? '');
+        if (ia !== ib) return ia - ib;
+        return (a.last_name ?? '').localeCompare(b.last_name ?? '', 'fr');
+      });
+
+      tableHtml = `
+        <h3>🥋 Judo (${judo.length})</h3>
+        ${buildMemberTable(judo, true)}
+        <h3>🗡️ Iaïdo (${iaido.length})</h3>
+        ${buildMemberTable(iaido, false)}
+        <h3>🤸 Taïso (${taiso.length})</h3>
+        ${buildMemberTable(taiso, false)}
+        ${other.length > 0 ? `<h3>Autres (${other.length})</h3>${buildMemberTable(other, false)}` : ''}
+      `;
     }
 
     contentEl.innerHTML = `

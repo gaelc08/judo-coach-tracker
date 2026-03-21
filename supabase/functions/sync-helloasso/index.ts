@@ -185,25 +185,54 @@ Deno.serve(async (req: Request): Promise<Response> => {
     )
     console.log('DEBUG sync-helloasso items fetched:', items.length)
 
-    // ---- Build upsert rows from items ----
-    const rows = items.map((item) => {
-      const payer = item.payer ?? {}
-      const user = item.user ?? {}
-      const firstPayment = (item.payments ?? [])[0]
-      const amountCentimes = item.amount ?? firstPayment?.amount
-      return {
-        helloasso_id: String(item.id ?? ''),
-        first_name: user.firstName ?? payer.firstName ?? null,
-        last_name: user.lastName ?? payer.lastName ?? null,
-        email: payer.email ?? null,
-        date_of_birth: null,
-        membership_amount: amountCentimes != null ? amountCentimes / 100 : null,
-        membership_date: item.order?.date ?? firstPayment?.date ?? null,
-        membership_state: item.state ?? firstPayment?.state ?? null,
-        raw_data: item as Record<string, unknown>,
-        synced_at: new Date().toISOString(),
+    // ---- Classify discipline and judo category from item name ----
+    function classifyItem(name: string): { discipline: string; judo_category: string | null } {
+      const n = (name ?? '').toLowerCase()
+      if (n.includes('iaïdo') || n.includes('iaido') || n.includes('cercle iaï')) {
+        return { discipline: 'iaido', judo_category: null }
       }
-    })
+      if (n.includes('taïso') || n.includes('taiso')) {
+        return { discipline: 'taiso', judo_category: null }
+      }
+      if (n.includes('baby judo')) {
+        return { discipline: 'judo', judo_category: 'Baby Judo' }
+      }
+      if (n.includes('mini-poussin') || n.includes('poussin')) {
+        return { discipline: 'judo', judo_category: 'Mini-Poussin/Poussin' }
+      }
+      if (n.includes('benjamin') || n.includes('minime')) {
+        return { discipline: 'judo', judo_category: 'Benjamin/Minime' }
+      }
+      if (n.includes('cadet') || n.includes('junior') || n.includes('senior')) {
+        return { discipline: 'judo', judo_category: 'Cadet/Junior/Senior' }
+      }
+      return { discipline: 'other', judo_category: null }
+    }
+
+    // ---- Build upsert rows from items (exclude Cancelled) ----
+    const rows = items
+      .filter((item) => (item.state ?? '').toLowerCase() !== 'canceled')
+      .map((item) => {
+        const payer = item.payer ?? {}
+        const user = item.user ?? {}
+        const firstPayment = (item.payments ?? [])[0]
+        const amountCentimes = item.amount ?? firstPayment?.amount
+        const { discipline, judo_category } = classifyItem(String(item.name ?? ''))
+        return {
+          helloasso_id: String(item.id ?? ''),
+          first_name: user.firstName ?? payer.firstName ?? null,
+          last_name: user.lastName ?? payer.lastName ?? null,
+          email: payer.email ?? null,
+          date_of_birth: null,
+          membership_amount: amountCentimes != null ? amountCentimes / 100 : null,
+          membership_date: item.order?.date ?? firstPayment?.date ?? null,
+          membership_state: item.state ?? firstPayment?.state ?? null,
+          discipline,
+          judo_category,
+          raw_data: item as Record<string, unknown>,
+          synced_at: new Date().toISOString(),
+        }
+      })
 
     // ---- Upsert into helloasso_members ----
     const { error: upsertError } = await supabaseAdmin
