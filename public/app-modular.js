@@ -356,9 +356,9 @@ async function renderHelloAssoSection() {
       if (year >= 2017) return 'Poussin';         // 2017-2018
       if (year >= 2015) return 'Benjamin';        // 2015-2016
       if (year >= 2013) return 'Minime';          // 2013-2014
-      if (year >= 2011) return 'Cadet';           // 2011-2012
-      if (year >= 2008) return 'Junior';          // 2008-2009-2010
-      return 'Senior';                            // ≤ 2007
+      if (year >= 2010) return 'Cadet';           // 2010-2011-2012
+      if (year >= 2007) return 'Junior';          // 2007-2008-2009
+      return 'Senior';                            // ≤ 2006
     }
 
     // Helper to build a member table for a given group
