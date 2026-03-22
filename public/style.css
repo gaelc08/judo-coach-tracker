@@ -6,19 +6,22 @@
 }
 
 :root {
-  --judo-red: #c0392b;
-  --judo-red-dark: #962d22;
-  --judo-red-light: #e74c3c;
-  --judo-black: #1a1a2e;
-  --judo-dark: #16213e;
-  --judo-navy: #0f3460;
-  --judo-gold: #f39c12;
-  --judo-gold-light: #f5d76e;
+  /* === JCC Brand Colors (charte graphique v1.0) === */
+  --judo-red: #1E3A7B;        /* → bleu marine (primaire) */
+  --judo-red-dark: #163063;   /* → bleu marine foncé */
+  --judo-red-light: #3A5FA0;  /* → bleu secondaire */
+  --judo-black: #1A1A1A;
+  --judo-dark: #1A1A1A;
+  --judo-navy: #1E3A7B;
+  --judo-gold: #FFC857;
+  --judo-gold-light: #FFE299;
   --white: #ffffff;
   --gray-100: #f8f9fa;
   --gray-200: #e9ecef;
   --gray-300: #dee2e6;
+  --gray-400: #aab4be;
   --gray-500: #adb5bd;
+  --gray-600: #868e96;
   --gray-700: #495057;
   --gray-900: #212529;
   --shadow-sm: 0 2px 8px rgba(0,0,0,0.08);
@@ -29,8 +32,8 @@
 }
 
 body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: linear-gradient(135deg, var(--judo-black) 0%, var(--judo-navy) 100%);
+  font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #0f1e40 0%, var(--judo-navy) 100%);
   min-height: 100vh;
   width: 100%;
   max-width: 100%;
