@@ -1,0 +1,43 @@
+/* === JCC Brand Tokens — Judo Club Cattenom Rodemack === */
+/* Charte graphique v1.0 — Mars 2026                      */
+
+:root {
+  /* Couleurs primaires */
+  --color-primary: #1E3A7B;
+  --color-primary-hover: #3A5FA0;
+  --color-accent: #FFC857;
+  --color-accent-hover: #FFE299;
+
+  /* Couleurs neutres */
+  --color-text: #1A1A1A;
+  --color-text-secondary: #6B7280;
+  --color-bg: #F3F4F6;
+  --color-surface: #FFFFFF;
+  --color-border: #E5E7EB;
+
+  /* Couleurs fonctionnelles */
+  --color-success: #16A34A;
+  --color-error: #DC2626;
+  --color-warning: #D97706;
+  --color-info: #2563EB;
+
+  /* Typographie */
+  --font-heading: 'Oswald', sans-serif;
+  --font-body: 'Inter', sans-serif;
+
+  /* Border radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-pill: 9999px;
+
+  /* Espacements */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+}
