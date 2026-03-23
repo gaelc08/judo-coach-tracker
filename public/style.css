@@ -193,6 +193,20 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   transform: translateY(-1px);
 }
 
+/* btn-secondary sur fond clair (ex: .card) */
+.card .btn-secondary {
+  background: var(--judo-navy);
+  color: white;
+  border: 1px solid var(--judo-navy);
+  backdrop-filter: none;
+}
+
+.card .btn-secondary:hover {
+  background: var(--judo-red-dark);
+  border-color: var(--judo-red-dark);
+  transform: translateY(-1px);
+}
+
 .btn-danger {
   background: #6c1e1e;
   color: white;
