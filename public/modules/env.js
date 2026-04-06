@@ -43,8 +43,8 @@ export const supabaseKey = effectiveEnv === 'dev'
   ? (localDevKeyOverride || DEV_SUPABASE_KEY || PROD_SUPABASE_KEY)
   : PROD_SUPABASE_KEY;
 
-export const VERSION_DATE = '2026-03-22';
-export const VERSION_INCREMENT = '01';
+export const VERSION_DATE = '2026-04-06';
+export const VERSION_INCREMENT = '02';
 export const BUILD_ID = `${VERSION_DATE}-r${VERSION_INCREMENT}`;
 
 if (effectiveEnv === 'dev' && !localDevKeyOverride) {
@@ -52,3 +52,8 @@ if (effectiveEnv === 'dev' && !localDevKeyOverride) {
 }
 
 console.log('DEBUG env:', effectiveEnv, 'supabase:', supabaseUrl);
+
+// Fonction pour récupérer la version automatiquement
+export const getVersion = () => {
+  return `-r`;
+};

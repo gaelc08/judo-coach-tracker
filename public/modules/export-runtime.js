@@ -28,3 +28,12 @@ export function downloadBlob(blob, fileName) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+// Fonction pour exporter les dépenses mensuelles
+function exportMonthlyExpenses(format) {
+  console.log(`Export des dépenses mensuelles au format ${format}...`);
+  alert(`Export des dépenses mensuelles au format ${format} en cours...`);
+
+  // Logique d'export à implémenter (appel API, génération de fichier, etc.)
+  // Exemple : fetch('/api/export?format=' + format).then(...)
+}
