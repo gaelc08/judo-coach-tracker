@@ -430,8 +430,17 @@
           <li><strong>🔒 Geler la fiche</strong> – verrouille ou déverrouille un mois pour empêcher les modifications.</li>
           <li><strong>📥 Importer JSON</strong> – permet de réinjecter une sauvegarde JSON dans la fiche affichée.</li>
           <li><strong>✉️ Inviter admin</strong> – envoie une invitation à un nouvel administrateur.</li>
+          <li><strong>📊 Exporter rapport mensuel</strong> – génère un rapport des dépenses (salaire + indemnités kilométriques) par entraîneur/mois.</li>
           <li>Les administrateurs peuvent consulter et exporter les données de n'importe quel profil.</li>
         </ul>
+      </div>
+
+      <div class="actions admin-only" style="display: none; margin-top: 20px;">
+        <button id="exportMonthlyExpensesBtn" class="btn-primary">📊 Exporter rapport mensuel</button>
+        <div id="exportFormatSelector" style="display: none; margin-top: 10px;">
+          <button id="exportCSVBtn" class="btn-secondary">CSV</button>
+          <button id="exportJSONBtn" class="btn-secondary">JSON</button>
+        </div>
       </div>
 
       <div class="help-version-card" aria-label="Version de l'application">

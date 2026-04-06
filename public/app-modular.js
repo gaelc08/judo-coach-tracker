@@ -4048,10 +4048,87 @@ function exportBackupJSON() {
   });
 }
 
+// Export monthly expenses report
+async function exportMonthlyExpenses(format = 'csv') {
+  try {
+    const token = await getAuthToken();
+    if (!token) throw new Error("Not authenticated");
+
+    const url = `${supabaseUrl}/functions/v1/export-monthly-expenses?format=${format}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to export report");
+    }
+
+    if (format === 'csv') {
+      const csv = await response.text();
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `monthly_expenses_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else {
+      const json = await response.json();
+      const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `monthly_expenses_${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    __logAuditEvent('export.monthly_expenses', 'export', {
+      metadata: { format }
+    });
+  } catch (error) {
+    alert("Erreur lors de l'export : " + error.message);
+    console.error("Export error:", error);
+  }
+}
+
+// Setup export button
+function setupExportMonthlyExpensesButton() {
+  const exportBtn = document.getElementById('exportMonthlyExpensesBtn');
+  const formatSelector = document.getElementById('exportFormatSelector');
+  const csvBtn = document.getElementById('exportCSVBtn');
+  const jsonBtn = document.getElementById('exportJSONBtn');
+
+  if (!exportBtn || !formatSelector || !csvBtn || !jsonBtn) return;
+
+  exportBtn.addEventListener('click', () => {
+    formatSelector.style.display = formatSelector.style.display === 'none' ? 'block' : 'none';
+  });
+
+  csvBtn.addEventListener('click', () => {
+    formatSelector.style.display = 'none';
+    exportMonthlyExpenses('csv');
+  });
+
+  jsonBtn.addEventListener('click', () => {
+    formatSelector.style.display = 'none';
+    exportMonthlyExpenses('json');
+  });
+}
+
+// Initialize when DOM is loaded
+document.addEventListener('DOMContentLoaded', setupExportMonthlyExpensesButton);
+
 // Optionally expose some functions globally if needed
 window.exportToCSV = exportDeclarationXLS;
 window.exportDeclarationXLS = exportDeclarationXLS;
 window.exportBackupJSON = exportBackupJSON;
+window.exportMonthlyExpenses = exportMonthlyExpenses;
 window.saveCoach = saveCoach;
 window.deleteCoach = deleteCoach;
 window.inviteCoach = inviteCoach;
