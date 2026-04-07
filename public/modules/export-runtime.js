@@ -37,3 +37,20 @@ function exportMonthlyExpenses(format) {
   // Logique d'export à implémenter (appel API, génération de fichier, etc.)
   // Exemple : fetch('/api/export?format=' + format).then(...)
 }
+
+// Fonction pour exporter les dépenses mensuelles
+document.getElementById('exportMonthlyExpensesBtn').addEventListener('click', function() {
+  const format = prompt("Format d'export :\n1. CSV\n2. JSON", "1");
+  if (format === "1" || format === "2") {
+    const exportFormat = format === "1" ? "csv" : "json";
+    exportMonthlyExpenses(exportFormat);
+  }
+});
+
+function exportMonthlyExpenses(format) {
+  console.log(`Export des dépenses mensuelles au format ${format}...`);
+  alert(`Export des dépenses mensuelles au format ${format} en cours...`);
+
+  // Logique d'export à implémenter (appel API, génération de fichier, etc.)
+  // Exemple : fetch('/api/export?format=' + format).then(...)
+}
