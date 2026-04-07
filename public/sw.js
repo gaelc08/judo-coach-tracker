@@ -1,11 +1,23 @@
-const CACHE_VERSION = 'judo-coach-pwa-v53';
-const APP_BUILD_ID = '2026-04-07-reset-v2';
+const CACHE_VERSION = 'judo-coach-pwa-v52';
+const APP_BUILD_ID = '2026-04-07-reset';
 const BASE_PATH = new URL('./', self.location.href).pathname;
 const INDEX_URL = `${BASE_PATH}index.html`;
 const OFFLINE_URL = `${BASE_PATH}offline.html`;
+const APP_SHELL = [
+  BASE_PATH,
+  INDEX_URL,
+  `${BASE_PATH}style.css?v=${APP_BUILD_ID}`,
+  `${BASE_PATH}app-modular.js?v=${APP_BUILD_ID}`,
+  `${BASE_PATH}manifest.webmanifest`,
+  `${BASE_PATH}logo-jcc.png`,
+  OFFLINE_URL
+];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(self.skipWaiting());
+  event.waitUntil(
+    caches.open(CACHE_VERSION).then((cache) => cache.addAll(APP_SHELL))
+  );
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
@@ -18,7 +30,47 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.mode === 'navigate') {
-    event.respondWith(fetch(event.request).catch(() => caches.match(INDEX_URL)));
+  const { request } = event;
+  if (request.method !== 'GET') return;
+
+  const url = new URL(request.url);
+
+  // Never cache Supabase API/Auth/Storage calls.
+  if (url.hostname.endsWith('.supabase.co')) {
+    return;
   }
+
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_VERSION).then((cache) => cache.put(INDEX_URL, copy)).catch(() => {});
+          return response;
+        })
+        .catch(async () => {
+          const cachedIndex = await caches.match(INDEX_URL);
+          if (cachedIndex) return cachedIndex;
+          return caches.match(OFFLINE_URL);
+        })
+    );
+    return;
+  }
+
+  event.respondWith(
+    caches.match(request).then((cached) => {
+      if (cached) return cached;
+      return fetch(request)
+        .then((response) => {
+          if (!response || response.status !== 200 || response.type !== 'basic') {
+            return response;
+          }
+          const copy = response.clone();
+          caches.open(CACHE_VERSION).then((cache) => cache.put(request, copy)).catch(() => {});
+          return response;
+        })
+        .catch(() => caches.match(OFFLINE_URL));
+    })
+  );
 });
+
