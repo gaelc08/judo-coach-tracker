@@ -64,7 +64,7 @@ swContent = replaceOrThrow(
 );
 swContent = replaceOrThrow(
   swContent,
-  /const APP_BUILD_ID = '[0-9]{4}-[0-9]{2}-[0-9]{2}-r[0-9]+';/,
+  /const APP_BUILD_ID = '[^']+';/,
   `const APP_BUILD_ID = '${nextBuildId}';`,
   'APP_BUILD_ID'
 );
