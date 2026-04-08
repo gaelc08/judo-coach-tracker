@@ -4104,6 +4104,7 @@ async function __fetchMonthlySummaryReport({ format = 'json', month = currentMon
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${token}`,
+      'apikey': supabaseKey,
       'Content-Type': 'application/json'
     }
   });
