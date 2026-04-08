@@ -31,6 +31,21 @@ function jsonResponse(payload: unknown, status = 200, extraHeaders: Record<strin
   });
 }
 
+function buildAuthDebug(
+  authHeader: string | null,
+  token: string,
+  userError?: { message?: string } | null,
+) {
+  const authScheme = authHeader ? authHeader.split(/\s+/, 1)[0] : null;
+  return {
+    hasAuthorizationHeader: !!authHeader,
+    authScheme,
+    tokenLength: token.length,
+    tokenSegments: token ? token.split('.').length : 0,
+    userError: userError?.message ?? null,
+  };
+}
+
 function parseFiscalPower(value: unknown) {
   const parsed = Number.parseInt(String(value ?? "").trim(), 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
@@ -80,7 +95,7 @@ serve(async (req) => {
   const authHeader = req.headers.get("Authorization");
   const token = authHeader?.replace("Bearer ", "");
   if (!token) {
-    return jsonResponse({ error: "Missing Authorization header", requestId }, 401);
+    return jsonResponse({ error: "Missing Authorization header", requestId, debug: buildAuthDebug(authHeader, "") }, 401);
   }
 
   const url = new URL(req.url);
@@ -111,7 +126,12 @@ serve(async (req) => {
   const { data: authData, error: authError } = await supabase.auth.getUser(token);
   const user = authData?.user;
   if (authError || !user) {
-    return jsonResponse({ error: "Unauthorized", requestId, details: authError?.message ?? null }, 401);
+    return jsonResponse({
+      error: "Unauthorized",
+      requestId,
+      details: authError?.message ?? null,
+      debug: buildAuthDebug(authHeader, token, authError),
+    }, 401);
   }
 
   if (!hasAdminAccess(token, user)) {

@@ -17,7 +17,7 @@ const functionsToDeploy = [
   { name: 'invite-admin', noVerifyJwt: true },
   { name: 'delete-coach-user', noVerifyJwt: true },
   { name: 'alert-admin', noVerifyJwt: false },
-  { name: 'export-monthly-expenses', noVerifyJwt: false },
+  { name: 'export-monthly-expenses', noVerifyJwt: true },
 ];
 
 for (const fn of functionsToDeploy) {
