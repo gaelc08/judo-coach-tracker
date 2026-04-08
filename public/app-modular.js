@@ -3,7 +3,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { BUILD_ID as __BUILD_ID, VERSION_DATE as __VERSION_DATE, VERSION_INCREMENT as __VERSION_INCREMENT, effectiveEnv as __effectiveEnv, supabaseKey, supabaseUrl } from './modules/env.js';
-import { auditMatchesCurrentCoach, formatAuditDateTime, formatAuditDetails, getAuditActionGroup } from './modules/audit-ui.js';
+import { auditMatchesCurrentCoach, formatAuditAction, formatAuditDateTime, formatAuditDetails, getAuditActionGroup } from './modules/audit-ui.js';
 import { isAdminViaLocalClaims, isAdminViaRest } from './modules/auth-admin.js';
 import { createAuditController } from './modules/audit-controller.js';
 import { createAuthNoHangLock, createAuthStorage, detectInviteFlowFromUrlHash } from './modules/auth-runtime.js';
@@ -258,6 +258,52 @@ function __getCurrentUserDisplayName(user, preferredCoach = null) {
   });
 }
 
+function __buildAuditPayload({
+  coach = currentCoach,
+  entityId = null,
+  targetUserId,
+  targetEmail,
+  metadata = {},
+} = {}) {
+  const resolvedCoach = coach || null;
+  const nextMetadata = { ...metadata };
+
+  if (resolvedCoach?.id != null && nextMetadata.coach_id == null) {
+    nextMetadata.coach_id = resolvedCoach.id;
+  }
+  if (resolvedCoach && nextMetadata.coach_name == null) {
+    nextMetadata.coach_name = __getCoachDisplayName(resolvedCoach) || resolvedCoach.name || null;
+  }
+
+  return {
+    entityId,
+    targetUserId: targetUserId ?? resolvedCoach?.owner_uid ?? null,
+    targetEmail: targetEmail ?? resolvedCoach?.email ?? null,
+    metadata: nextMetadata,
+  };
+}
+
+function __buildMonthlyAuditPayload({
+  coach = currentCoach,
+  entityId = null,
+  month = currentMonth,
+  metadata = {},
+  targetUserId,
+  targetEmail,
+} = {}) {
+  const normalizedMonth = month ? __normalizeMonth(month) : null;
+  return __buildAuditPayload({
+    coach,
+    entityId,
+    targetUserId,
+    targetEmail,
+    metadata: {
+      ...(normalizedMonth ? { month: normalizedMonth } : {}),
+      ...metadata,
+    },
+  });
+}
+
 function __findExistingProfileByEmail(email, { excludeId = null } = {}) {
   return findExistingProfileByEmail(email, {
     excludeId,
@@ -301,6 +347,7 @@ const __auditController = createAuditController({
   isAdminForUi: __isAdminForUi,
   escapeHtml: __escapeHtml,
   formatAuditDateTime,
+  formatAuditAction,
   formatAuditDetails,
   getAuditActionGroup,
   auditMatchesCurrentCoach,
@@ -1077,16 +1124,11 @@ async function toggleFreezeMonth() {
       return;
     }
     frozenMonths.delete(key);
-    await __logAuditEvent('timesheet.unfreeze', 'frozen_timesheet', {
+    await __logAuditEvent('timesheet.unfreeze', 'frozen_timesheet', __buildMonthlyAuditPayload({
+      coach: currentCoach,
       entityId: key,
-      targetUserId: currentCoach.owner_uid || null,
-      targetEmail: currentCoach.email || null,
-      metadata: {
-        coach_id: currentCoach.id,
-        coach_name: __getCoachDisplayName(currentCoach) || currentCoach.name || null,
-        month: normalizedMonth,
-      },
-    });
+      month: normalizedMonth,
+    }));
   } else {
     const res = await globalThis.fetch(`${supabaseUrl}/rest/v1/frozen_timesheets`, {
       method: 'POST',
@@ -1109,16 +1151,11 @@ async function toggleFreezeMonth() {
       return;
     }
     frozenMonths.add(key);
-    await __logAuditEvent('timesheet.freeze', 'frozen_timesheet', {
+    await __logAuditEvent('timesheet.freeze', 'frozen_timesheet', __buildMonthlyAuditPayload({
+      coach: currentCoach,
       entityId: key,
-      targetUserId: currentCoach.owner_uid || null,
-      targetEmail: currentCoach.email || null,
-      metadata: {
-        coach_id: currentCoach.id,
-        coach_name: __getCoachDisplayName(currentCoach) || currentCoach.name || null,
-        month: normalizedMonth,
-      },
-    });
+      month: normalizedMonth,
+    }));
   }
   currentMonth = normalizedMonth;
   updateFreezeUI();
@@ -1575,17 +1612,14 @@ const coachData = {
       }
       currentCoach = saved;
       loadCoaches();
-      await __logAuditEvent(wasEditMode ? 'profile.update' : 'profile.create', 'user_profile', {
+      await __logAuditEvent(wasEditMode ? 'profile.update' : 'profile.create', 'user_profile', __buildAuditPayload({
+        coach: saved,
         entityId: saved.id,
-        targetUserId: saved.owner_uid || null,
-        targetEmail: saved.email || null,
         metadata: {
-          coach_id: saved.id,
-          coach_name: __getCoachDisplayName(saved) || saved.name || null,
           profile_type: saved.profile_type || profileType,
           role: saved.role || coachData.role,
         },
-      });
+      }));
     }
 
     document.getElementById('coachModal').classList.remove('active');
@@ -1674,16 +1708,14 @@ async function deleteCoach() {
     const { error: error2 } = await supabase.from('time_data').delete().eq('coach_id', editingCoachId);
     if (error2) throw error2;
 
-    await __logAuditEvent('profile.delete', 'user_profile', {
+    await __logAuditEvent('profile.delete', 'user_profile', __buildAuditPayload({
+      coach: targetCoach,
       entityId: editingCoachId,
-      targetUserId: targetCoach?.owner_uid || null,
-      targetEmail: targetCoach?.email || null,
       metadata: {
         coach_id: editingCoachId,
-        coach_name: targetCoach ? (__getCoachDisplayName(targetCoach) || targetCoach.name || null) : null,
         deleted_auth_user: !!(targetCoach?.owner_uid || targetCoach?.email),
       },
-    });
+    }));
 
     await loadAllDataFromSupabase();
 
@@ -2253,18 +2285,14 @@ async function saveDay() {
     if (existing && existing.id) {
       const { error } = await supabase.from('time_data').delete().eq('id', existing.id);
       if (error) throw error;
-      await __logAuditEvent('time_data.delete', 'time_data', {
+      await __logAuditEvent('time_data.delete', 'time_data', __buildMonthlyAuditPayload({
+        coach: currentCoach,
         entityId: existing.id,
-        targetUserId: currentCoach.owner_uid || null,
-        targetEmail: currentCoach.email || null,
         metadata: {
-          coach_id: currentCoach.id,
-          coach_name: __getCoachDisplayName(currentCoach) || currentCoach.name || null,
           date: selectedDay,
-          month: __normalizeMonth(currentMonth),
           source: 'saveDay-empty-payload',
         },
-      });
+      }));
         await notifyAdminAlert(currentCoach.name, selectedDay, { deleted: true });
     }
     delete timeData[key];
@@ -2311,15 +2339,11 @@ async function saveDay() {
         ownerEmail: ownerEmailForRow,
         id: existing.id
       };
-      await __logAuditEvent('time_data.update', 'time_data', {
+      await __logAuditEvent('time_data.update', 'time_data', __buildMonthlyAuditPayload({
+        coach: currentCoach,
         entityId: existing.id,
-        targetUserId: currentCoach.owner_uid || null,
-        targetEmail: currentCoach.email || null,
         metadata: {
-          coach_id: currentCoach.id,
-          coach_name: __getCoachDisplayName(currentCoach) || currentCoach.name || null,
           date: selectedDay,
-          month: __normalizeMonth(currentMonth),
           hours,
           competition,
           km,
@@ -2328,7 +2352,7 @@ async function saveDay() {
           achat,
           had_existing_id: !!existingId,
         },
-      });
+      }));
         await notifyAdminAlert(currentCoach.name, selectedDay, timeData[key]);
     } else {
       const { data: inserted, error } = await supabase.from('time_data').insert(data).select();
@@ -2351,15 +2375,11 @@ async function saveDay() {
         ownerEmail: ownerEmailForRow,
         id: inserted[0].id
       };
-      await __logAuditEvent('time_data.create', 'time_data', {
+      await __logAuditEvent('time_data.create', 'time_data', __buildMonthlyAuditPayload({
+        coach: currentCoach,
         entityId: inserted?.[0]?.id || null,
-        targetUserId: currentCoach.owner_uid || null,
-        targetEmail: currentCoach.email || null,
         metadata: {
-          coach_id: currentCoach.id,
-          coach_name: __getCoachDisplayName(currentCoach) || currentCoach.name || null,
           date: selectedDay,
-          month: __normalizeMonth(currentMonth),
           hours,
           competition,
           km,
@@ -2367,7 +2387,7 @@ async function saveDay() {
           hotel,
           achat,
         },
-      });
+      }));
         await notifyAdminAlert(currentCoach.name, selectedDay, timeData[key]);
     }
   }
@@ -2392,18 +2412,14 @@ async function deleteDay() {
   if (existing && existing.id) {
     const { error } = await supabase.from('time_data').delete().eq('id', existing.id);
     if (error) throw error;
-    await __logAuditEvent('time_data.delete', 'time_data', {
+    await __logAuditEvent('time_data.delete', 'time_data', __buildMonthlyAuditPayload({
+      coach: currentCoach,
       entityId: existing.id,
-      targetUserId: currentCoach.owner_uid || null,
-      targetEmail: currentCoach.email || null,
       metadata: {
-        coach_id: currentCoach.id,
-        coach_name: __getCoachDisplayName(currentCoach) || currentCoach.name || null,
         date: selectedDay,
-        month: __normalizeMonth(currentMonth),
         source: 'deleteDay',
       },
-    });
+    }));
         await notifyAdminAlert(currentCoach.name, selectedDay, { deleted: true });
   }
   delete timeData[key];
@@ -2738,19 +2754,16 @@ async function exportDeclarationXLS() {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });
   __downloadBlob(blob, `declaration_salaire_${safeName}_${currentMonth}.xlsx`);
-  await __logAuditEvent('export.declaration_xlsx', 'export', {
+  await __logAuditEvent('export.declaration_xlsx', 'export', __buildMonthlyAuditPayload({
+    coach: currentCoach,
     entityId: `${currentCoach.id}-${currentMonth}`,
-    targetUserId: currentCoach.owner_uid || null,
-    targetEmail: currentCoach.email || null,
     metadata: {
-      coach_id: currentCoach.id,
       coach_name: coachDisplayName || null,
-      month: currentMonth,
       total_hours: totalHours,
       competition_days: competitionDays,
       total_amount: grandTotal,
     },
-  });
+  }));
 }
 
 function __closeMileagePreviewModal() {
@@ -3601,19 +3614,16 @@ ${rows
 
   const fileName = `note_frais_${currentCoach.name}_${currentMonth}.html`;
 
-  __logAuditEvent('export.expense_html', 'export', {
+  __logAuditEvent('export.expense_html', 'export', __buildMonthlyAuditPayload({
+    coach: currentCoach,
     entityId: `${currentCoach.id}-${currentMonth}`,
-    targetUserId: currentCoach.owner_uid || null,
-    targetEmail: currentCoach.email || null,
     metadata: {
-      coach_id: currentCoach.id,
       coach_name: coachDisplayName || null,
-      month: currentMonth,
       total_amount: total,
       total_km: totalMileageKm,
       rows: rows.length,
     },
-  });
+  }));
 
   if (usePreviewModal) {
     __showMileagePreviewModal(html, fileName, downloadHtml);
@@ -3890,12 +3900,15 @@ function exportTimesheetHTML() {
   win.document.write(html);
   win.document.close();
   
-  __logAuditEvent('export.timesheet_pdf', currentCoach.id, {
-    coach_name: coachDisplayName,
-    month: currentMonth,
-    total_hours: totalHours,
-    total_amount: totalAmount,
-  });
+  __logAuditEvent('export.timesheet_pdf', 'export', __buildMonthlyAuditPayload({
+    coach: currentCoach,
+    entityId: `${currentCoach.id}-${currentMonth}`,
+    metadata: {
+      coach_name: coachDisplayName || null,
+      total_hours: totalHours,
+      total_amount: totalAmount,
+    },
+  }));
 }
 
 // Expose the function
@@ -3969,17 +3982,14 @@ async function importCoachData(data) {
     const { error } = await supabase.from('time_data').insert(inserts);
     if (error) throw error;
   }
-  await __logAuditEvent('time_data.import_json', 'import', {
+  await __logAuditEvent('time_data.import_json', 'time_data', __buildMonthlyAuditPayload({
+    coach: currentCoach,
     entityId: `${currentCoach.id}-${currentMonth}`,
-    targetUserId: currentCoach.owner_uid || null,
-    targetEmail: currentCoach.email || null,
     metadata: {
-      coach_id: currentCoach.id,
-      coach_name: __getCoachDisplayName(currentCoach) || currentCoach.name || null,
       rows_inserted: inserts.length,
       source_profile_name: data.entraineur || null,
     },
-  });
+  }));
   await loadAllDataFromSupabase();
   updateCalendar();
   updateSummary();
@@ -4036,16 +4046,13 @@ function exportBackupJSON() {
   a.download = `backup_${safeName}_${new Date().toISOString().split("T")[0]}.json`;
   a.click();
   URL.revokeObjectURL(url);
-  __logAuditEvent('export.backup_json', 'export', {
-    entityId: currentCoach.id,
-    targetUserId: currentCoach.owner_uid || null,
-    targetEmail: currentCoach.email || null,
+  __logAuditEvent('export.backup_json', 'export', __buildMonthlyAuditPayload({
+    coach: currentCoach,
+    entityId: `${currentCoach.id}-${currentMonth}`,
     metadata: {
-      coach_id: currentCoach.id,
-      coach_name: __getCoachDisplayName(currentCoach) || currentCoach.name || null,
       entries: entries.length,
     },
-  });
+  }));
 }
 
 // Export monthly expenses report
@@ -4088,9 +4095,15 @@ async function exportMonthlyExpenses(format = 'csv') {
       URL.revokeObjectURL(url);
     }
 
-    __logAuditEvent('export.monthly_expenses', 'export', {
-      metadata: { format }
-    });
+    __logAuditEvent('export.monthly_expenses', 'export', __buildMonthlyAuditPayload({
+      coach: null,
+      entityId: `monthly-expenses-${__normalizeMonth(currentMonth)}-${format}`,
+      month: currentMonth,
+      metadata: {
+        format,
+        scope: 'all_profiles',
+      },
+    }));
   } catch (error) {
     alert("Erreur lors de l'export : " + error.message);
     console.error("Export error:", error);

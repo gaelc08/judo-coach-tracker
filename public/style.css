@@ -1362,9 +1362,40 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   gap: 4px;
 }
 
+.audit-meta-row {
+  display: grid;
+  gap: 2px;
+}
+
+.audit-meta-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gray-600);
+}
+
 .audit-meta-item {
   color: var(--gray-700);
   line-height: 1.35;
+}
+
+.audit-action-cell {
+  display: grid;
+  gap: 4px;
+}
+
+.audit-action-summary {
+  color: var(--gray-800);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.audit-action-code {
+  color: var(--gray-600);
+  font-size: 0.74rem;
+  font-family: Consolas, 'Courier New', monospace;
+  overflow-wrap: anywhere;
 }
 
 .audit-badge {
