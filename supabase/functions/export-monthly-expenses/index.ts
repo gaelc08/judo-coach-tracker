@@ -3,6 +3,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { hasAdminAccess } from "../invite-coach/auth-helpers.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -75,9 +76,11 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  const token = req.headers.get("Authorization")?.replace("Bearer ", "");
+  const requestId = crypto.randomUUID();
+  const authHeader = req.headers.get("Authorization");
+  const token = authHeader?.replace("Bearer ", "");
   if (!token) {
-    return jsonResponse({ error: "Unauthorized" }, 401);
+    return jsonResponse({ error: "Missing Authorization header", requestId }, 401);
   }
 
   const url = new URL(req.url);
@@ -95,20 +98,24 @@ serve(async (req) => {
   const yearStart = `${requestedMonth.slice(0, 4)}-01-01`;
   const yearEnd = `${requestedMonth.slice(0, 4)}-12-31`;
 
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-    { global: { headers: { Authorization: `Bearer ${token}` } } }
-  );
-
-  const { data: authData, error: authError } = await supabase.auth.getUser();
-  if (authError || !authData?.user) {
-    return jsonResponse({ error: "Unauthorized" }, 401);
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (!supabaseUrl || !serviceRoleKey) {
+    return jsonResponse({ error: "Server configuration error", requestId }, 500);
   }
 
-  const { data: isAdmin, error: adminError } = await supabase.rpc("is_admin").single();
-  if (adminError || !isAdmin) {
-    return jsonResponse({ error: "Admin access required" }, 403);
+  const supabase = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  const { data: authData, error: authError } = await supabase.auth.getUser(token);
+  const user = authData?.user;
+  if (authError || !user) {
+    return jsonResponse({ error: "Unauthorized", requestId, details: authError?.message ?? null }, 401);
+  }
+
+  if (!hasAdminAccess(token, user)) {
+    return jsonResponse({ error: "Admin access required", requestId }, 403);
   }
 
   try {
