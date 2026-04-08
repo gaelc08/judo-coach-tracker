@@ -388,37 +388,44 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   border-color: var(--judo-red);
 }
 
-.toolbar-actions {
+.admin-panel {
+  border-top: 4px solid var(--judo-gold);
+  background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(245,248,255,0.98) 100%);
+}
+
+.admin-panel-header {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.admin-panel-title {
+  color: var(--judo-navy);
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.admin-panel-subtitle {
+  color: var(--gray-600);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.admin-actions-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 8px;
-  align-items: stretch;
+  gap: 10px;
+}
+
+.admin-actions-grid button {
   width: 100%;
-  margin-left: 0;
-}
-
-.toolbar-actions button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 64px;
-  padding: 12px 16px;
-  background: var(--judo-navy);
-  color: white;
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 0.95rem;
-  font-weight: 600;
+  min-height: 58px;
+  white-space: normal;
   text-align: center;
-  line-height: 1.2;
-  cursor: pointer;
-  transition: all 0.2s;
 }
 
-.toolbar-actions button:hover {
-  background: var(--judo-red);
-  transform: translateY(-1px);
+.admin-import-group {
+  grid-column: 1 / -1;
 }
 
 /* ===== Legend ===== */
@@ -996,24 +1003,6 @@ button, .btn-primary, .btn-secondary, .btn-danger {
     font-size: 0.9rem;
   }
 
-  .toolbar-actions {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
-    width: 100%;
-    grid-column: 1 / -1;
-  }
-
-  .toolbar-actions button {
-    width: 100%;
-    min-width: 0;
-    min-height: 52px;
-    padding: 10px 8px;
-    font-size: 0.82rem;
-    line-height: 1.15;
-    white-space: normal;
-  }
-
   .summary-grid {
     grid-template-columns: 1fr;
   }
@@ -1032,6 +1021,10 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   .import-group {
     width: 100%;
     grid-column: 1 / -1;
+  }
+
+  .admin-actions-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .calendar.card {
@@ -1066,13 +1059,12 @@ button, .btn-primary, .btn-secondary, .btn-danger {
     width: 100%;
   }
 
-  .toolbar-actions {
-    grid-template-columns: 1fr;
-  }
-
-  .toolbar-actions button,
   .actions button {
     min-width: 0;
+  }
+
+  .admin-actions-grid {
+    grid-template-columns: 1fr;
   }
 
   .calendar {

@@ -915,21 +915,25 @@ function setupAuthListeners() {
       // --- VERIFICATION DU ROLE ---
       const isAdmin = await isCurrentUserAdminDB();
       if (isAdmin) {
+        document.getElementById("adminActionsPanel").style.display = "block";
         document.getElementById("addCoachBtn").style.display = "inline-block";
         document.getElementById("editCoachBtn").style.display = "inline-block";
         document.getElementById("inviteAdminBtn").style.display = "inline-block";
         document.getElementById("freezeBtn").style.display = "inline-block";
         document.getElementById("auditLogsBtn").style.display = "inline-block";
         document.getElementById("helloAssoBtn").style.display = "inline-block";
+        document.getElementById("exportMonthlyExpensesBtn").style.display = "inline-block";
         document.getElementById("importGroup").style.display = "flex";
         document.getElementById("backupBtn").style.display = "inline-block";
       } else {
+        document.getElementById("adminActionsPanel").style.display = "none";
         document.getElementById("addCoachBtn").style.display = "none";
         document.getElementById("editCoachBtn").style.display = "none";
         document.getElementById("inviteAdminBtn").style.display = "none";
         document.getElementById("freezeBtn").style.display = "none";
         document.getElementById("auditLogsBtn").style.display = "none";
         document.getElementById("helloAssoBtn").style.display = "none";
+        document.getElementById("exportMonthlyExpensesBtn").style.display = "none";
         document.getElementById("importGroup").style.display = "none";
         document.getElementById("backupBtn").style.display = "none";
       }
