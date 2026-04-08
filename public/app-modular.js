@@ -213,6 +213,7 @@ let currentSession = null;
 let currentAccessToken = null;
 let __eventListenersSetup = false;
 let auditLogs = [];
+let __monthlySummaryPreviewState = { month: null, report: null };
 
 const __restGateway = createRestGateway({
   supabaseUrl,
@@ -302,6 +303,33 @@ function __buildMonthlyAuditPayload({
       ...metadata,
     },
   });
+}
+
+async function __getFreshAccessToken() {
+  let accessToken = currentAccessToken;
+  const currentTokenHasAdminClaim = __hasAdminClaim(accessToken);
+
+  try {
+    const { data: { session } } = await supabase.auth.refreshSession();
+    if (session?.access_token) {
+      const refreshedAccessToken = session.access_token;
+      if (currentTokenHasAdminClaim && !__hasAdminClaim(refreshedAccessToken)) {
+        return accessToken;
+      }
+      accessToken = refreshedAccessToken;
+      currentAccessToken = accessToken;
+      return accessToken;
+    }
+
+    const { data: { session: existing } } = await supabase.auth.getSession();
+    if (existing?.access_token) {
+      accessToken = existing.access_token;
+      currentAccessToken = accessToken;
+    }
+  } catch {
+  }
+
+  return accessToken;
 }
 
 function __findExistingProfileByEmail(email, { excludeId = null } = {}) {
@@ -4056,52 +4084,237 @@ function exportBackupJSON() {
 }
 
 // Export monthly expenses report
-async function exportMonthlyExpenses(format = 'csv') {
+async function __fetchMonthlySummaryReport({ format = 'json', month = currentMonth } = {}) {
+  const selectedMonth = __normalizeMonth(month);
+  if (!selectedMonth) {
+    throw new Error("Veuillez sélectionner un mois.");
+  }
+
+  const token = await __getFreshAccessToken();
+  if (!token) {
+    throw new Error("Session expirée. Veuillez vous reconnecter.");
+  }
+
+  const url = `${supabaseUrl}/functions/v1/export-monthly-expenses?format=${format}&month=${encodeURIComponent(selectedMonth)}`;
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    }
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || `Failed to load report (${response.status})`);
+  }
+
+  const rowsExported = Number.parseInt(response.headers.get('X-Report-Rows') || '0', 10);
+  return {
+    month: selectedMonth,
+    rowsExported: Number.isFinite(rowsExported) ? rowsExported : 0,
+    response,
+  };
+}
+
+function __closeMonthlySummaryPreviewModal() {
+  document.getElementById('monthlySummaryPreviewModal')?.classList.remove('active');
+}
+
+function __formatMonthlySummaryProfileType(profileType) {
+  return __getProfileLabel(profileType, { capitalized: true }) || 'Profil';
+}
+
+function __renderMonthlySummaryPreview(report, monthValue) {
+  const subtitleEl = document.getElementById('monthlySummarySubtitle');
+  const statusEl = document.getElementById('monthlySummaryStatus');
+  const totalsEl = document.getElementById('monthlySummaryTotals');
+  const bodyEl = document.getElementById('monthlySummaryTableBody');
+  const exportCsvBtn = document.getElementById('monthlySummaryExportCsvBtn');
+  const exportJsonBtn = document.getElementById('monthlySummaryExportJsonBtn');
+  if (!subtitleEl || !statusEl || !totalsEl || !bodyEl || !exportCsvBtn || !exportJsonBtn) return;
+
+  const reportMonth = report?.month || monthValue;
+  const rows = Array.isArray(report?.rows) ? report.rows : [];
+  const totals = report?.totals || {};
+  const monthLabel = __formatMonthLabel(reportMonth);
+
+  subtitleEl.textContent = `Mois sélectionné : ${monthLabel}`;
+  statusEl.textContent = rows.length
+    ? `${rows.length} profil(s) avec activité sur ${monthLabel}`
+    : `Aucune activité enregistrée sur ${monthLabel}`;
+
+  totalsEl.innerHTML = `
+    <article class="monthly-summary-card">
+      <span class="monthly-summary-card-label">Profils</span>
+      <strong class="monthly-summary-card-value">${numberDisplay(totals.coaches || 0)}</strong>
+    </article>
+    <article class="monthly-summary-card">
+      <span class="monthly-summary-card-label">Heures payées</span>
+      <strong class="monthly-summary-card-value">${numberDisplay(totals.total_hours || 0, 2)}</strong>
+    </article>
+    <article class="monthly-summary-card">
+      <span class="monthly-summary-card-label">Compétitions</span>
+      <strong class="monthly-summary-card-value">${numberDisplay(totals.competition_days || 0)}</strong>
+    </article>
+    <article class="monthly-summary-card">
+      <span class="monthly-summary-card-label">Salaire payé</span>
+      <strong class="monthly-summary-card-value">${currencyDisplay(totals.paid_salary_amount || 0)}</strong>
+    </article>
+    <article class="monthly-summary-card">
+      <span class="monthly-summary-card-label">Indemnités kilométriques</span>
+      <strong class="monthly-summary-card-value">${currencyDisplay(totals.mileage_amount || 0)}</strong>
+    </article>
+    <article class="monthly-summary-card monthly-summary-card-total">
+      <span class="monthly-summary-card-label">Total</span>
+      <strong class="monthly-summary-card-value">${currencyDisplay(totals.total_amount || 0)}</strong>
+    </article>
+  `;
+
+  if (!rows.length) {
+    bodyEl.innerHTML = '<tr><td colspan="8" class="audit-empty">Aucune ligne pour ce mois.</td></tr>';
+  } else {
+    bodyEl.innerHTML = rows.map((row) => `
+      <tr>
+        <td>
+          <div class="monthly-summary-name">${__escapeHtml(row.coach_name || 'Profil')}</div>
+          <div class="monthly-summary-secondary">${__escapeHtml(__formatMonthlySummaryProfileType(row.profile_type))}</div>
+        </td>
+        <td>${numberDisplay(row.total_hours || 0, 2)}</td>
+        <td>${numberDisplay(row.competition_days || 0)}</td>
+        <td>
+          <div>${currencyDisplay(row.salary_amount || 0)}</div>
+          <div class="monthly-summary-secondary">+ ${currencyDisplay(row.competition_amount || 0)}</div>
+        </td>
+        <td>${currencyDisplay(row.paid_salary_amount || 0)}</td>
+        <td>${numberDisplay(row.total_km || 0, 2)}</td>
+        <td>${currencyDisplay(row.mileage_amount || 0)}</td>
+        <td>${currencyDisplay(row.total_amount || 0)}</td>
+      </tr>
+    `).join('');
+  }
+
+  exportCsvBtn.disabled = false;
+  exportJsonBtn.disabled = false;
+}
+
+function __ensureMonthlySummaryPreviewModal() {
+  let modal = document.getElementById('monthlySummaryPreviewModal');
+  if (modal) return modal;
+
+  modal = document.createElement('div');
+  modal.id = 'monthlySummaryPreviewModal';
+  modal.className = 'modal';
+  modal.innerHTML = `
+    <div class="modal-content modal-content-audit modal-content-monthly-summary">
+      <div class="monthly-summary-header">
+        <div>
+          <h2>📊 Synthèse du mois</h2>
+          <p id="monthlySummarySubtitle" class="monthly-summary-subtitle">Chargement…</p>
+        </div>
+        <div class="monthly-summary-toolbar">
+          <button id="monthlySummaryRefreshBtn" class="btn-secondary">↻ Actualiser</button>
+          <button id="monthlySummaryExportCsvBtn" class="btn-secondary">CSV</button>
+          <button id="monthlySummaryExportJsonBtn" class="btn-secondary">JSON</button>
+        </div>
+      </div>
+      <div id="monthlySummaryStatus" class="audit-status">Chargement…</div>
+      <div id="monthlySummaryTotals" class="monthly-summary-totals"></div>
+      <div class="audit-table-wrap monthly-summary-table-wrap">
+        <table class="audit-table monthly-summary-table">
+          <thead>
+            <tr>
+              <th>Profil</th>
+              <th>Heures</th>
+              <th>Compétitions</th>
+              <th>Salaire heures + comp.</th>
+              <th>Salaire payé</th>
+              <th>KM</th>
+              <th>Indemnités KM</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody id="monthlySummaryTableBody">
+            <tr><td colspan="8" class="audit-empty">Chargement…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="modal-actions">
+        <button id="closeMonthlySummaryPreview" class="btn-primary">Fermer</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal) __closeMonthlySummaryPreviewModal();
+  });
+
+  modal.querySelector('#closeMonthlySummaryPreview')?.addEventListener('click', __closeMonthlySummaryPreviewModal);
+  modal.querySelector('#monthlySummaryRefreshBtn')?.addEventListener('click', () => openMonthlySummaryPreviewModal({ forceReload: true }));
+  modal.querySelector('#monthlySummaryExportCsvBtn')?.addEventListener('click', () => exportMonthlyExpenses('csv', __monthlySummaryPreviewState.month || currentMonth));
+  modal.querySelector('#monthlySummaryExportJsonBtn')?.addEventListener('click', () => exportMonthlyExpenses('json', __monthlySummaryPreviewState.month || currentMonth));
+  return modal;
+}
+
+async function openMonthlySummaryPreviewModal({ forceReload = false } = {}) {
+  if (!__isAdminForUi()) {
+    alert("Seul l'administrateur peut consulter cette synthèse.");
+    return;
+  }
+
+  const selectedMonth = __normalizeMonth(currentMonth);
+  if (!selectedMonth) {
+    alert("Veuillez sélectionner un mois.");
+    return;
+  }
+
+  const modal = __ensureMonthlySummaryPreviewModal();
+  const statusEl = modal.querySelector('#monthlySummaryStatus');
+  const totalsEl = modal.querySelector('#monthlySummaryTotals');
+  const bodyEl = modal.querySelector('#monthlySummaryTableBody');
+  const exportCsvBtn = modal.querySelector('#monthlySummaryExportCsvBtn');
+  const exportJsonBtn = modal.querySelector('#monthlySummaryExportJsonBtn');
+
+  modal.classList.add('active');
+  if (statusEl) statusEl.textContent = `Chargement de la synthèse ${__formatMonthLabel(selectedMonth)}…`;
+  if (totalsEl) totalsEl.innerHTML = '';
+  if (bodyEl) bodyEl.innerHTML = '<tr><td colspan="8" class="audit-empty">Chargement…</td></tr>';
+  if (exportCsvBtn) exportCsvBtn.disabled = true;
+  if (exportJsonBtn) exportJsonBtn.disabled = true;
+
   try {
-    if (!currentMonth) {
-      alert("Veuillez sélectionner un mois.");
-      return;
+    if (forceReload || __monthlySummaryPreviewState.month !== selectedMonth || !__monthlySummaryPreviewState.report) {
+      const { response, month } = await __fetchMonthlySummaryReport({ format: 'json', month: selectedMonth });
+      __monthlySummaryPreviewState = {
+        month,
+        report: await response.json(),
+      };
     }
 
-    const token = await getAuthToken();
-    if (!token) throw new Error("Not authenticated");
+    __renderMonthlySummaryPreview(__monthlySummaryPreviewState.report, __monthlySummaryPreviewState.month);
+  } catch (error) {
+    if (statusEl) statusEl.textContent = `Erreur : ${error.message || error}`;
+    if (bodyEl) bodyEl.innerHTML = '<tr><td colspan="8" class="audit-empty">Impossible de charger la synthèse.</td></tr>';
+    console.error('Monthly summary preview error:', error);
+  }
+}
 
-    const selectedMonth = __normalizeMonth(currentMonth);
-    const url = `${supabaseUrl}/functions/v1/export-monthly-expenses?format=${format}&month=${encodeURIComponent(selectedMonth)}`;
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || "Failed to export report");
-    }
+async function exportMonthlyExpenses(format = 'csv', month = currentMonth) {
+  try {
+    const { response, month: selectedMonth, rowsExported } = await __fetchMonthlySummaryReport({ format, month });
 
     if (format === 'csv') {
       const csv = await response.text();
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `admin_monthly_summary_${selectedMonth}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+      __downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }), `admin_monthly_summary_${selectedMonth}.csv`);
     } else {
       const json = await response.json();
-      const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `admin_monthly_summary_${selectedMonth}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
+      __downloadBlob(new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' }), `admin_monthly_summary_${selectedMonth}.json`);
+      __monthlySummaryPreviewState = {
+        month: selectedMonth,
+        report: json,
+      };
     }
-
-    const rowsExported = Number.parseInt(response.headers.get('X-Report-Rows') || '0', 10);
 
     __logAuditEvent('export.monthly_expenses', 'export', __buildMonthlyAuditPayload({
       coach: null,
@@ -4110,7 +4323,7 @@ async function exportMonthlyExpenses(format = 'csv') {
       metadata: {
         format,
         scope: 'all_profiles',
-        rows: Number.isFinite(rowsExported) ? rowsExported : 0,
+        rows: rowsExported,
       },
     }));
   } catch (error) {
@@ -4122,25 +4335,8 @@ async function exportMonthlyExpenses(format = 'csv') {
 // Setup export button
 function setupExportMonthlyExpensesButton() {
   const exportBtn = document.getElementById('exportMonthlyExpensesBtn');
-  const formatSelector = document.getElementById('exportFormatSelector');
-  const csvBtn = document.getElementById('exportCSVBtn');
-  const jsonBtn = document.getElementById('exportJSONBtn');
-
-  if (!exportBtn || !formatSelector || !csvBtn || !jsonBtn) return;
-
-  exportBtn.addEventListener('click', () => {
-    formatSelector.style.display = formatSelector.style.display === 'none' ? 'block' : 'none';
-  });
-
-  csvBtn.addEventListener('click', () => {
-    formatSelector.style.display = 'none';
-    exportMonthlyExpenses('csv');
-  });
-
-  jsonBtn.addEventListener('click', () => {
-    formatSelector.style.display = 'none';
-    exportMonthlyExpenses('json');
-  });
+  if (!exportBtn) return;
+  exportBtn.addEventListener('click', () => openMonthlySummaryPreviewModal());
 }
 
 // Initialize when DOM is loaded
