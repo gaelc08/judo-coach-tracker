@@ -122,6 +122,7 @@ Current Edge Functions:
 - `alert-admin`
 - `app`
 - `delete-coach-user`
+- `export-monthly-expenses`
 - `invite-admin`
 - `invite-coach`
 

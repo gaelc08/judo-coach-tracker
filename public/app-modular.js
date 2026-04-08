@@ -4058,10 +4058,16 @@ function exportBackupJSON() {
 // Export monthly expenses report
 async function exportMonthlyExpenses(format = 'csv') {
   try {
+    if (!currentMonth) {
+      alert("Veuillez sélectionner un mois.");
+      return;
+    }
+
     const token = await getAuthToken();
     if (!token) throw new Error("Not authenticated");
 
-    const url = `${supabaseUrl}/functions/v1/export-monthly-expenses?format=${format}`;
+    const selectedMonth = __normalizeMonth(currentMonth);
+    const url = `${supabaseUrl}/functions/v1/export-monthly-expenses?format=${format}&month=${encodeURIComponent(selectedMonth)}`;
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -4081,7 +4087,7 @@ async function exportMonthlyExpenses(format = 'csv') {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `monthly_expenses_${new Date().toISOString().split('T')[0]}.csv`;
+      a.download = `admin_monthly_summary_${selectedMonth}.csv`;
       a.click();
       URL.revokeObjectURL(url);
     } else {
@@ -4090,18 +4096,21 @@ async function exportMonthlyExpenses(format = 'csv') {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `monthly_expenses_${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `admin_monthly_summary_${selectedMonth}.json`;
       a.click();
       URL.revokeObjectURL(url);
     }
 
+    const rowsExported = Number.parseInt(response.headers.get('X-Report-Rows') || '0', 10);
+
     __logAuditEvent('export.monthly_expenses', 'export', __buildMonthlyAuditPayload({
       coach: null,
-      entityId: `monthly-expenses-${__normalizeMonth(currentMonth)}-${format}`,
-      month: currentMonth,
+      entityId: `monthly-summary-${selectedMonth}-${format}`,
+      month: selectedMonth,
       metadata: {
         format,
         scope: 'all_profiles',
+        rows: Number.isFinite(rowsExported) ? rowsExported : 0,
       },
     }));
   } catch (error) {

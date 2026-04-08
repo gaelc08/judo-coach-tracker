@@ -19,7 +19,7 @@ const ACTION_LABELS = {
   'export.expense_html': 'Export note de frais',
   'export.timesheet_pdf': 'Export releve mensuel',
   'export.backup_json': 'Export sauvegarde JSON',
-  'export.monthly_expenses': 'Export rapport mensuel',
+  'export.monthly_expenses': 'Export synthese mensuelle',
   'invite.admin': 'Invitation administrateur',
   'invite.coach': 'Invitation profil',
   'auth_user.delete': 'Suppression compte Auth',
