@@ -91,7 +91,9 @@ async function __uploadExpenseJustification(file, prefix) {
 // ===== Calendar rendering =====
 
 export async function updateCalendar() {
+  console.log('DEBUG updateCalendar start, currentCoach=', currentCoach?.id, 'currentMonth=', currentMonth);
   const calendar = document.getElementById('calendar');
+  console.log('DEBUG calendar el=', calendar);
   if (!calendar) return;
   calendar.innerHTML = '';
 
