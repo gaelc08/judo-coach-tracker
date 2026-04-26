@@ -120,18 +120,23 @@ export function updateCurrentProfileUI() {
 
 // ===== Monthly summary =====
 export function updateSummary() {
+  const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+
   if (!currentCoach || !currentMonth) {
-    const summaryEl = document.getElementById('summary');
-    if (summaryEl) summaryEl.innerHTML = '';
+    ['totalHours','hourlyRate','trainingPayment','compDays','compPayment',
+     'totalKm','kmPayment','tollPayment','hotelPayment','purchasePayment',
+     'urssafTotalPayment','reimbursementTotalPayment'].forEach(id => setVal(id, '—'));
     return;
   }
 
   const tdKeys = Object.keys(timeData);
   const matchingKeys = tdKeys.filter(k => k.startsWith(`${currentCoach.id}-${currentMonth}`));
-  console.log('DEBUG summary: coach=', currentCoach?.id, 'month=', currentMonth, 'matching=', matchingKeys.length, 'total=', tdKeys.length);
   if (matchingKeys.length === 0) {
-    const summaryEl = document.getElementById('summary');
-    if (summaryEl) summaryEl.innerHTML = '<div class="summary-empty">Aucune donnée saisie pour ce mois.</div>';
+    ['totalHours','hourlyRate','trainingPayment','compDays','compPayment',
+     'totalKm','kmPayment','tollPayment','hotelPayment','purchasePayment',
+     'urssafTotalPayment','reimbursementTotalPayment'].forEach(id => setVal(id, '0'));
+    updateFreezeUI();
+    updateCurrentProfileUI();
     return;
   }
 
@@ -139,18 +144,12 @@ export function updateSummary() {
   const daysInMonth = new Date(year, month, 0).getDate();
   const isVolunteer = __isVolunteerProfile(currentCoach);
 
-  let totalHours = 0;
-  let totalKm = 0;
-  let totalPeage = 0;
-  let totalHotel = 0;
-  let totalAchat = 0;
-  let competitionDays = 0;
-  let trainingDays = 0;
+  let totalHours = 0, totalKm = 0, totalPeage = 0, totalHotel = 0, totalAchat = 0;
+  let competitionDays = 0, trainingDays = 0;
 
   for (let d = 1; d <= daysInMonth; d++) {
     const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    const key = `${currentCoach.id}-${dateStr}`;
-    const data = timeData[key];
+    const data = timeData[`${currentCoach.id}-${dateStr}`];
     if (!data) continue;
     totalHours += data.hours || 0;
     totalKm += data.km || 0;
@@ -168,28 +167,30 @@ export function updateSummary() {
   const salaryHours = totalHours * hourlyRate;
   const salaryCompetition = competitionDays * dailyAllowance;
   const kmAmount = totalKm * kmRate;
-  const totalGross = salaryHours + salaryCompetition + kmAmount + totalPeage + totalHotel + totalAchat;
+  const totalReimbursement = kmAmount + totalPeage + totalHotel + totalAchat;
+  const totalGross = salaryHours + salaryCompetition;
 
-  const summaryEl = document.getElementById('summary');
-  if (!summaryEl) return;
+  // Affichage/masquage des lignes coach vs bénévole
+  const hideIds = isVolunteer
+    ? ['summaryRateItem','summaryTrainingPaymentItem','summaryCompPaymentItem','summaryUrssafTotalItem']
+    : [];
+  ['summaryRateItem','summaryTrainingPaymentItem','summaryCompPaymentItem','summaryUrssafTotalItem'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = hideIds.includes(id) ? 'none' : '';
+  });
 
-  if (isVolunteer) {
-    summaryEl.innerHTML = `
-      <div class="summary-row"><span>Jours de séance :</span><span>${trainingDays}</span></div>
-      <div class="summary-row"><span>Jours de compétition :</span><span>${competitionDays}</span></div>
-      <div class="summary-row"><span>Km parcourus :</span><span>${numberDisplay(totalKm)} km</span></div>
-    `;
-  } else {
-    summaryEl.innerHTML = `
-      <div class="summary-row"><span>Heures :</span><span>${numberDisplay(totalHours)} h × ${currencyDisplay(hourlyRate)} = ${currencyDisplay(salaryHours)}</span></div>
-      <div class="summary-row"><span>Compétitions :</span><span>${competitionDays} j × ${currencyDisplay(dailyAllowance)} = ${currencyDisplay(salaryCompetition)}</span></div>
-      <div class="summary-row"><span>Km :</span><span>${numberDisplay(totalKm)} km × ${currencyDisplay(kmRate)} = ${currencyDisplay(kmAmount)}</span></div>
-      ${totalPeage > 0 ? `<div class="summary-row"><span>Péages :</span><span>${currencyDisplay(totalPeage)}</span></div>` : ''}
-      ${totalHotel > 0 ? `<div class="summary-row"><span>Hébergement :</span><span>${currencyDisplay(totalHotel)}</span></div>` : ''}
-      ${totalAchat > 0 ? `<div class="summary-row"><span>Achats :</span><span>${currencyDisplay(totalAchat)}</span></div>` : ''}
-      <div class="summary-row summary-total"><span>Total brut :</span><span>${currencyDisplay(totalGross)}</span></div>
-    `;
-  }
+  setVal('totalHours',            numberDisplay(totalHours) + ' h');
+  setVal('hourlyRate',            currencyDisplay(hourlyRate));
+  setVal('trainingPayment',       currencyDisplay(salaryHours));
+  setVal('compDays',              competitionDays + ' j');
+  setVal('compPayment',           currencyDisplay(salaryCompetition));
+  setVal('totalKm',               numberDisplay(totalKm) + ' km');
+  setVal('kmPayment',             currencyDisplay(kmAmount));
+  setVal('tollPayment',           currencyDisplay(totalPeage));
+  setVal('hotelPayment',          currencyDisplay(totalHotel));
+  setVal('purchasePayment',       currencyDisplay(totalAchat));
+  setVal('urssafTotalPayment',    currencyDisplay(totalGross));
+  setVal('reimbursementTotalPayment', currencyDisplay(totalReimbursement));
 
   updateFreezeUI();
   updateCurrentProfileUI();
