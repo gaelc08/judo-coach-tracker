@@ -105,6 +105,12 @@ import { createInviteDebugTools } from './modules/invite-debug.js';
 import { findExistingProfileByEmail, getCoachDisplayName, getCurrentUserDisplayName, getProfileLabel, getProfileType, isVolunteerProfile } from './modules/profile-utils.js';
 import { syncHelloAssoMembers, getHelloAssoMembers, getLastSyncTime, parseHelloAssoCsv, importHelloAssoCsvData } from './modules/helloasso-service.js';
 
+// ===== Export UI (fully extracted) =====
+import { createExportUI } from './modules/export-ui.js';
+
+// ===== HelloAsso UI (fully extracted) =====
+import { createHelloAssoUI } from './modules/helloasso-ui.js';
+
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 // ===== REST Gateway =====
@@ -215,24 +221,66 @@ function openCoachModal(mode) {
   modal.classList.add('active');
 }
 
-// ===== Export UI stubs (export-ui.js still has TODO stubs) =====
-// TODO: replace with real imports once export-ui.js is extracted
-async function exportDeclarationXLS()    { console.warn('exportDeclarationXLS: not yet extracted to module'); }
-async function exportTimesheetHTML()     { console.warn('exportTimesheetHTML: not yet extracted to module'); }
-async function exportExpenseHTML()       { console.warn('exportExpenseHTML: not yet extracted to module'); }
-async function exportMonthlyExpenses()   { console.warn('exportMonthlyExpenses: not yet extracted to module'); }
-async function openMileagePreviewModal() { console.warn('openMileagePreviewModal: not yet extracted to module'); }
-async function openMonthlySummaryPreviewModal() { console.warn('openMonthlySummaryPreviewModal: not yet extracted to module'); }
-async function importCoachData(file)     { console.warn('importCoachData: not yet extracted to module'); }
-async function exportBackupJSON()        { console.warn('exportBackupJSON: not yet extracted to module'); }
+// ===== Export UI (module instanciation) =====
+const __exportUI = createExportUI({
+  // State getters
+  getCurrentCoach:      () => currentCoach,
+  getCurrentMonth:      () => currentMonth,
+  getTimeData:          () => timeData,
+  getSelectedDay:       () => selectedDay,
+  getCurrentUser:       () => currentUser,
+  getCurrentAccessToken: () => currentAccessToken,
 
-// ===== HelloAsso UI stub (helloasso-ui.js still has TODO stubs) =====
-// TODO: replace with real import once helloasso-ui.js is extracted
-async function openHelloAssoModal() {
-  console.warn('openHelloAssoModal: not yet extracted to module');
-  const modal = document.getElementById('helloAssoModal');
-  if (modal) modal.classList.add('active');
-}
+  // Services
+  supabase,
+  supabaseUrl,
+  supabaseKey,
+  logAuditEvent:            __logAuditEvent,
+  buildMonthlyAuditPayload: __buildMonthlyAuditPayload,
+
+  // Runtime utils
+  downloadBlob,
+  loadExcelJs,
+  blobToDataUrl,
+  isStandaloneApp,
+
+  // Domain utils
+  escapeHtml:                   __escapeHtml,
+  normalizeMonth:               __normalizeMonth,
+  getCoachDisplayName:          __getCoachDisplayName,
+  getProfileLabel:              __getProfileLabel,
+  getProfileType:               __getProfileType,
+  isVolunteerProfile:           __isVolunteerProfile,
+  getMileageScaleDescription:   __getMileageScaleDescription,
+  getMonthlyMileageBreakdown:   __getMonthlyMileageBreakdown,
+  getMileageYearBreakdown:      __getMileageYearBreakdown,
+  parseFiscalPower:             __parseFiscalPower,
+  getMileageScaleBand:          __getMileageScaleBand,
+  calculateAnnualMileageAmount: __calculateAnnualMileageAmount,
+  getMileageYearBreakdownFn:    __getMileageYearBreakdown,
+});
+
+const exportDeclarationXLS            = __exportUI.exportDeclarationXLS;
+const exportExpenseHTML               = __exportUI.exportExpenseHTML;
+const exportTimesheetHTML             = __exportUI.exportTimesheetHTML;
+const exportMonthlyExpenses           = __exportUI.exportMonthlyExpenses;
+const exportBackupJSON                = __exportUI.exportBackupJSON;
+const importCoachData                 = __exportUI.importCoachData;
+const openMileagePreviewModal         = __exportUI.openMileagePreviewModal;
+const openMonthlySummaryPreviewModal  = __exportUI.openMonthlySummaryPreviewModal;
+
+// ===== HelloAsso UI (module instanciation) =====
+const __helloAssoUI = createHelloAssoUI({
+  supabase,
+  syncHelloAssoMembers,
+  getHelloAssoMembers,
+  getLastSyncTime,
+  parseHelloAssoCsv,
+  importHelloAssoCsvData,
+  escapeHtml: __escapeHtml,
+});
+
+const openHelloAssoModal = __helloAssoUI.openHelloAssoModal;
 
 // ===== Wire auth-listeners =====
 initAuthListeners({
