@@ -128,6 +128,7 @@ export function updateSummary() {
 
   const tdKeys = Object.keys(timeData);
   const matchingKeys = tdKeys.filter(k => k.startsWith(`${currentCoach.id}-${currentMonth}`));
+  console.log('DEBUG summary: coach=', currentCoach?.id, 'month=', currentMonth, 'matching=', matchingKeys.length, 'total=', tdKeys.length);
   if (matchingKeys.length === 0) {
     const summaryEl = document.getElementById('summary');
     if (summaryEl) summaryEl.innerHTML = '<div class="summary-empty">Aucune donnée saisie pour ce mois.</div>';
