@@ -25,12 +25,34 @@ export function initCoachManager({ supabase, coachWriteViaRest, logAuditEvent })
 }
 
 // ===== Modal open helper =====
-export function openCoachModal(mode) {
+export function fillCoachForm(coach) {
+  if (!coach) return;
+  const profileType = coach.profile_type || coach.role || 'coach';
+  const profileTypeEl = document.getElementById('coachProfileType');
+  if (profileTypeEl) profileTypeEl.value = profileType;
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val ?? ''; };
+  set('coachName',        coach.name);
+  set('coachFirstName',   coach.first_name);
+  set('coachEmail',       coach.email);
+  set('coachAddress',     coach.address);
+  set('coachVehicle',     coach.vehicle);
+  set('coachFiscalPower', coach.fiscal_power);
+  set('coachRate',        coach.hourly_rate);
+  set('dailyAllowance',   coach.daily_allowance);
+  set('coachOwnerUid',    coach.owner_uid);
+  updateCoachFormProfileUI(profileType);
+}
+
+export function openCoachModal(mode, coach = null) {
   const modal = document.getElementById('coachModal');
   if (!modal) return;
   if (mode === 'edit') {
     document.getElementById('coachModalTitle').textContent = 'Modifier le profil';
     setEditMode(true);
+    if (coach) {
+      setEditingCoachId(coach.id);
+      fillCoachForm(coach);
+    }
   } else {
     document.getElementById('coachModalTitle').textContent = 'Ajouter un profil';
     clearCoachForm();

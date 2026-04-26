@@ -81,7 +81,10 @@ export function setupEventListeners() {
 
   // Coach management
   bindClick('addCoachBtn',    () => openCoachModal?.('add'));
-  bindClick('editCoachBtn',   () => openCoachModal?.('edit'));
+  bindClick('editCoachBtn',   () => openCoachModal?.('edit', currentCoach));
+  bindClick('cancelCoach',    () => {
+    document.getElementById('coachModal')?.classList.remove('active');
+  });
   bindClick('inviteAdminBtn', () => inviteAdmin?.());
 
   // Freeze
