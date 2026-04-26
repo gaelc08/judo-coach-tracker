@@ -103,11 +103,11 @@ export function setupEventListeners() {
   // => on les bind via délégation sur document pour éviter les WARN au démarrage
   document.addEventListener('click', (e) => {
     const id = e.target?.id;
-    if (id === 'exportDeclarationBtn')         exportDeclarationXLS?.();
-    else if (id === 'exportTimesheetBtn')      exportTimesheetHTML?.();
-    else if (id === 'exportExpenseBtn')        exportExpenseHTML?.();
-    else if (id === 'exportMileagePreviewBtn') openMileagePreviewModal?.();
-    else if (id === 'monthlySummaryPreviewBtn') openMonthlySummaryPreviewModal?.();
+    if (id === 'exportDeclarationBtn')                        exportDeclarationXLS?.();
+    else if (id === 'exportTimesheetBtn' || id === 'timesheetBtn') exportTimesheetHTML?.();
+    else if (id === 'exportExpenseBtn'   || id === 'mileageBtn')   exportExpenseHTML?.();
+    else if (id === 'exportMileagePreviewBtn')                 openMileagePreviewModal?.();
+    else if (id === 'monthlySummaryPreviewBtn')                openMonthlySummaryPreviewModal?.();
   });
 
   // Import / Backup
