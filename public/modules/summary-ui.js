@@ -127,7 +127,8 @@ export function updateSummary() {
   }
 
   const tdKeys = Object.keys(timeData);
-  console.log('DEBUG updateSummary coach=', currentCoach?.id, 'month=', currentMonth, 'timeData keys=', tdKeys.length, 'sample=', tdKeys.slice(0,3));
+  const matchingKeys = tdKeys.filter(k => k.startsWith(currentCoach.id));
+  console.log('DEBUG updateSummary coach=', currentCoach?.id, 'month=', currentMonth, 'total keys=', tdKeys.length, 'matching coach=', matchingKeys.length, 'sample key=', tdKeys[0]?.substring(0, 50));
 
   const [year, month] = currentMonth.split('-').map(Number);
   const daysInMonth = new Date(year, month, 0).getDate();
