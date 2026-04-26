@@ -2,8 +2,8 @@
 // Uses Supabase JS SDK
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { BUILD_ID as __BUILD_ID, effectiveEnv as __effectiveEnv, supabaseKey, supabaseUrl } from './modules/env.js';
-import { auditMatchesCurrentCoach, formatAuditDateTime, formatAuditDetails, getAuditActionGroup } from './modules/audit-ui.js';
+import { BUILD_ID as __BUILD_ID, VERSION_DATE as __VERSION_DATE, VERSION_INCREMENT as __VERSION_INCREMENT, effectiveEnv as __effectiveEnv, supabaseKey, supabaseUrl } from './modules/env.js';
+import { auditMatchesCurrentCoach, formatAuditAction, formatAuditDateTime, formatAuditDetails, getAuditActionGroup } from './modules/audit-ui.js';
 import { isAdminViaLocalClaims, isAdminViaRest } from './modules/auth-admin.js';
 import { createAuditController } from './modules/audit-controller.js';
 import { createAuthNoHangLock, createAuthStorage, detectInviteFlowFromUrlHash } from './modules/auth-runtime.js';
@@ -16,6 +16,7 @@ import { calculateAnnualMileageAmount, formatNumberFr, getLegacyKmRateFromFiscal
 import { findExistingProfileByEmail, getCoachDisplayName, getCurrentUserDisplayName, getProfileLabel, getProfileType, isVolunteerProfile } from './modules/profile-utils.js';
 import { setupPWA } from './modules/pwa.js';
 import { createRestGateway } from './modules/rest-gateway.js';
+import { syncHelloAssoMembers, getHelloAssoMembers, getLastSyncTime, parseHelloAssoCsv, importHelloAssoCsvData } from './modules/helloasso-service.js';
 import {
   __decodeJwtPayload,
   __describeJwt,
@@ -54,9 +55,11 @@ const __supabaseFetchDebugWrapped = async (input, init = {}) => {
   if (isSupabase && !init.signal && typeof AbortController !== 'undefined') {
     controller = new AbortController();
     finalInit = { ...init, signal: controller.signal };
+    // Use a longer timeout for Edge Function calls (e.g. HelloAsso sync can take time)
+    const fetchTimeoutMs = String(url).includes('/functions/v1/') ? 60000 : 15000;
     timeoutId = setTimeout(() => {
       try { controller.abort(); } catch {}
-    }, 15000);
+    }, fetchTimeoutMs);
   }
 
   try {
@@ -210,6 +213,7 @@ let currentSession = null;
 let currentAccessToken = null;
 let __eventListenersSetup = false;
 let auditLogs = [];
+let __monthlySummaryPreviewState = { month: null, report: null };
 
 const __restGateway = createRestGateway({
   supabaseUrl,
@@ -255,6 +259,79 @@ function __getCurrentUserDisplayName(user, preferredCoach = null) {
   });
 }
 
+function __buildAuditPayload({
+  coach = currentCoach,
+  entityId = null,
+  targetUserId,
+  targetEmail,
+  metadata = {},
+} = {}) {
+  const resolvedCoach = coach || null;
+  const nextMetadata = { ...metadata };
+
+  if (resolvedCoach?.id != null && nextMetadata.coach_id == null) {
+    nextMetadata.coach_id = resolvedCoach.id;
+  }
+  if (resolvedCoach && nextMetadata.coach_name == null) {
+    nextMetadata.coach_name = __getCoachDisplayName(resolvedCoach) || resolvedCoach.name || null;
+  }
+
+  return {
+    entityId,
+    targetUserId: targetUserId ?? resolvedCoach?.owner_uid ?? null,
+    targetEmail: targetEmail ?? resolvedCoach?.email ?? null,
+    metadata: nextMetadata,
+  };
+}
+
+function __buildMonthlyAuditPayload({
+  coach = currentCoach,
+  entityId = null,
+  month = currentMonth,
+  metadata = {},
+  targetUserId,
+  targetEmail,
+} = {}) {
+  const normalizedMonth = month ? __normalizeMonth(month) : null;
+  return __buildAuditPayload({
+    coach,
+    entityId,
+    targetUserId,
+    targetEmail,
+    metadata: {
+      ...(normalizedMonth ? { month: normalizedMonth } : {}),
+      ...metadata,
+    },
+  });
+}
+
+async function __getFreshAccessToken() {
+  let accessToken = currentAccessToken;
+  const currentTokenHasAdminClaim = __hasAdminClaim(accessToken);
+
+  try {
+    const { data: { session } } = await supabase.auth.refreshSession();
+    if (session?.access_token) {
+      const refreshedAccessToken = session.access_token;
+      if (currentTokenHasAdminClaim && !__hasAdminClaim(refreshedAccessToken)) {
+        return accessToken;
+      }
+      accessToken = refreshedAccessToken;
+      currentAccessToken = accessToken;
+      return accessToken;
+    }
+
+    const { data: { session: existing } } = await supabase.auth.getSession();
+    if (existing?.access_token) {
+      accessToken = existing.access_token;
+      currentAccessToken = accessToken;
+    }
+  } catch {
+  }
+
+  return accessToken;
+}
+
 function __findExistingProfileByEmail(email, { excludeId = null } = {}) {
   return findExistingProfileByEmail(email, {
     excludeId,
@@ -298,6 +375,7 @@ const __auditController = createAuditController({
   isAdminForUi: __isAdminForUi,
   escapeHtml: __escapeHtml,
   formatAuditDateTime,
+  formatAuditAction,
   formatAuditDetails,
   getAuditActionGroup,
   auditMatchesCurrentCoach,
@@ -317,6 +395,188 @@ async function loadAuditLogs() {
 
 async function openAuditLogsModal() {
   return await __auditController.openAuditLogsModal();
+}
+
+// ===== HelloAsso members =====
+
+async function renderHelloAssoSection() {
+  const contentEl = document.getElementById('helloAssoContent');
+  if (!contentEl) return;
+
+  contentEl.innerHTML = '<p>Chargement…</p>';
+
+  try {
+    const [lastSync, members] = await Promise.all([
+      getLastSyncTime(supabase),
+      getHelloAssoMembers(supabase),
+    ]);
+
+    const syncInfo = lastSync
+      ? `Dernière synchronisation : ${new Date(lastSync).toLocaleString('fr-FR')}`
+      : 'Jamais synchronisé';
+
+    // Compute FFJ judo category from year of birth.
+    // Season reference: competition year starts in September, so use current year.
+    // FFJ categories 2025/2026: year of birth determines category.
+    function getFfjCategory(dateOfBirth) {
+      if (!dateOfBirth) return null;
+      // Try to extract year from various formats: DD/MM/YYYY, YYYY-MM-DD, DD-MM-YYYY
+      const yearMatch = String(dateOfBirth).match(/(?:^|\D)(\d{4})(?:\D|$)/);
+      if (!yearMatch) return null;
+      const year = parseInt(yearMatch[1], 10);
+      if (isNaN(year)) return null;
+      // FFJ categories based on birth year for season 2025/2026
+      if (year >= 2020) return 'Baby Judo';    // 2020-2021-2022
+      if (year >= 2018) return 'Mini-Poussin'; // 2018-2019
+      if (year >= 2016) return 'Poussin';      // 2016-2017
+      if (year >= 2014) return 'Benjamin';     // 2014-2015
+      if (year >= 2012) return 'Minime';       // 2012-2013
+      if (year >= 2009) return 'Cadet';        // 2009-2010-2011
+      if (year >= 2006) return 'Junior';       // 2006-2007-2008
+      if (year >= 1996) return 'Senior';       // 2005 et avant (jusqu'à 1996)
+      return 'Vétéran';                        // 1996 et avant
+    }
+
+    // Helper to build a member table for a given group
+    function buildMemberTable(group, showCategory = false) {
+      if (group.length === 0) return '<p class="audit-status">Aucun adhérent.</p>';
+      const rows = group.map((m) => {
+        const amount = m.membership_amount != null
+          ? `${Number(m.membership_amount).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €`
+          : '—';
+        const date = m.membership_date
+          ? new Date(m.membership_date).toLocaleDateString('fr-FR')
+          : '—';
+        const ffjCategory = showCategory ? getFfjCategory(m.date_of_birth) : null;
+        const categoryCell = showCategory
+          ? `<td>${__escapeHtml(ffjCategory ?? m.judo_category ?? '—')}</td>`
+          : '';
+        const dob = m.date_of_birth ? __escapeHtml(m.date_of_birth) : '—';
+        return `<tr>
+          <td>${__escapeHtml(m.first_name ?? '')}</td>
+          <td>${__escapeHtml(m.last_name ?? '')}</td>
+          <td>${__escapeHtml(m.email ?? '')}</td>
+          ${categoryCell}
+          <td>${dob}</td>
+          <td>${amount}</td>
+          <td>${date}</td>
+        </tr>`;
+      }).join('');
+      const categoryHeader = showCategory ? '<th>Catégorie</th>' : '';
+      return `
+        <div class="audit-table-wrap">
+          <table class="audit-table">
+            <thead><tr>
+              <th>Prénom</th><th>Nom</th><th>Email</th>
+              ${categoryHeader}
+              <th>Naissance</th><th>Montant (€)</th><th>Date adhésion</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+    }
+
+    let tableHtml = '';
+    if (members.length === 0) {
+      tableHtml = '<p class="audit-status">Aucun membre synchronisé. Cliquez sur Synchroniser.</p>';
+    } else {
+      // Sort by last name
+      const sorted = [...members].sort((a, b) =>
+        (a.last_name ?? '').localeCompare(b.last_name ?? '', 'fr'));
+
+      const judo = sorted.filter((m) => m.discipline === 'judo');
+      const iaido = sorted.filter((m) => m.discipline === 'iaido');
+      const taiso = sorted.filter((m) => m.discipline === 'taiso');
+      const other = sorted.filter((m) => !['judo','iaido','taiso'].includes(m.discipline));
+
+      // Sort judo by FFJ category (from date_of_birth if available, else from judo_category)
+      const ffjOrder = ['Baby Judo', 'Mini-Poussin', 'Poussin', 'Benjamin', 'Minime', 'Cadet', 'Junior', 'Senior', 'Vétéran'];
+      const legacyOrder = ['Baby Judo', 'Mini-Poussin/Poussin', 'Benjamin/Minime', 'Cadet/Junior/Senior'];
+      judo.sort((a, b) => {
+        const catA = getFfjCategory(a.date_of_birth) ?? a.judo_category ?? '';
+        const catB = getFfjCategory(b.date_of_birth) ?? b.judo_category ?? '';
+        const ia = ffjOrder.indexOf(catA) !== -1 ? ffjOrder.indexOf(catA) : legacyOrder.indexOf(catA) * 2;
+        const ib = ffjOrder.indexOf(catB) !== -1 ? ffjOrder.indexOf(catB) : legacyOrder.indexOf(catB) * 2;
+        if (ia !== ib) return ia - ib;
+        return (a.last_name ?? '').localeCompare(b.last_name ?? '', 'fr');
+      });
+
+      tableHtml = `
+        <h3>🥋 Judo (${judo.length})</h3>
+        ${buildMemberTable(judo, true)}
+        <h3>🗡️ Iaïdo (${iaido.length})</h3>
+        ${buildMemberTable(iaido, false)}
+        <h3>🤸 Taïso (${taiso.length})</h3>
+        ${buildMemberTable(taiso, false)}
+        
+      `;
+    }
+
+    contentEl.innerHTML = `
+      <div class="audit-toolbar">
+        <span class="audit-status">${__escapeHtml(syncInfo)}</span>
+        <button id="syncHelloAssoBtn" class="btn-secondary">🔄 Synchroniser</button>
+        <label class="btn-secondary" style="cursor:pointer;margin-left:0.5rem" title="Importer un export CSV HelloAsso pour enrichir les dates de naissance">
+          📂 Importer CSV
+          <input type="file" id="helloAssoCsvInput" accept=".csv" style="display:none">
+        </label>
+      </div>
+      ${tableHtml}`;
+
+    const syncBtn = document.getElementById('syncHelloAssoBtn');
+    if (syncBtn) {
+      syncBtn.onclick = async () => {
+        syncBtn.disabled = true;
+        syncBtn.textContent = '⏳ Synchronisation…';
+        try {
+          const result = await syncHelloAssoMembers(supabase);
+          console.log('DEBUG sync-helloasso result:', result);
+        } catch (e) {
+          console.error('DEBUG sync-helloasso error:', e);
+          alert(`Erreur lors de la synchronisation : ${e.message || e}`);
+        } finally {
+          await renderHelloAssoSection();
+        }
+      };
+    }
+
+    const csvInput = document.getElementById('helloAssoCsvInput');
+    if (csvInput) {
+      csvInput.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          const rows = parseHelloAssoCsv(text);
+          if (rows.length === 0) {
+            alert('Aucune donnée trouvée dans le CSV. Vérifiez le format du fichier.');
+            return;
+          }
+          const withDob = rows.filter((r) => r.date_of_birth);
+          if (withDob.length === 0) {
+            alert('Le CSV ne contient pas de colonne "date de naissance". Vérifiez les colonnes exportées depuis HelloAsso.');
+            return;
+          }
+          const { updated, notFound } = await importHelloAssoCsvData(supabase, withDob);
+          let msg = `✅ ${updated} date(s) de naissance importée(s).`;
+          if (notFound.length > 0) msg += `\n⚠️ ${notFound.length} email(s) non trouvé(s) dans la base.`;
+          alert(msg);
+          await renderHelloAssoSection();
+        } catch (err) {
+          alert(`Erreur lors de l'import CSV : ${err.message || err}`);
+        }
+        csvInput.value = '';
+      };
+    }
+  } catch (e) {
+    console.error('DEBUG renderHelloAssoSection error:', e);
+    contentEl.innerHTML = `<p class="audit-status">Erreur : ${__escapeHtml(String(e))}</p>`;
+  }
+}
+
+async function openHelloAssoModal() {
+  document.getElementById('helloAssoModal').classList.add('active');
+  await renderHelloAssoSection();
 }
 
 // ===== Holiday data (dynamically fetched, with static fallback) =====
@@ -347,6 +607,22 @@ function setupEnvironmentBanner() {
   envBanner.style.display = 'block';
 }
 
+function setupVersionBadge() {
+  const el = document.getElementById('appVersion');
+  if (!el) return;
+  el.textContent = `v${__BUILD_ID}`;
+}
+
+function setupHelpVersion() {
+  const el = document.getElementById('helpVersion');
+  if (!el) return;
+  el.innerHTML = `
+    <span class="help-version-label">Version</span>
+    <span class="help-version-date">${__VERSION_DATE}</span>
+    <span class="help-version-build">#${__VERSION_INCREMENT}</span>
+  `;
+}
+
 // ===== Init =====
 async function debugSession() {
   try {
@@ -364,6 +640,8 @@ async function debugSession() {
 document.addEventListener("DOMContentLoaded", () => {
   console.log('DEBUG DOMContentLoaded');
   setupEnvironmentBanner();
+  setupVersionBadge();
+  setupHelpVersion();
   setupPWA();
   setupAuthListeners();
   debugSession();
@@ -637,19 +915,25 @@ function setupAuthListeners() {
       // --- VERIFICATION DU ROLE ---
       const isAdmin = await isCurrentUserAdminDB();
       if (isAdmin) {
+        document.getElementById("adminActionsPanel").style.display = "block";
         document.getElementById("addCoachBtn").style.display = "inline-block";
         document.getElementById("editCoachBtn").style.display = "inline-block";
         document.getElementById("inviteAdminBtn").style.display = "inline-block";
         document.getElementById("freezeBtn").style.display = "inline-block";
         document.getElementById("auditLogsBtn").style.display = "inline-block";
+        document.getElementById("helloAssoBtn").style.display = "inline-block";
+        document.getElementById("exportMonthlyExpensesBtn").style.display = "inline-block";
         document.getElementById("importGroup").style.display = "flex";
         document.getElementById("backupBtn").style.display = "inline-block";
       } else {
+        document.getElementById("adminActionsPanel").style.display = "none";
         document.getElementById("addCoachBtn").style.display = "none";
         document.getElementById("editCoachBtn").style.display = "none";
         document.getElementById("inviteAdminBtn").style.display = "none";
         document.getElementById("freezeBtn").style.display = "none";
         document.getElementById("auditLogsBtn").style.display = "none";
+        document.getElementById("helloAssoBtn").style.display = "none";
+        document.getElementById("exportMonthlyExpensesBtn").style.display = "none";
         document.getElementById("importGroup").style.display = "none";
         document.getElementById("backupBtn").style.display = "none";
       }
@@ -872,16 +1156,11 @@ async function toggleFreezeMonth() {
       return;
     }
     frozenMonths.delete(key);
-    await __logAuditEvent('timesheet.unfreeze', 'frozen_timesheet', {
+    await __logAuditEvent('timesheet.unfreeze', 'frozen_timesheet', __buildMonthlyAuditPayload({
+      coach: currentCoach,
       entityId: key,
-      targetUserId: currentCoach.owner_uid || null,
-      targetEmail: currentCoach.email || null,
-      metadata: {
-        coach_id: currentCoach.id,
-        coach_name: __getCoachDisplayName(currentCoach) || currentCoach.name || null,
-        month: normalizedMonth,
-      },
-    });
+      month: normalizedMonth,
+    }));
   } else {
     const res = await globalThis.fetch(`${supabaseUrl}/rest/v1/frozen_timesheets`, {
       method: 'POST',
@@ -904,16 +1183,11 @@ async function toggleFreezeMonth() {
       return;
     }
     frozenMonths.add(key);
-    await __logAuditEvent('timesheet.freeze', 'frozen_timesheet', {
+    await __logAuditEvent('timesheet.freeze', 'frozen_timesheet', __buildMonthlyAuditPayload({
+      coach: currentCoach,
       entityId: key,
-      targetUserId: currentCoach.owner_uid || null,
-      targetEmail: currentCoach.email || null,
-      metadata: {
-        coach_id: currentCoach.id,
-        coach_name: __getCoachDisplayName(currentCoach) || currentCoach.name || null,
-        month: normalizedMonth,
-      },
-    });
+      month: normalizedMonth,
+    }));
   }
   currentMonth = normalizedMonth;
   updateFreezeUI();
@@ -1063,6 +1337,18 @@ function setupEventListeners() {
   });
 
   bindClick("auditLogsBtn", openAuditLogsModal);
+
+  bindClick("helloAssoBtn", openHelloAssoModal);
+
+  bindClick("closeHelloAsso", () => {
+    document.getElementById("helloAssoModal").classList.remove("active");
+  });
+
+  bindClick("helloAssoModal", (e) => {
+    if (e.target.id === "helloAssoModal") {
+      document.getElementById("helloAssoModal").classList.remove("active");
+    }
+  });
 
   bindClick("refreshAuditLogsBtn", loadAuditLogs);
 
@@ -1358,17 +1644,14 @@ const coachData = {
       }
       currentCoach = saved;
       loadCoaches();
-      await __logAuditEvent(wasEditMode ? 'profile.update' : 'profile.create', 'user_profile', {
+      await __logAuditEvent(wasEditMode ? 'profile.update' : 'profile.create', 'user_profile', __buildAuditPayload({
+        coach: saved,
         entityId: saved.id,
-        targetUserId: saved.owner_uid || null,
-        targetEmail: saved.email || null,
         metadata: {
-          coach_id: saved.id,
-          coach_name: __getCoachDisplayName(saved) || saved.name || null,
           profile_type: saved.profile_type || profileType,
           role: saved.role || coachData.role,
         },
-      });
+      }));
     }
 
     document.getElementById('coachModal').classList.remove('active');
@@ -1457,16 +1740,14 @@ async function deleteCoach() {
     const { error: error2 } = await supabase.from('time_data').delete().eq('coach_id', editingCoachId);
     if (error2) throw error2;
 
-    await __logAuditEvent('profile.delete', 'user_profile', {
+    await __logAuditEvent('profile.delete', 'user_profile', __buildAuditPayload({
+      coach: targetCoach,
       entityId: editingCoachId,
-      targetUserId: targetCoach?.owner_uid || null,
-      targetEmail: targetCoach?.email || null,
       metadata: {
         coach_id: editingCoachId,
-        coach_name: targetCoach ? (__getCoachDisplayName(targetCoach) || targetCoach.name || null) : null,
         deleted_auth_user: !!(targetCoach?.owner_uid || targetCoach?.email),
       },
-    });
+    }));
 
     await loadAllDataFromSupabase();
 
@@ -2023,22 +2304,27 @@ async function saveDay() {
     }
   }
 
+  const missingJustifs = [];
+  if (peage > 0 && !justificationUrl) missingJustifs.push('péage');
+  if (hotel > 0 && !hotelJustificationUrl) missingJustifs.push('hôtel');
+  if (achat > 0 && !achatJustificationUrl) missingJustifs.push('achat');
+  if (missingJustifs.length > 0) {
+    alert(`Justificatif obligatoire pour : ${missingJustifs.join(', ')}. Veuillez joindre les justificatifs manquants.`);
+    return;
+  }
+
   if (hours === 0 && !competition && km === 0 && !description && peage === 0 && hotel === 0 && achat === 0) {
     if (existing && existing.id) {
       const { error } = await supabase.from('time_data').delete().eq('id', existing.id);
       if (error) throw error;
-      await __logAuditEvent('time_data.delete', 'time_data', {
+      await __logAuditEvent('time_data.delete', 'time_data', __buildMonthlyAuditPayload({
+        coach: currentCoach,
         entityId: existing.id,
-        targetUserId: currentCoach.owner_uid || null,
-        targetEmail: currentCoach.email || null,
         metadata: {
-          coach_id: currentCoach.id,
-          coach_name: __getCoachDisplayName(currentCoach) || currentCoach.name || null,
           date: selectedDay,
-          month: __normalizeMonth(currentMonth),
           source: 'saveDay-empty-payload',
         },
-      });
+      }));
         await notifyAdminAlert(currentCoach.name, selectedDay, { deleted: true });
     }
     delete timeData[key];
@@ -2085,15 +2371,11 @@ async function saveDay() {
         ownerEmail: ownerEmailForRow,
         id: existing.id
       };
-      await __logAuditEvent('time_data.update', 'time_data', {
+      await __logAuditEvent('time_data.update', 'time_data', __buildMonthlyAuditPayload({
+        coach: currentCoach,
         entityId: existing.id,
-        targetUserId: currentCoach.owner_uid || null,
-        targetEmail: currentCoach.email || null,
         metadata: {
-          coach_id: currentCoach.id,
-          coach_name: __getCoachDisplayName(currentCoach) || currentCoach.name || null,
           date: selectedDay,
-          month: __normalizeMonth(currentMonth),
           hours,
           competition,
           km,
@@ -2102,7 +2384,7 @@ async function saveDay() {
           achat,
           had_existing_id: !!existingId,
         },
-      });
+      }));
         await notifyAdminAlert(currentCoach.name, selectedDay, timeData[key]);
     } else {
       const { data: inserted, error } = await supabase.from('time_data').insert(data).select();
@@ -2125,15 +2407,11 @@ async function saveDay() {
         ownerEmail: ownerEmailForRow,
         id: inserted[0].id
       };
-      await __logAuditEvent('time_data.create', 'time_data', {
+      await __logAuditEvent('time_data.create', 'time_data', __buildMonthlyAuditPayload({
+        coach: currentCoach,
         entityId: inserted?.[0]?.id || null,
-        targetUserId: currentCoach.owner_uid || null,
-        targetEmail: currentCoach.email || null,
         metadata: {
-          coach_id: currentCoach.id,
-          coach_name: __getCoachDisplayName(currentCoach) || currentCoach.name || null,
           date: selectedDay,
-          month: __normalizeMonth(currentMonth),
           hours,
           competition,
           km,
@@ -2141,7 +2419,7 @@ async function saveDay() {
           hotel,
           achat,
         },
-      });
+      }));
         await notifyAdminAlert(currentCoach.name, selectedDay, timeData[key]);
     }
   }
@@ -2166,18 +2444,14 @@ async function deleteDay() {
   if (existing && existing.id) {
     const { error } = await supabase.from('time_data').delete().eq('id', existing.id);
     if (error) throw error;
-    await __logAuditEvent('time_data.delete', 'time_data', {
+    await __logAuditEvent('time_data.delete', 'time_data', __buildMonthlyAuditPayload({
+      coach: currentCoach,
       entityId: existing.id,
-      targetUserId: currentCoach.owner_uid || null,
-      targetEmail: currentCoach.email || null,
       metadata: {
-        coach_id: currentCoach.id,
-        coach_name: __getCoachDisplayName(currentCoach) || currentCoach.name || null,
         date: selectedDay,
-        month: __normalizeMonth(currentMonth),
         source: 'deleteDay',
       },
-    });
+    }));
         await notifyAdminAlert(currentCoach.name, selectedDay, { deleted: true });
   }
   delete timeData[key];
@@ -2512,19 +2786,16 @@ async function exportDeclarationXLS() {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });
   __downloadBlob(blob, `declaration_salaire_${safeName}_${currentMonth}.xlsx`);
-  await __logAuditEvent('export.declaration_xlsx', 'export', {
+  await __logAuditEvent('export.declaration_xlsx', 'export', __buildMonthlyAuditPayload({
+    coach: currentCoach,
     entityId: `${currentCoach.id}-${currentMonth}`,
-    targetUserId: currentCoach.owner_uid || null,
-    targetEmail: currentCoach.email || null,
     metadata: {
-      coach_id: currentCoach.id,
       coach_name: coachDisplayName || null,
-      month: currentMonth,
       total_hours: totalHours,
       competition_days: competitionDays,
       total_amount: grandTotal,
     },
-  });
+  }));
 }
 
 function __closeMileagePreviewModal() {
@@ -2585,12 +2856,13 @@ function updateCurrentProfileUI() {
 
   const reimbursementLabel = document.getElementById("reimbursementTotalLabel");
   if (reimbursementLabel) reimbursementLabel.textContent = isVolunteer ? "Total à rembourser" : "Remboursement frais";
-
+  const exportBtn = document.getElementById("exportBtn");
+  if (exportBtn) exportBtn.style.display = isVolunteer ? "none" : "";
   const trainingHoursGroup = document.getElementById("trainingHoursGroup");
   if (trainingHoursGroup) trainingHoursGroup.style.display = isVolunteer ? "none" : "";
 }
 
-function __showMileagePreviewModal(html, fileName) {
+function __showMileagePreviewModal(html, fileName, downloadHtml = html) {
   let modal = document.getElementById('mileagePreviewModal');
   if (!modal) {
     modal = document.createElement('div');
@@ -2620,8 +2892,19 @@ function __showMileagePreviewModal(html, fileName) {
   const printBtn = modal.querySelector('#previewPrintBtn');
   const downloadBtn = modal.querySelector('#previewDownloadBtn');
 
+  if (printBtn) {
+    printBtn.disabled = true;
+  }
+
   if (iframe) {
+    iframe.onload = () => {
+      if (printBtn) {
+        printBtn.disabled = false;
+      }
+    };
     iframe.srcdoc = html;
+  } else if (printBtn) {
+    printBtn.disabled = false;
   }
 
   if (printBtn) {
@@ -2637,7 +2920,7 @@ function __showMileagePreviewModal(html, fileName) {
 
   if (downloadBtn) {
     downloadBtn.onclick = () => {
-      const blob = new Blob([html], { type: 'text/html;charset=utf-8;' });
+      const blob = new Blob([downloadHtml], { type: 'text/html;charset=utf-8;' });
       __downloadBlob(blob, fileName);
     };
   }
@@ -2704,14 +2987,56 @@ function exportExpenseHTML() {
   const totalPurchaseAmount = rows.reduce((sum, row) => sum + (row.purchaseAmount || 0), 0);
   const totalMileageKm = rows.reduce((sum, row) => sum + (Number(row.km) || 0), 0);
   const mileageScaleDescription = __getMileageScaleDescription(currentCoach.fiscal_power);
+  const escapeExpenseText = (value, fallback = '') => __escapeHtml(value || fallback);
+  const sanitizeExpenseUrl = (value) => {
+    if (!value) return '';
+    try {
+      const parsedUrl = new URL(String(value), window.location.href);
+      const protocol = parsedUrl.protocol.toLowerCase();
+      if (protocol !== 'http:' && protocol !== 'https:') return '';
+      return __escapeHtml(parsedUrl.href);
+    } catch {
+      return '';
+    }
+  };
+  const buildExpenseJustificationLinks = (row) => {
+    const links = [];
+    const tollUrl = sanitizeExpenseUrl(row.justificationUrl);
+    const hotelUrl = sanitizeExpenseUrl(row.hotelJustificationUrl);
+    const purchaseUrl = sanitizeExpenseUrl(row.achatJustificationUrl);
 
-  const html = `
+    if (tollUrl) links.push(`<a href="${tollUrl}" target="_blank" rel="noopener noreferrer">Péage</a>`);
+    if (hotelUrl) links.push(`<a href="${hotelUrl}" target="_blank" rel="noopener noreferrer">Hôtel</a>`);
+    if (purchaseUrl) links.push(`<a href="${purchaseUrl}" target="_blank" rel="noopener noreferrer">Achat</a>`);
+
+    return links.length
+      ? `<div class="justif-links">${links.join('')}</div>`
+      : '<span class="meta-line">Aucun justificatif</span>';
+  };
+  const safeCoachName = escapeExpenseText(currentCoach.name);
+  const safeCoachDisplayName = escapeExpenseText(coachDisplayName, 'Non renseigné');
+  const safeAddress = escapeExpenseText(currentCoach.address, 'Non renseignée');
+  const safeProfileLabel = escapeExpenseText(profileLabel);
+  const safeVehicle = escapeExpenseText(currentCoach.vehicle, 'Non renseigné');
+  const safeFiscalPower = escapeExpenseText(currentCoach.fiscal_power, 'Non renseignée');
+  const safeMileageScaleDescription = escapeExpenseText(mileageScaleDescription);
+  const safeSignatureLabel = escapeExpenseText(signatureLabel);
+  const usePreviewModal = __isStandaloneApp();
+  const renderExpenseHtml = ({ embeddedPreview = false, includeCloseButton = true } = {}) => {
+    const expenseDocumentControls = embeddedPreview
+      ? ''
+      : `
+      <button class="print-button no-print" onclick="window.print()">🖨️ Imprimer / Enregistrer en PDF</button>
+      ${includeCloseButton ? '<button class="print-button close-button no-print" onclick="window.close()">✖ Fermer</button>' : ''}
+    `;
+
+    return `
 <!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Note de frais - ${currentCoach.name} - ${month}/${year}</title>
+<title>Note de frais - ${safeCoachName} - ${month}/${year}</title>
 <style>
   * {
     box-sizing: border-box;
@@ -2727,6 +3052,7 @@ function exportExpenseHTML() {
     html, body {
       width: 194mm;
       margin: 0;
+      padding: 0;
       background: white;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
@@ -2738,11 +3064,13 @@ function exportExpenseHTML() {
       margin: 0;
       width: 194mm;
       max-width: 194mm;
+      min-height: 0 !important;
       display: flex;
       border-radius: 0;
     }
     .page-inner {
       padding: 0;
+      min-height: 0 !important;
       display: flex;
       flex-direction: column;
     }
@@ -2786,13 +3114,13 @@ function exportExpenseHTML() {
   }
 
   .page-shell {
-    width: 194mm;
-    max-width: 194mm;
-    min-height: 245mm;
+    width: ${embeddedPreview ? '100%' : '194mm'};
+    max-width: ${embeddedPreview ? '100%' : '194mm'};
+    min-height: ${embeddedPreview ? '0' : '245mm'};
     margin: 0 auto;
     background: #ffffff;
     border: none;
-    border-radius: 12px;
+    border-radius: ${embeddedPreview ? '0' : '12px'};
     box-shadow: none;
     display: flex;
     overflow: hidden;
@@ -2800,7 +3128,7 @@ function exportExpenseHTML() {
 
   .page-inner {
     padding: 8px 12px 12px;
-    min-height: 245mm;
+    min-height: ${embeddedPreview ? '0' : '245mm'};
     display: flex;
     flex-direction: column;
   }
@@ -2818,6 +3146,11 @@ function exportExpenseHTML() {
     box-shadow: none;
   }
 
+  .close-button {
+    margin-left: 8px;
+    background: linear-gradient(135deg, #c0392b, #922b21);
+  }
+
   .header { 
     display: flex; 
     align-items: flex-start;
@@ -2830,24 +3163,22 @@ function exportExpenseHTML() {
   
   .header-brand {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 12px;
   }
   
   .header-logo {
-    width: 54px;
-    height: 54px;
+    width: 160px;
+    height: 160px;
     flex: 0 0 auto;
-    display: grid;
-    place-items: center;
-    border-radius: 12px;
-    background: #f5f8fc;
-    border: 1px solid #d8e2ef;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
   }
   
   .header-logo img { 
-    max-width: 40px;
-    max-height: 40px;
+    max-width: 144px;
+    max-height: 144px;
   }
   
   .header-text {
@@ -3157,7 +3488,7 @@ function exportExpenseHTML() {
 <body>
   <div class="page-shell">
     <div class="page-inner">
-      <button class="print-button no-print" onclick="window.print()">🖨️ Imprimer / Enregistrer en PDF</button>
+      ${expenseDocumentControls}
 
       <div class="header">
         <div class="header-brand">
@@ -3165,12 +3496,10 @@ function exportExpenseHTML() {
             <img src="${logoUrl}" alt="Judo Club Cattenom-Rodemack" />
           </div>
           <div class="header-text">
-            <h1>Judo Club de Cattenom-Rodemack</h1>
-            <p>Dojo Communautaire</p>
-            <p>3 rue St Exupery</p>
+            <h1>Judo Club de Cattenom Rodemack</h1>
+            <p>Maison des arts martiaux</p>
             <p>57570 Cattenom</p>
-            <p>SIRET 30157248300024</p>
-            <p>📧 judoclubcattenom@gmail.com – 📞 06 62 62 53 13</p>
+            <p>judoclubcattenom@gmail.com</p>
           </div>
         </div>
         <div class="document-badge">
@@ -3184,9 +3513,9 @@ function exportExpenseHTML() {
         <section class="info-card">
           <h3>Informations du demandeur</h3>
           <div class="info-list">
-            <div class="info-row"><span class="label">Nom et prénom</span><span class="value">${coachDisplayName || "Non renseigné"}</span></div>
-            <div class="info-row"><span class="label">Adresse</span><span class="value">${currentCoach.address || "Non renseignée"}</span></div>
-            <div class="info-row"><span class="label">Poste</span><span class="value">${profileLabel}</span></div>
+            <div class="info-row"><span class="label">Nom et prénom</span><span class="value">${safeCoachDisplayName}</span></div>
+            <div class="info-row"><span class="label">Adresse</span><span class="value">${safeAddress}</span></div>
+            <div class="info-row"><span class="label">Poste</span><span class="value">${safeProfileLabel}</span></div>
             <div class="info-row"><span class="label">Date d'édition</span><span class="value">${today}</span></div>
           </div>
         </section>
@@ -3194,9 +3523,9 @@ function exportExpenseHTML() {
         <section class="info-card">
           <h3>Informations véhicule</h3>
           <div class="info-list">
-            <div class="info-row"><span class="label">Véhicule</span><span class="value">${currentCoach.vehicle || "Non renseigné"}</span></div>
-            <div class="info-row"><span class="label">Puissance fiscale</span><span class="value">${currentCoach.fiscal_power || "Non renseignée"} CV</span></div>
-            <div class="info-row"><span class="label">Barème appliqué</span><span class="value">${mileageScaleDescription}</span></div>
+            <div class="info-row"><span class="label">Véhicule</span><span class="value">${safeVehicle}</span></div>
+            <div class="info-row"><span class="label">Puissance fiscale</span><span class="value">${safeFiscalPower} CV</span></div>
+            <div class="info-row"><span class="label">Barème appliqué</span><span class="value">${safeMileageScaleDescription}</span></div>
             <div class="info-row"><span class="label">Mois concerné</span><span class="value">${month}/${year}</span></div>
           </div>
         </section>
@@ -3247,22 +3576,21 @@ function exportExpenseHTML() {
     <tbody>
 ${rows
   .map(
-    (r) => `
+    (r) => {
+      const safeDate = escapeExpenseText(r.date);
+      const safeDescription = escapeExpenseText(r.description, 'Déplacement judo');
+      const safeDeparture = escapeExpenseText(r.departurePlace, '-');
+      const safeArrival = escapeExpenseText(r.arrivalPlace, '-');
+      const justificationLinks = buildExpenseJustificationLinks(r);
+
+      return `
       <tr>
-        <td>${r.date}</td>
+        <td>${safeDate}</td>
         <td>
           <div class="expense-cell">
-            <strong>${r.description || "Déplacement judo"}</strong>
-            <span class="route-line">${r.departurePlace || "-"} → ${r.arrivalPlace || "-"}</span>
-            ${[
-              r.justificationUrl ? `<a href="${r.justificationUrl}" target="_blank" rel="noopener noreferrer">Péage</a>` : '',
-              r.hotelJustificationUrl ? `<a href="${r.hotelJustificationUrl}" target="_blank" rel="noopener noreferrer">Hôtel</a>` : '',
-              r.achatJustificationUrl ? `<a href="${r.achatJustificationUrl}" target="_blank" rel="noopener noreferrer">Achat</a>` : ''
-            ].filter(Boolean).length ? `<div class="justif-links">${[
-              r.justificationUrl ? `<a href="${r.justificationUrl}" target="_blank" rel="noopener noreferrer">Péage</a>` : '',
-              r.hotelJustificationUrl ? `<a href="${r.hotelJustificationUrl}" target="_blank" rel="noopener noreferrer">Hôtel</a>` : '',
-              r.achatJustificationUrl ? `<a href="${r.achatJustificationUrl}" target="_blank" rel="noopener noreferrer">Achat</a>` : ''
-            ].filter(Boolean).join('')}</div>` : '<span class="meta-line">Aucun justificatif</span>'}
+            <strong>${safeDescription}</strong>
+            <span class="route-line">${safeDeparture} → ${safeArrival}</span>
+            ${justificationLinks}
           </div>
         </td>
         <td class="number">${r.km}</td>
@@ -3275,7 +3603,8 @@ ${rows
         <td class="amount">${r.amount
           .toFixed(2)
           .replace(".", ",")} €</td>
-      </tr>`
+      </tr>`;
+    }
   )
   .join("")}
       <tr class="total-row">
@@ -3296,8 +3625,8 @@ ${rows
 
       <div class="signature">
         <div>
-          <strong>${signatureLabel}</strong><br><br><br>
-          ${coachDisplayName || currentCoach.name}
+          <strong>${safeSignatureLabel}</strong><br><br><br>
+          ${safeCoachDisplayName}
         </div>
         <div>
           <strong>Signature de l'employeur</strong><br><br><br>
@@ -3309,33 +3638,39 @@ ${rows
 </body>
 </html>
 `;
+  };
+
+  const html = renderExpenseHtml({ embeddedPreview: usePreviewModal, includeCloseButton: false });
+  const downloadHtml = renderExpenseHtml({ embeddedPreview: false, includeCloseButton: false });
+  const windowHtml = renderExpenseHtml({ embeddedPreview: false, includeCloseButton: true });
 
   const fileName = `note_frais_${currentCoach.name}_${currentMonth}.html`;
 
-  __logAuditEvent('export.expense_html', 'export', {
+  __logAuditEvent('export.expense_html', 'export', __buildMonthlyAuditPayload({
+    coach: currentCoach,
     entityId: `${currentCoach.id}-${currentMonth}`,
-    targetUserId: currentCoach.owner_uid || null,
-    targetEmail: currentCoach.email || null,
     metadata: {
-      coach_id: currentCoach.id,
       coach_name: coachDisplayName || null,
-      month: currentMonth,
       total_amount: total,
       total_km: totalMileageKm,
       rows: rows.length,
     },
-  });
+  }));
 
-  if (__isStandaloneApp()) {
-    __showMileagePreviewModal(html, fileName);
+  if (usePreviewModal) {
+    __showMileagePreviewModal(html, fileName, downloadHtml);
     return;
   }
 
   const newWindow = window.open('', '_blank');
   if (newWindow) {
-    newWindow.document.write(html);
+    newWindow.document.write(windowHtml);
     newWindow.document.close();
+    return;
   }
+
+  alert("La fenêtre d'export a été bloquée par le navigateur. Le document HTML va être téléchargé à la place.");
+  __downloadBlob(new Blob([downloadHtml], { type: 'text/html;charset=utf-8;' }), fileName);
 }
 
 
@@ -3410,12 +3745,12 @@ function exportTimesheetHTML() {
     @page { size: A4 portrait; margin: 8mm; }
     * { box-shadow: none !important; text-shadow: none !important; filter: none !important; }
     html, body {
-      width: 194mm; margin: 0; background: white;
+      width: 194mm; margin: 0; padding: 0; background: white;
       -webkit-print-color-adjust: exact; print-color-adjust: exact;
     }
     .no-print { display: none; }
-    .page-shell { box-shadow: none; border: none; margin: 0; width: 194mm; max-width: 194mm; display: flex; border-radius: 0; }
-    .page-inner { padding: 0; display: flex; flex-direction: column; }
+    .page-shell { box-shadow: none; border: none; margin: 0; width: 194mm; max-width: 194mm; min-height: 0 !important; display: flex; border-radius: 0; }
+    .page-inner { padding: 0; min-height: 0 !important; display: flex; flex-direction: column; }
     .header, .header-brand {
       display: flex !important;
       flex-direction: row !important;
@@ -3428,15 +3763,18 @@ function exportTimesheetHTML() {
     .info-row { grid-template-columns: 120px 1fr !important; }
     .summary-card.total { grid-column: 1 / -1 !important; }
   }
-  body { margin: 0; padding: 10px; background: #ffffff; color: #243447; font-family: Inter, Arial, sans-serif; }
-  .page-shell { width: 194mm; max-width: 194mm; min-height: 245mm; margin: 0 auto; background: #ffffff; border: none; border-radius: 12px; box-shadow: none; display: flex; overflow: hidden; }
+  body { margin: 0; padding: 10px; background: #eef3f9; color: #243447; font-family: Inter, Arial, sans-serif; }
+  .page-shell { width: 194mm; max-width: 194mm; min-height: 245mm; margin: 0 auto; background: #ffffff; border: none; border-radius: 0; box-shadow: none; display: flex; overflow: hidden; }
   .page-inner { padding: 14px 16px 16px; min-height: 245mm; display: flex; flex-direction: column; }
   .print-button { margin: 0 0 10px; padding: 8px 14px; background: linear-gradient(135deg, #0f3460, #145da0); color: white; border: none; border-radius: 999px; cursor: pointer; font-size: 0.82rem; font-weight: 700; box-shadow: none; }
+  .close-button { margin-left: 8px; background: linear-gradient(135deg, #c0392b, #922b21); }
   .header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; border-bottom: 2px solid #d8e2ef; padding-bottom: 10px; margin-bottom: 10px; }
-  .header-brand { display: flex; align-items: center; gap: 12px; }
-  .header-logo { width: 54px; height: 54px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 12px; background: #f5f8fc; border: 1px solid #d8e2ef; }
-  .header-logo img { max-width: 40px; max-height: 40px; }
-  /* Removed duplicate .header-text h1 and .header-text p rules to ensure centering applies globally */
+  .header-brand { display: flex; align-items: flex-start; gap: 12px; }
+  .header-logo { width: 160px; height: 160px; flex: 0 0 auto; display: flex; align-items: flex-start; justify-content: center; }
+  .header-logo img { max-width: 144px; max-height: 144px; }
+  .header-text { text-align: center; }
+  .header-text h1 { margin: 0 0 4px; font-size: 1.1rem; color: #0f3460; }
+  .header-text p { margin: 1px 0; color: #526274; font-size: 0.72rem; }
   .document-badge { text-align: right; min-width: 180px; }
   .document-badge .label { display: inline-block; padding: 5px 10px; border-radius: 999px; background: #eaf2ff; color: #145da0; font-weight: 700; font-size: 0.68rem; letter-spacing: 0.03em; text-transform: uppercase; }
   .document-badge h2 { margin: 6px 0 2px; font-size: 1rem; color: #0f3460; }
@@ -3477,6 +3815,7 @@ function exportTimesheetHTML() {
 <body>
   <div class="no-print" style="margin-bottom: 10px; text-align: center;">
     <button class="print-button" onclick="window.print()">🖨 Imprimer / Enregistrer en PDF</button>
+    <button class="print-button close-button" onclick="window.close()">✖ Fermer</button>
   </div>
   
   <div class="page-shell">
@@ -3487,12 +3826,10 @@ function exportTimesheetHTML() {
             <img src="${logoUrl}" alt="Judo Club Cattenom-Rodemack" />
           </div>
           <div class="header-text">
-            <h1>Judo Club de Cattenom-Rodemack</h1>
-            <p>Dojo Communautaire</p>
-            <p>3 rue St Exupery</p>
+            <h1>Judo Club de Cattenom Rodemack</h1>
+            <p>Maison des arts martiaux</p>
             <p>57570 Cattenom</p>
-            <p>SIRET 30157248300024</p>
-            <p>📧 judoclubcattenom@gmail.com – 📞 06 62 62 53 13</p>
+            <p>judoclubcattenom@gmail.com</p>
           </div>
         </div>
         <div class="document-badge">
@@ -3595,12 +3932,15 @@ function exportTimesheetHTML() {
   win.document.write(html);
   win.document.close();
   
-  __logAuditEvent('export.timesheet_pdf', currentCoach.id, {
-    coach_name: coachDisplayName,
-    month: currentMonth,
-    total_hours: totalHours,
-    total_amount: totalAmount,
-  });
+  __logAuditEvent('export.timesheet_pdf', 'export', __buildMonthlyAuditPayload({
+    coach: currentCoach,
+    entityId: `${currentCoach.id}-${currentMonth}`,
+    metadata: {
+      coach_name: coachDisplayName || null,
+      total_hours: totalHours,
+      total_amount: totalAmount,
+    },
+  }));
 }
 
 // Expose the function
@@ -3674,17 +4014,14 @@ async function importCoachData(data) {
     const { error } = await supabase.from('time_data').insert(inserts);
     if (error) throw error;
   }
-  await __logAuditEvent('time_data.import_json', 'import', {
+  await __logAuditEvent('time_data.import_json', 'time_data', __buildMonthlyAuditPayload({
+    coach: currentCoach,
     entityId: `${currentCoach.id}-${currentMonth}`,
-    targetUserId: currentCoach.owner_uid || null,
-    targetEmail: currentCoach.email || null,
     metadata: {
-      coach_id: currentCoach.id,
-      coach_name: __getCoachDisplayName(currentCoach) || currentCoach.name || null,
       rows_inserted: inserts.length,
       source_profile_name: data.entraineur || null,
     },
-  });
+  }));
   await loadAllDataFromSupabase();
   updateCalendar();
   updateSummary();
@@ -3741,22 +4078,280 @@ function exportBackupJSON() {
   a.download = `backup_${safeName}_${new Date().toISOString().split("T")[0]}.json`;
   a.click();
   URL.revokeObjectURL(url);
-  __logAuditEvent('export.backup_json', 'export', {
-    entityId: currentCoach.id,
-    targetUserId: currentCoach.owner_uid || null,
-    targetEmail: currentCoach.email || null,
+  __logAuditEvent('export.backup_json', 'export', __buildMonthlyAuditPayload({
+    coach: currentCoach,
+    entityId: `${currentCoach.id}-${currentMonth}`,
     metadata: {
-      coach_id: currentCoach.id,
-      coach_name: __getCoachDisplayName(currentCoach) || currentCoach.name || null,
       entries: entries.length,
     },
-  });
+  }));
 }
+
+// Export monthly expenses report
+async function __fetchMonthlySummaryReport({ format = 'json', month = currentMonth } = {}) {
+  const selectedMonth = __normalizeMonth(month);
+  if (!selectedMonth) {
+    throw new Error("Veuillez sélectionner un mois.");
+  }
+
+  const token = await __getFreshAccessToken();
+  if (!token) {
+    throw new Error("Session expirée. Veuillez vous reconnecter.");
+  }
+
+  const url = `${supabaseUrl}/functions/v1/export-monthly-expenses?format=${format}&month=${encodeURIComponent(selectedMonth)}`;
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'apikey': supabaseKey,
+      'Content-Type': 'application/json'
+    }
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || `Failed to load report (${response.status})`);
+  }
+
+  const rowsExported = Number.parseInt(response.headers.get('X-Report-Rows') || '0', 10);
+  return {
+    month: selectedMonth,
+    rowsExported: Number.isFinite(rowsExported) ? rowsExported : 0,
+    response,
+  };
+}
+
+function __closeMonthlySummaryPreviewModal() {
+  document.getElementById('monthlySummaryPreviewModal')?.classList.remove('active');
+}
+
+function __formatMonthlySummaryProfileType(profileType) {
+  return __getProfileLabel(profileType, { capitalized: true }) || 'Profil';
+}
+
+function __renderMonthlySummaryPreview(report, monthValue) {
+  const subtitleEl = document.getElementById('monthlySummarySubtitle');
+  const statusEl = document.getElementById('monthlySummaryStatus');
+  const totalsEl = document.getElementById('monthlySummaryTotals');
+  const bodyEl = document.getElementById('monthlySummaryTableBody');
+  const exportCsvBtn = document.getElementById('monthlySummaryExportCsvBtn');
+  const exportJsonBtn = document.getElementById('monthlySummaryExportJsonBtn');
+  if (!subtitleEl || !statusEl || !totalsEl || !bodyEl || !exportCsvBtn || !exportJsonBtn) return;
+
+  const reportMonth = report?.month || monthValue;
+  const rows = Array.isArray(report?.rows) ? report.rows : [];
+  const totals = report?.totals || {};
+  const monthLabel = __formatMonthLabel(reportMonth);
+
+  subtitleEl.textContent = `Mois sélectionné : ${monthLabel}`;
+  statusEl.textContent = rows.length
+    ? `${rows.length} profil(s) avec activité sur ${monthLabel}`
+    : `Aucune activité enregistrée sur ${monthLabel}`;
+
+  totalsEl.innerHTML = `
+    <article class="monthly-summary-card">
+      <span class="monthly-summary-card-label">Profils</span>
+      <strong class="monthly-summary-card-value">${numberDisplay(totals.coaches || 0)}</strong>
+    </article>
+    <article class="monthly-summary-card">
+      <span class="monthly-summary-card-label">Heures payées</span>
+      <strong class="monthly-summary-card-value">${numberDisplay(totals.total_hours || 0, 2)}</strong>
+    </article>
+    <article class="monthly-summary-card">
+      <span class="monthly-summary-card-label">Compétitions</span>
+      <strong class="monthly-summary-card-value">${numberDisplay(totals.competition_days || 0)}</strong>
+    </article>
+    <article class="monthly-summary-card">
+      <span class="monthly-summary-card-label">Salaire payé</span>
+      <strong class="monthly-summary-card-value">${currencyDisplay(totals.paid_salary_amount || 0)}</strong>
+    </article>
+    <article class="monthly-summary-card">
+      <span class="monthly-summary-card-label">Indemnités kilométriques</span>
+      <strong class="monthly-summary-card-value">${currencyDisplay(totals.mileage_amount || 0)}</strong>
+    </article>
+    <article class="monthly-summary-card monthly-summary-card-total">
+      <span class="monthly-summary-card-label">Total</span>
+      <strong class="monthly-summary-card-value">${currencyDisplay(totals.total_amount || 0)}</strong>
+    </article>
+  `;
+
+  if (!rows.length) {
+    bodyEl.innerHTML = '<tr><td colspan="8" class="audit-empty">Aucune ligne pour ce mois.</td></tr>';
+  } else {
+    bodyEl.innerHTML = rows.map((row) => `
+      <tr>
+        <td>
+          <div class="monthly-summary-name">${__escapeHtml(row.coach_name || 'Profil')}</div>
+          <div class="monthly-summary-secondary">${__escapeHtml(__formatMonthlySummaryProfileType(row.profile_type))}</div>
+        </td>
+        <td>${numberDisplay(row.total_hours || 0, 2)}</td>
+        <td>${numberDisplay(row.competition_days || 0)}</td>
+        <td>
+          <div>${currencyDisplay(row.salary_amount || 0)}</div>
+          <div class="monthly-summary-secondary">+ ${currencyDisplay(row.competition_amount || 0)}</div>
+        </td>
+        <td>${currencyDisplay(row.paid_salary_amount || 0)}</td>
+        <td>${numberDisplay(row.total_km || 0, 2)}</td>
+        <td>${currencyDisplay(row.mileage_amount || 0)}</td>
+        <td>${currencyDisplay(row.total_amount || 0)}</td>
+      </tr>
+    `).join('');
+  }
+
+  exportCsvBtn.disabled = false;
+  exportJsonBtn.disabled = false;
+}
+
+function __ensureMonthlySummaryPreviewModal() {
+  let modal = document.getElementById('monthlySummaryPreviewModal');
+  if (modal) return modal;
+
+  modal = document.createElement('div');
+  modal.id = 'monthlySummaryPreviewModal';
+  modal.className = 'modal';
+  modal.innerHTML = `
+    <div class="modal-content modal-content-audit modal-content-monthly-summary">
+      <div class="monthly-summary-header">
+        <div>
+          <h2>📊 Synthèse du mois</h2>
+          <p id="monthlySummarySubtitle" class="monthly-summary-subtitle">Chargement…</p>
+        </div>
+        <div class="monthly-summary-toolbar">
+          <button id="monthlySummaryRefreshBtn" class="btn-secondary">↻ Actualiser</button>
+          <button id="monthlySummaryExportCsvBtn" class="btn-secondary">CSV</button>
+          <button id="monthlySummaryExportJsonBtn" class="btn-secondary">JSON</button>
+        </div>
+      </div>
+      <div id="monthlySummaryStatus" class="audit-status">Chargement…</div>
+      <div id="monthlySummaryTotals" class="monthly-summary-totals"></div>
+      <div class="audit-table-wrap monthly-summary-table-wrap">
+        <table class="audit-table monthly-summary-table">
+          <thead>
+            <tr>
+              <th>Profil</th>
+              <th>Heures</th>
+              <th>Compétitions</th>
+              <th>Salaire heures + comp.</th>
+              <th>Salaire payé</th>
+              <th>KM</th>
+              <th>Indemnités KM</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody id="monthlySummaryTableBody">
+            <tr><td colspan="8" class="audit-empty">Chargement…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="modal-actions">
+        <button id="closeMonthlySummaryPreview" class="btn-primary">Fermer</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal) __closeMonthlySummaryPreviewModal();
+  });
+
+  modal.querySelector('#closeMonthlySummaryPreview')?.addEventListener('click', __closeMonthlySummaryPreviewModal);
+  modal.querySelector('#monthlySummaryRefreshBtn')?.addEventListener('click', () => openMonthlySummaryPreviewModal({ forceReload: true }));
+  modal.querySelector('#monthlySummaryExportCsvBtn')?.addEventListener('click', () => exportMonthlyExpenses('csv', __monthlySummaryPreviewState.month || currentMonth));
+  modal.querySelector('#monthlySummaryExportJsonBtn')?.addEventListener('click', () => exportMonthlyExpenses('json', __monthlySummaryPreviewState.month || currentMonth));
+  return modal;
+}
+
+async function openMonthlySummaryPreviewModal({ forceReload = false } = {}) {
+  if (!__isAdminForUi()) {
+    alert("Seul l'administrateur peut consulter cette synthèse.");
+    return;
+  }
+
+  const selectedMonth = __normalizeMonth(currentMonth);
+  if (!selectedMonth) {
+    alert("Veuillez sélectionner un mois.");
+    return;
+  }
+
+  const modal = __ensureMonthlySummaryPreviewModal();
+  const statusEl = modal.querySelector('#monthlySummaryStatus');
+  const totalsEl = modal.querySelector('#monthlySummaryTotals');
+  const bodyEl = modal.querySelector('#monthlySummaryTableBody');
+  const exportCsvBtn = modal.querySelector('#monthlySummaryExportCsvBtn');
+  const exportJsonBtn = modal.querySelector('#monthlySummaryExportJsonBtn');
+
+  modal.classList.add('active');
+  if (statusEl) statusEl.textContent = `Chargement de la synthèse ${__formatMonthLabel(selectedMonth)}…`;
+  if (totalsEl) totalsEl.innerHTML = '';
+  if (bodyEl) bodyEl.innerHTML = '<tr><td colspan="8" class="audit-empty">Chargement…</td></tr>';
+  if (exportCsvBtn) exportCsvBtn.disabled = true;
+  if (exportJsonBtn) exportJsonBtn.disabled = true;
+
+  try {
+    if (forceReload || __monthlySummaryPreviewState.month !== selectedMonth || !__monthlySummaryPreviewState.report) {
+      const { response, month } = await __fetchMonthlySummaryReport({ format: 'json', month: selectedMonth });
+      __monthlySummaryPreviewState = {
+        month,
+        report: await response.json(),
+      };
+    }
+
+    __renderMonthlySummaryPreview(__monthlySummaryPreviewState.report, __monthlySummaryPreviewState.month);
+  } catch (error) {
+    if (statusEl) statusEl.textContent = `Erreur : ${error.message || error}`;
+    if (bodyEl) bodyEl.innerHTML = '<tr><td colspan="8" class="audit-empty">Impossible de charger la synthèse.</td></tr>';
+    console.error('Monthly summary preview error:', error);
+  }
+}
+
+async function exportMonthlyExpenses(format = 'csv', month = currentMonth) {
+  try {
+    const { response, month: selectedMonth, rowsExported } = await __fetchMonthlySummaryReport({ format, month });
+
+    if (format === 'csv') {
+      const csv = await response.text();
+      __downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }), `admin_monthly_summary_${selectedMonth}.csv`);
+    } else {
+      const json = await response.json();
+      __downloadBlob(new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' }), `admin_monthly_summary_${selectedMonth}.json`);
+      __monthlySummaryPreviewState = {
+        month: selectedMonth,
+        report: json,
+      };
+    }
+
+    __logAuditEvent('export.monthly_expenses', 'export', __buildMonthlyAuditPayload({
+      coach: null,
+      entityId: `monthly-summary-${selectedMonth}-${format}`,
+      month: selectedMonth,
+      metadata: {
+        format,
+        scope: 'all_profiles',
+        rows: rowsExported,
+      },
+    }));
+  } catch (error) {
+    alert("Erreur lors de l'export : " + error.message);
+    console.error("Export error:", error);
+  }
+}
+
+// Setup export button
+function setupExportMonthlyExpensesButton() {
+  const exportBtn = document.getElementById('exportMonthlyExpensesBtn');
+  if (!exportBtn) return;
+  exportBtn.addEventListener('click', () => openMonthlySummaryPreviewModal());
+}
+
+// Initialize when DOM is loaded
+document.addEventListener('DOMContentLoaded', setupExportMonthlyExpensesButton);
 
 // Optionally expose some functions globally if needed
 window.exportToCSV = exportDeclarationXLS;
 window.exportDeclarationXLS = exportDeclarationXLS;
 window.exportBackupJSON = exportBackupJSON;
+window.exportMonthlyExpenses = exportMonthlyExpenses;
 window.saveCoach = saveCoach;
 window.deleteCoach = deleteCoach;
 window.inviteCoach = inviteCoach;

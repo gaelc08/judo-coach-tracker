@@ -1,0 +1,5 @@
+#!/bin/sh
+set -e
+
+node scripts/bump-app-version.mjs
+git add public/modules/env.js public/sw.js public/index.html

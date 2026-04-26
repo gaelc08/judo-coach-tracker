@@ -6,6 +6,7 @@ const DEV_SUPABASE_KEY = 'sb_publishable_lHFJ9uxG0ZgkCeONR3PXyA_Jf8Lx_p_';
 
 const hostname = (window.location.hostname || '').toLowerCase();
 const isLocalHost = ['localhost', '127.0.0.1'].includes(hostname);
+// isDevHost: reserved for future dev-prefixed staging domains (e.g. dev.example.com)
 const isDevHost = hostname === 'dev' || hostname.startsWith('dev.') || hostname.startsWith('dev-');
 const ENV_OVERRIDE_KEY = 'jct.env.override';
 const envParam = (new URLSearchParams(window.location.search).get('env') || '').toLowerCase();
@@ -42,10 +43,17 @@ export const supabaseKey = effectiveEnv === 'dev'
   ? (localDevKeyOverride || DEV_SUPABASE_KEY || PROD_SUPABASE_KEY)
   : PROD_SUPABASE_KEY;
 
-export const BUILD_ID = '2026-03-14-host-env-1';
+export const VERSION_DATE = '2026-04-08';
+export const VERSION_INCREMENT = '09';
+export const BUILD_ID = `${VERSION_DATE}-r${VERSION_INCREMENT}`;
 
 if (effectiveEnv === 'dev' && !localDevKeyOverride) {
   console.info('DEBUG dev env active using remote dev Supabase project defaults.');
 }
 
 console.log('DEBUG env:', effectiveEnv, 'supabase:', supabaseUrl);
+
+// Fonction pour récupérer la version automatiquement
+export const getVersion = () => {
+  return `-r`;
+};

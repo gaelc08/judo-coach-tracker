@@ -7,6 +7,7 @@ export function createAuditController({
   isAdminForUi,
   escapeHtml,
   formatAuditDateTime,
+  formatAuditAction,
   formatAuditDetails,
   getAuditActionGroup,
   auditMatchesCurrentCoach,
@@ -49,7 +50,7 @@ export function createAuditController({
       return `
       <tr>
         <td>${escapeHtml(formatAuditDateTime(row.created_at))}</td>
-        <td><span class="audit-badge">${escapeHtml(row.action || '—')}</span></td>
+        <td>${formatAuditAction(row, { escapeHtml })}</td>
         <td>${escapeHtml(actor)}</td>
         <td>${escapeHtml(target)}</td>
         <td>${formatAuditDetails(row, { escapeHtml })}</td>
