@@ -278,7 +278,7 @@ export function setupAuthListeners() {
       try {
         await _loadAllDataFromSupabase({ isAdminOverride: isAdmin });
         if (select) _loadCoaches?.();
-        if (coaches.length > 0) {
+        if (!isAdmin && coaches.length > 0) {
           setCurrentCoach(coaches[0]);
           if (select) select.value = String(coaches[0].id);
         }
