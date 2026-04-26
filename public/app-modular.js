@@ -63,6 +63,39 @@ import { createAuditController } from './modules/audit-controller.js';
 import { setupEventListeners, initEventListeners } from './modules/event-listeners.js';
 import { setupPWA } from './modules/pwa.js';
 
+// ===== Calendar UI (fully implemented) =====
+import {
+  initCalendarUi,
+  updateCalendar,
+  openDayModal,
+  saveDay,
+  deleteDay,
+  loadCoaches as loadCoachesDropdown,
+  clearCoachForm,
+  updateCoachGreeting,
+} from './modules/calendar-ui.js';
+
+// ===== Coach manager (fully implemented) =====
+import {
+  initCoachManager,
+  saveCoach,
+  deleteCoach,
+  inviteCoach,
+  inviteAdmin,
+  updateCoachFormProfileUI,
+  clearCoachForm as clearCoachFormManager,
+} from './modules/coach-manager.js';
+
+// ===== Summary UI (fully implemented) =====
+import {
+  initSummaryUi,
+  updateSummary,
+  updateFreezeUI,
+  isCurrentMonthFrozen,
+  toggleFreezeMonth,
+  updateCurrentProfileUI,
+} from './modules/summary-ui.js';
+
 // ===== Feature modules =====
 import { currencyDisplay, numberDisplay } from './modules/display-format.js';
 import { blobToDataUrl, downloadBlob, isStandaloneApp, loadExcelJs } from './modules/export-runtime.js';
@@ -91,6 +124,15 @@ const __logAuditEvent     = __restGateway.logAuditEvent;
 
 // ===== Data loader init =====
 initDataLoader({ restSelect: __restSelect });
+
+// ===== Init calendar UI (inject supabase + audit logger) =====
+initCalendarUi({ supabase, logAuditEvent: __logAuditEvent });
+
+// ===== Init coach manager =====
+initCoachManager({ supabase, coachWriteViaRest: __coachWriteViaRest, logAuditEvent: __logAuditEvent });
+
+// ===== Init summary UI =====
+initSummaryUi({ logAuditEvent: __logAuditEvent });
 
 // ===== Invite debug tools =====
 const __inviteDebugTools = createInviteDebugTools({
@@ -144,67 +186,8 @@ function renderAuditLogs()      { return __auditController.renderAuditLogs(); }
 async function loadAuditLogs()  { return await __auditController.loadAuditLogs(); }
 async function openAuditLogsModal() { return await __auditController.openAuditLogsModal(); }
 
-// ===== Freeze helpers =====
-function isCurrentMonthFrozen() {
-  if (!currentCoach || !currentMonth) return false;
-  return frozenMonths.has(`${currentCoach.id}-${__normalizeMonth(currentMonth)}`);
-}
-
-function updateFreezeUI() {
-  const frozen = isCurrentMonthFrozen();
-  const banner = document.getElementById('frozenBanner');
-  const btn    = document.getElementById('freezeBtn');
-  if (banner) banner.style.display = frozen ? 'block' : 'none';
-  if (btn) {
-    btn.textContent = frozen ? '🔓 Dégeler la fiche' : '🔒 Geler la fiche';
-    btn.classList.toggle('frozen', frozen);
-  }
-}
-
-async function toggleFreezeMonth() {
-  if (!currentCoach || !currentMonth) { alert('Veuillez sélectionner un profil et un mois.'); return; }
-  const isAdmin = await isCurrentUserAdminDB();
-  if (!isAdmin) { alert("Seul l'admin peut geler ou dégeler une fiche."); return; }
-  if (!currentAccessToken) { alert('Session invalide. Reconnectez-vous puis réessayez.'); return; }
-
-  const normalizedMonth = __normalizeMonth(currentMonth);
-  const frozen = isCurrentMonthFrozen();
-  const key    = `${currentCoach.id}-${normalizedMonth}`;
-
-  if (frozen) {
-    const urlObj = new URL(`${supabaseUrl}/rest/v1/frozen_timesheets`);
-    urlObj.searchParams.set('coach_id', `eq.${currentCoach.id}`);
-    urlObj.searchParams.set('month',    `eq.${normalizedMonth}`);
-    const res = await globalThis.fetch(urlObj.toString(), {
-      method: 'DELETE',
-      headers: { apikey: supabaseKey, Authorization: `Bearer ${currentAccessToken}` },
-    });
-    if (!res.ok) { alert('Erreur lors du dégel : ' + (await res.text())); return; }
-    frozenMonths.delete(key);
-    await __logAuditEvent('timesheet.unfreeze', 'frozen_timesheet', __buildMonthlyAuditPayload({ entityId: key, month: normalizedMonth }));
-  } else {
-    const res = await globalThis.fetch(`${supabaseUrl}/rest/v1/frozen_timesheets`, {
-      method: 'POST',
-      headers: {
-        apikey: supabaseKey,
-        Authorization: `Bearer ${currentAccessToken}`,
-        'Content-Type': 'application/json',
-        Prefer: 'return=representation,resolution=merge-duplicates',
-      },
-      body: JSON.stringify({ coach_id: currentCoach.id, month: normalizedMonth, frozen_by: currentUser?.email || null }),
-    });
-    if (!res.ok) { alert('Erreur lors du gel : ' + (await res.text())); return; }
-    frozenMonths.add(key);
-    await __logAuditEvent('timesheet.freeze', 'frozen_timesheet', __buildMonthlyAuditPayload({ entityId: key, month: normalizedMonth }));
-  }
-  setCurrentMonth(normalizedMonth);
-  updateFreezeUI();
-}
-
-// ===== Admin UI helper =====
+// ===== Admin UI helper (synchronous heuristic) =====
 function __isAdminForUi() {
-  // Synchronous heuristic — uses cached admin state or local claims.
-  // For accurate async check use isCurrentUserAdminDB().
   return !!window.__cachedIsAdmin;
 }
 
@@ -216,29 +199,40 @@ async function notifyAdminAlert(coachName, date, data) {
   } catch (err) { console.error('Failed to notify admin', err); }
 }
 
-// ===== UI stubs — implemented in their own modules =====
-// These forward declarations allow other modules to reference them before
-// their full implementations are loaded.
-function updateCalendar()   { console.warn('updateCalendar: not yet wired'); }
-function updateSummary()    { console.warn('updateSummary: not yet wired'); }
-function updateCoachGreeting(user, coach, isAdmin) { /* implemented in coach-manager or ui module */ }
-function openCoachModal(mode) { /* implemented in coach-manager */ }
-function saveCoach()   { /* implemented in coach-manager */ }
-function deleteCoach() { /* implemented in coach-manager */ }
-function inviteCoach() { /* implemented in admin-service */ }
-function inviteAdmin() { /* implemented in admin-service */ }
-function openDayModal(date) { /* implemented in calendar-ui */ }
-function saveDay()   { /* implemented in calendar-ui */ }
-function deleteDay() { /* implemented in calendar-ui */ }
-function exportDeclarationXLS()    { /* implemented in export-ui */ }
-function exportTimesheetHTML()     { /* implemented in export-ui */ }
-function exportExpenseHTML()       { /* implemented in export-ui */ }
-function exportMonthlyExpenses()   { /* implemented in export-ui */ }
-function openMileagePreviewModal() { /* implemented in export-ui */ }
-function openMonthlySummaryPreviewModal() { /* implemented in summary-ui */ }
-function importCoachData(file) { /* implemented in data-loader or admin-service */ }
-function exportBackupJSON()    { /* implemented in export-ui */ }
-async function openHelloAssoModal() { /* implemented in helloasso-ui */ }
+// ===== Coach modal open helper (not yet in a module) =====
+function openCoachModal(mode) {
+  const modal = document.getElementById('coachModal');
+  if (!modal) return;
+  if (mode === 'edit') {
+    document.getElementById('coachModalTitle').textContent = 'Modifier le profil';
+    setEditMode(true);
+  } else {
+    document.getElementById('coachModalTitle').textContent = 'Ajouter un profil';
+    clearCoachFormManager();
+    setEditMode(false);
+    setEditingCoachId(null);
+  }
+  modal.classList.add('active');
+}
+
+// ===== Export UI stubs (export-ui.js still has TODO stubs) =====
+// TODO: replace with real imports once export-ui.js is extracted
+async function exportDeclarationXLS()    { console.warn('exportDeclarationXLS: not yet extracted to module'); }
+async function exportTimesheetHTML()     { console.warn('exportTimesheetHTML: not yet extracted to module'); }
+async function exportExpenseHTML()       { console.warn('exportExpenseHTML: not yet extracted to module'); }
+async function exportMonthlyExpenses()   { console.warn('exportMonthlyExpenses: not yet extracted to module'); }
+async function openMileagePreviewModal() { console.warn('openMileagePreviewModal: not yet extracted to module'); }
+async function openMonthlySummaryPreviewModal() { console.warn('openMonthlySummaryPreviewModal: not yet extracted to module'); }
+async function importCoachData(file)     { console.warn('importCoachData: not yet extracted to module'); }
+async function exportBackupJSON()        { console.warn('exportBackupJSON: not yet extracted to module'); }
+
+// ===== HelloAsso UI stub (helloasso-ui.js still has TODO stubs) =====
+// TODO: replace with real import once helloasso-ui.js is extracted
+async function openHelloAssoModal() {
+  console.warn('openHelloAssoModal: not yet extracted to module');
+  const modal = document.getElementById('helloAssoModal');
+  if (modal) modal.classList.add('active');
+}
 
 // ===== Wire auth-listeners =====
 initAuthListeners({
