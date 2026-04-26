@@ -1,6 +1,6 @@
 // coach-manager.js
 // Coach profile CRUD: saveCoach, deleteCoach, inviteCoach, inviteAdmin
-// and modal UI helpers: clearCoachForm, updateCoachFormProfileUI
+// and modal UI helpers: clearCoachForm, updateCoachFormProfileUI, openCoachModal
 
 import { supabaseUrl, supabaseKey } from './env.js';
 import { __normalizeEmail, __escapeHtml } from './shared-utils.js';
@@ -22,6 +22,22 @@ export function initCoachManager({ supabase, coachWriteViaRest, logAuditEvent })
   _supabase = supabase;
   _coachWriteViaRest = coachWriteViaRest;
   _logAuditEvent = logAuditEvent;
+}
+
+// ===== Modal open helper =====
+export function openCoachModal(mode) {
+  const modal = document.getElementById('coachModal');
+  if (!modal) return;
+  if (mode === 'edit') {
+    document.getElementById('coachModalTitle').textContent = 'Modifier le profil';
+    setEditMode(true);
+  } else {
+    document.getElementById('coachModalTitle').textContent = 'Ajouter un profil';
+    clearCoachForm();
+    setEditMode(false);
+    setEditingCoachId(null);
+  }
+  modal.classList.add('active');
 }
 
 // ===== Form helpers =====
@@ -71,7 +87,6 @@ export async function saveCoach() {
 
   if (!name) { alert('Veuillez saisir un nom.'); return; }
 
-  // Duplicate email check
   if (email) {
     const existing = __findExistingProfileByEmail(email, { excludeId: editMode ? editingCoachId : null });
     if (existing) { alert(`Un profil avec l'e-mail ${email} existe déjà.`); return; }
@@ -141,7 +156,6 @@ export async function deleteCoach() {
   const coach = coaches.find((c) => c.id === editingCoachId);
   if (!confirm(`Supprimer le profil « ${coach?.name || editingCoachId} » ? Cette action est irréversible.`)) return;
 
-  // Delete auth user via Edge Function
   if (coach?.owner_uid) {
     try {
       const accessToken = await __getFreshAccessToken(_supabase);

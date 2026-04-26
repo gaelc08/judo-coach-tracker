@@ -78,6 +78,7 @@ import {
 // ===== Coach manager (fully implemented) =====
 import {
   initCoachManager,
+  openCoachModal,
   saveCoach,
   deleteCoach,
   inviteCoach,
@@ -105,6 +106,9 @@ import { createInviteDebugTools } from './modules/invite-debug.js';
 import { findExistingProfileByEmail, getCoachDisplayName, getCurrentUserDisplayName, getProfileLabel, getProfileType, isVolunteerProfile } from './modules/profile-utils.js';
 import { syncHelloAssoMembers, getHelloAssoMembers, getLastSyncTime, parseHelloAssoCsv, importHelloAssoCsvData } from './modules/helloasso-service.js';
 
+// ===== Admin service (fully implemented) =====
+import { notifyAdminAlert, __isAdminForUi, initAdminService } from './modules/admin-service.js';
+
 // ===== Export UI (fully extracted) =====
 import { createExportUI } from './modules/export-ui.js';
 
@@ -130,6 +134,14 @@ const __logAuditEvent     = __restGateway.logAuditEvent;
 
 // ===== Data loader init =====
 initDataLoader({ restSelect: __restSelect });
+
+// ===== Admin service init =====
+initAdminService({
+  supabase,
+  getCurrentUser:        () => currentUser,
+  getCurrentSession:     () => currentSession,
+  getCurrentAccessToken: () => currentAccessToken,
+});
 
 // ===== Init calendar UI (inject supabase + audit logger) =====
 initCalendarUi({ supabase, logAuditEvent: __logAuditEvent });
@@ -171,7 +183,7 @@ let schoolHolidays = [];
 // ===== Audit controller =====
 const __auditController = createAuditController({
   getAuditLogs: () => auditLogs,
-  setAuditLogs: (nextRows) => { /* handled via app-context setAuditLogs */ },
+  setAuditLogs: (nextRows) => { /* handled via app-context */ },
   getCurrentCoach: () => currentCoach,
   getCurrentMonth: () => currentMonth,
   restSelect: __restSelect,
@@ -188,63 +200,27 @@ const __auditController = createAuditController({
   alertFn: (message) => alert(message),
 });
 
-function renderAuditLogs()      { return __auditController.renderAuditLogs(); }
-async function loadAuditLogs()  { return await __auditController.loadAuditLogs(); }
-async function openAuditLogsModal() { return await __auditController.openAuditLogsModal(); }
+function renderAuditLogs()         { return __auditController.renderAuditLogs(); }
+async function loadAuditLogs()     { return await __auditController.loadAuditLogs(); }
+async function openAuditLogsModal(){ return await __auditController.openAuditLogsModal(); }
 
-// ===== Admin UI helper (synchronous heuristic) =====
-function __isAdminForUi() {
-  return !!window.__cachedIsAdmin;
-}
-
-// ===== Notify admin (coach-side) =====
-async function notifyAdminAlert(coachName, date, data) {
-  if (__isAdminForUi()) return;
-  try {
-    await supabase.functions.invoke('alert-admin', { body: { coachName, date, data } });
-  } catch (err) { console.error('Failed to notify admin', err); }
-}
-
-// ===== Coach modal open helper (not yet in a module) =====
-function openCoachModal(mode) {
-  const modal = document.getElementById('coachModal');
-  if (!modal) return;
-  if (mode === 'edit') {
-    document.getElementById('coachModalTitle').textContent = 'Modifier le profil';
-    setEditMode(true);
-  } else {
-    document.getElementById('coachModalTitle').textContent = 'Ajouter un profil';
-    clearCoachFormManager();
-    setEditMode(false);
-    setEditingCoachId(null);
-  }
-  modal.classList.add('active');
-}
-
-// ===== Export UI (module instanciation) =====
+// ===== Export UI =====
 const __exportUI = createExportUI({
-  // State getters
   getCurrentCoach:      () => currentCoach,
   getCurrentMonth:      () => currentMonth,
   getTimeData:          () => timeData,
   getSelectedDay:       () => selectedDay,
   getCurrentUser:       () => currentUser,
   getCurrentAccessToken: () => currentAccessToken,
-
-  // Services
   supabase,
   supabaseUrl,
   supabaseKey,
   logAuditEvent:            __logAuditEvent,
   buildMonthlyAuditPayload: __buildMonthlyAuditPayload,
-
-  // Runtime utils
   downloadBlob,
   loadExcelJs,
   blobToDataUrl,
   isStandaloneApp,
-
-  // Domain utils
   escapeHtml:                   __escapeHtml,
   normalizeMonth:               __normalizeMonth,
   getCoachDisplayName:          __getCoachDisplayName,
@@ -260,16 +236,16 @@ const __exportUI = createExportUI({
   getMileageYearBreakdownFn:    __getMileageYearBreakdown,
 });
 
-const exportDeclarationXLS            = __exportUI.exportDeclarationXLS;
-const exportExpenseHTML               = __exportUI.exportExpenseHTML;
-const exportTimesheetHTML             = __exportUI.exportTimesheetHTML;
-const exportMonthlyExpenses           = __exportUI.exportMonthlyExpenses;
-const exportBackupJSON                = __exportUI.exportBackupJSON;
-const importCoachData                 = __exportUI.importCoachData;
-const openMileagePreviewModal         = __exportUI.openMileagePreviewModal;
-const openMonthlySummaryPreviewModal  = __exportUI.openMonthlySummaryPreviewModal;
+const exportDeclarationXLS           = __exportUI.exportDeclarationXLS;
+const exportExpenseHTML              = __exportUI.exportExpenseHTML;
+const exportTimesheetHTML            = __exportUI.exportTimesheetHTML;
+const exportMonthlyExpenses          = __exportUI.exportMonthlyExpenses;
+const exportBackupJSON               = __exportUI.exportBackupJSON;
+const importCoachData                = __exportUI.importCoachData;
+const openMileagePreviewModal        = __exportUI.openMileagePreviewModal;
+const openMonthlySummaryPreviewModal = __exportUI.openMonthlySummaryPreviewModal;
 
-// ===== HelloAsso UI (module instanciation) =====
+// ===== HelloAsso UI =====
 const __helloAssoUI = createHelloAssoUI({
   supabase,
   syncHelloAssoMembers,

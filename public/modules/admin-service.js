@@ -1,20 +1,21 @@
 // admin-service.js
 // Admin role detection: REST check + local claims cache.
-// Exports isCurrentUserAdminDB() and __isAdminForUi() (fast synchronous check).
+// Exports isCurrentUserAdminDB(), __isAdminForUi() and notifyAdminAlert().
 
 import { isAdminViaLocalClaims, isAdminViaRest } from './auth-admin.js';
 import { __hasAdminClaim } from './shared-utils.js';
 import { supabaseUrl, supabaseKey } from './env.js';
 
-// These are references to shared state from app-context - injected at init time
 let _getCurrentUser = () => null;
 let _getCurrentSession = () => null;
 let _getCurrentAccessToken = () => null;
+let _supabase = null;
 
-export function initAdminService({ getCurrentUser, getCurrentSession, getCurrentAccessToken }) {
+export function initAdminService({ getCurrentUser, getCurrentSession, getCurrentAccessToken, supabase }) {
   _getCurrentUser = getCurrentUser;
   _getCurrentSession = getCurrentSession;
   _getCurrentAccessToken = getCurrentAccessToken;
+  _supabase = supabase;
 }
 
 // ===== Admin cache =====
@@ -34,7 +35,6 @@ export function __isAdminForUi() {
 
   if (!currentUser) return false;
 
-  // Use cached value if fresh (5 min TTL)
   const ttlMs = 5 * 60 * 1000;
   if (
     __adminCache.userId === currentUser.id &&
@@ -44,7 +44,6 @@ export function __isAdminForUi() {
     return __adminCache.value;
   }
 
-  // Fall back to local JWT claims
   return isAdminViaLocalClaims({
     accessToken: currentAccessToken,
     currentUser,
@@ -118,5 +117,17 @@ export async function isCurrentUserAdminDB() {
     return false;
   } finally {
     __adminInFlight = null;
+  }
+}
+
+// ===== Notify admin alert (coach-side push via Edge Function) =====
+// Only fires when the current user is NOT admin.
+export async function notifyAdminAlert(coachName, date, data) {
+  if (__isAdminForUi()) return;
+  if (!_supabase) { console.warn('notifyAdminAlert: admin-service not initialised with supabase'); return; }
+  try {
+    await _supabase.functions.invoke('alert-admin', { body: { coachName, date, data } });
+  } catch (err) {
+    console.error('notifyAdminAlert: failed to notify admin', err);
   }
 }
