@@ -126,6 +126,9 @@ export function updateSummary() {
     return;
   }
 
+  const tdKeys = Object.keys(timeData);
+  console.log('DEBUG updateSummary coach=', currentCoach?.id, 'month=', currentMonth, 'timeData keys=', tdKeys.length, 'sample=', tdKeys.slice(0,3));
+
   const [year, month] = currentMonth.split('-').map(Number);
   const daysInMonth = new Date(year, month, 0).getDate();
   const isVolunteer = __isVolunteerProfile(currentCoach);
