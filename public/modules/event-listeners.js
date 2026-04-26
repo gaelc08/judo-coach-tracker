@@ -77,8 +77,9 @@ export function setupEventListeners() {
     console.log('DEBUG coachSelect change', e.target.value);
     const coach = coaches.find((c) => String(c.id) === String(e.target.value));
     setCurrentCoach(coach || null);
-    updateCalendar?.();
-    updateSummary?.();
+    console.log('DEBUG calling updateCalendar, coach=', coach?.id);
+    try { updateCalendar?.(); } catch(err) { console.error('ERROR updateCalendar:', err); }
+    try { updateSummary?.(); } catch(err) { console.error('ERROR updateSummary:', err); }
   });
 
   // Coach management
