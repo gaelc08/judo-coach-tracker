@@ -80,8 +80,8 @@ export function setupEventListeners() {
   });
 
   // Coach management
-  bindClick('addCoachBtn',  () => openCoachModal?.('add'));
-  bindClick('editCoachBtn', () => openCoachModal?.('edit'));
+  bindClick('addCoachBtn',    () => openCoachModal?.('add'));
+  bindClick('editCoachBtn',   () => openCoachModal?.('edit'));
   bindClick('inviteAdminBtn', () => inviteAdmin?.());
 
   // Freeze
@@ -91,16 +91,23 @@ export function setupEventListeners() {
   bindClick('auditLogsBtn', () => openAuditLogsModal?.());
   bindClick('helloAssoBtn', () => openHelloAssoModal?.());
 
-  // Export
-  bindClick('exportDeclarationBtn',       () => exportDeclarationXLS?.());
-  bindClick('exportTimesheetBtn',         () => exportTimesheetHTML?.());
-  bindClick('exportExpenseBtn',           () => exportExpenseHTML?.());
+  // Export — IDs correspondent aux boutons dans index.html
   bindClick('exportMonthlyExpensesBtn',   () => exportMonthlyExpenses?.());
-  bindClick('exportMileagePreviewBtn',    () => openMileagePreviewModal?.());
-  bindClick('monthlySummaryPreviewBtn',   () => openMonthlySummaryPreviewModal?.());
+  bindClick('backupBtn',                  () => exportBackupJSON?.());
+
+  // Boutons export coach-level (visibles dans le panneau coach)
+  // Ces boutons sont injectés dynamiquement dans le DOM par le module summary/export
+  // => on les bind via délégation sur document pour éviter les WARN au démarrage
+  document.addEventListener('click', (e) => {
+    const id = e.target?.id;
+    if (id === 'exportDeclarationBtn')         exportDeclarationXLS?.();
+    else if (id === 'exportTimesheetBtn')      exportTimesheetHTML?.();
+    else if (id === 'exportExpenseBtn')        exportExpenseHTML?.();
+    else if (id === 'exportMileagePreviewBtn') openMileagePreviewModal?.();
+    else if (id === 'monthlySummaryPreviewBtn') openMonthlySummaryPreviewModal?.();
+  });
 
   // Import / Backup
-  bindClick('backupBtn', () => exportBackupJSON?.());
   const importInput = document.getElementById('importFile');
   if (importInput) {
     importInput.onchange = (e) => {
@@ -111,13 +118,15 @@ export function setupEventListeners() {
   }
 
   // Coach modal save/delete/invite
-  bindClick('saveCoachBtn',   () => saveCoach?.());
-  bindClick('deleteCoachBtn', () => deleteCoach?.());
-  bindClick('inviteCoachBtn', () => inviteCoach?.());
+  // HTML ids: saveCoach, deleteCoach, inviteCoach (sans suffixe Btn)
+  bindClick('saveCoach',   () => saveCoach?.());
+  bindClick('deleteCoach', () => deleteCoach?.());
+  bindClick('inviteCoach', () => inviteCoach?.());
 
   // Day modal save/delete
-  bindClick('saveDayBtn',   () => saveDay?.());
-  bindClick('deleteDayBtn', () => deleteDay?.());
+  // HTML ids: saveDay, deleteDay (sans suffixe Btn)
+  bindClick('saveDay',   () => saveDay?.());
+  bindClick('deleteDay', () => deleteDay?.());
 
   // Close modal buttons (generic: any .modal-close-btn inside a .modal)
   document.querySelectorAll('.modal-close-btn').forEach((btn) => {
