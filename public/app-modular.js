@@ -264,7 +264,7 @@ initAuthListeners({
   supabase,
   isCurrentUserAdminDB,
   loadAllDataFromSupabase,
-  loadCoaches,
+  loadCoaches: loadCoachesDropdown,
   updateCoachGreeting,
   updateCalendar,
   updateSummary,
