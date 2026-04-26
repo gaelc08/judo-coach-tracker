@@ -91,7 +91,7 @@ async function __uploadExpenseJustification(file, prefix) {
 // ===== Calendar rendering =====
 
 export async function updateCalendar() {
-  const calendar = document.getElementById('calendarGrid');
+  const calendar = document.getElementById('calendar');
   if (!calendar) return;
   calendar.innerHTML = '';
 
