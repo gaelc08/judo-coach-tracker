@@ -73,12 +73,12 @@ export function setupEventListeners() {
   });
 
   // Coach select
-  bindChange('coachSelect', (e) => {
+  bindChange('coachSelect', async (e) => {
     console.log('DEBUG coachSelect change', e.target.value);
     const coach = coaches.find((c) => String(c.id) === String(e.target.value));
     setCurrentCoach(coach || null);
     console.log('DEBUG calling updateCalendar, coach=', coach?.id);
-    try { updateCalendar?.(); } catch(err) { console.error('ERROR updateCalendar:', err); }
+    try { await updateCalendar?.(); } catch(err) { console.error('ERROR updateCalendar:', err); }
     try { updateSummary?.(); } catch(err) { console.error('ERROR updateSummary:', err); }
   });
 
