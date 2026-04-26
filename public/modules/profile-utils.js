@@ -2,7 +2,7 @@ export function getCoachDisplayName(coach) {
   if (!coach) return '';
   const firstName = String(coach.first_name || '').trim();
   const lastName = String(coach.name || '').trim();
-  return [firstName, lastName].filter(Boolean).join(' ').trim();
+  return [lastName, firstName].filter(Boolean).join(' ').trim();
 }
 
 export function getCurrentUserDisplayName(user, {
