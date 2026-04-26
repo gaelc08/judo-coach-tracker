@@ -95,7 +95,7 @@ export function setupEventListeners() {
   bindClick('helloAssoBtn', () => openHelloAssoModal?.());
 
   // Export — IDs correspondent aux boutons dans index.html
-  bindClick('exportMonthlyExpensesBtn',   () => exportMonthlyExpenses?.());
+  bindClick('exportMonthlyExpensesBtn',   () => openMonthlySummaryPreviewModal?.());
   bindClick('backupBtn',                  () => exportBackupJSON?.());
 
   // Boutons export coach-level (visibles dans le panneau coach)
