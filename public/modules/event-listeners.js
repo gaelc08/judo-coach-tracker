@@ -15,7 +15,6 @@ export function initEventListeners(handlers) {
 }
 
 export function setupEventListeners() {
-  console.log('DEBUG setupEventListeners called');
   const {
     updateCalendar, updateSummary,
     openCoachModal, saveCoach, deleteCoach,
@@ -74,12 +73,10 @@ export function setupEventListeners() {
 
   // Coach select
   bindChange('coachSelect', async (e) => {
-    console.log('DEBUG coachSelect change', e.target.value);
     const coach = coaches.find((c) => String(c.id) === String(e.target.value));
     setCurrentCoach(coach || null);
-    console.log('DEBUG calling updateCalendar, coach=', coach?.id);
-    try { await updateCalendar?.(); } catch(err) { console.error('ERROR updateCalendar:', err); }
-    try { updateSummary?.(); } catch(err) { console.error('ERROR updateSummary:', err); }
+    await updateCalendar?.();
+    updateSummary?.();
   });
 
   // Coach management
