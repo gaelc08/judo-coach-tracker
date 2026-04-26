@@ -76,7 +76,6 @@ export function setupEventListeners() {
     const coach = coaches.find((c) => String(c.id) === String(e.target.value));
     setCurrentCoach(coach || null);
     await updateCalendar?.();
-    console.log('DEBUG updateSummary fn=', typeof updateSummary, updateSummary);
     updateSummary?.();
   });
 
