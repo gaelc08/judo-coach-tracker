@@ -13,6 +13,7 @@ export function createExportUI({
   getSelectedDay,
   getCurrentUser,
   getCurrentAccessToken,
+  getCoaches,
 
   // Services
   supabase,
@@ -492,8 +493,68 @@ export function createExportUI({
 
   async function openMonthlySummaryPreviewModal() {
     const currentMonth = getCurrentMonth();
+    const timeData = getTimeData();
+    const coaches = getCoaches ? getCoaches() : [];
     if (!currentMonth) { alert('Veuillez sélectionner un mois.'); return; }
-    exportMonthlyExpenses('csv', currentMonth);
+
+    const [year, month] = currentMonth.split('-');
+    const monthLabel = new Date(Number(year), Number(month) - 1, 1)
+      .toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+
+    const rows = coaches.map((coach) => {
+      const keys = Object.keys(timeData).filter((k) => k.startsWith(`${coach.id}-${year}-${month}`));
+      const totalHours = keys.reduce((s, k) => s + (timeData[k].hours || 0), 0);
+      const totalCompetitions = keys.filter((k) => timeData[k].competition).length;
+      const totalKm = keys.reduce((s, k) => s + (Number(timeData[k].km) || 0), 0);
+      const mileage = getMonthlyMileageBreakdown(coach, currentMonth);
+      const totalMileageAmount = mileage?.total || 0;
+      const salary = isVolunteerProfile(coach) ? 0 : totalHours * (coach.hourly_rate || 0);
+      return { coach, totalHours, totalCompetitions, totalKm, totalMileageAmount, salary };
+    }).filter((r) => r.totalHours > 0 || r.totalKm > 0);
+
+    if (rows.length === 0) { alert(`Aucune donnée saisie pour ${monthLabel}.`); return; }
+
+    const fmt = (n) => Number(n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const totalSalary = rows.reduce((s, r) => s + r.salary, 0);
+    const totalMileage = rows.reduce((s, r) => s + r.totalMileageAmount, 0);
+
+    const tableRows = rows.map((r) => `
+      <tr>
+        <td>${escapeHtml(getCoachDisplayName(r.coach))}</td>
+        <td>${escapeHtml(getProfileLabel(r.coach) || (isVolunteerProfile(r.coach) ? 'Bénévole' : 'Entraîneur'))}</td>
+        <td style="text-align:center">${r.totalHours}</td>
+        <td style="text-align:center">${r.totalCompetitions}</td>
+        <td style="text-align:center">${r.totalKm}</td>
+        <td style="text-align:right">${fmt(r.totalMileageAmount)} €</td>
+        <td style="text-align:right">${isVolunteerProfile(r.coach) ? '—' : fmt(r.salary) + ' €'}</td>
+      </tr>`).join('');
+
+    const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+      <title>Synthèse ${monthLabel}</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 24px; font-size: 13px; }
+        h2 { color: #1a1a2e; }
+        table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+        th { background: #1a1a2e; color: #fff; padding: 8px 12px; text-align: left; }
+        td { padding: 7px 12px; border-bottom: 1px solid #e0e0e0; }
+        tr:nth-child(even) td { background: #f7f7f7; }
+        tfoot td { font-weight: bold; border-top: 2px solid #1a1a2e; }
+      </style></head><body>
+      <h2>📊 Synthèse du mois — ${escapeHtml(monthLabel)}</h2>
+      <table>
+        <thead><tr>
+          <th>Profil</th><th>Type</th><th>Heures</th><th>Compétitions</th><th>Km</th><th>Indemnités km</th><th>Salaire brut</th>
+        </tr></thead>
+        <tbody>${tableRows}</tbody>
+        <tfoot><tr>
+          <td colspan="5">Total</td>
+          <td style="text-align:right">${fmt(totalMileage)} €</td>
+          <td style="text-align:right">${fmt(totalSalary)} €</td>
+        </tr></tfoot>
+      </table>
+    </body></html>`;
+
+    __showMileagePreviewModal(html, `synthese_${currentMonth}.html`);
   }
 
   // ─────────────────────────────────────────────────────────────────

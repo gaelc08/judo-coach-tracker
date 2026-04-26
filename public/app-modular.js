@@ -212,6 +212,7 @@ const __exportUI = createExportUI({
   getSelectedDay:       () => selectedDay,
   getCurrentUser:       () => currentUser,
   getCurrentAccessToken: () => currentAccessToken,
+  getCoaches:           () => coaches,
   supabase,
   supabaseUrl,
   supabaseKey,
