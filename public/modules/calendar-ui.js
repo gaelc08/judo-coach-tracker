@@ -11,8 +11,18 @@ import {
   __getCoachDisplayName, __getProfileLabel, __isVolunteerProfile, __buildAuditPayload,
 } from './app-context.js';
 import { isCurrentUserAdminDB, __isAdminForUi } from './admin-service.js';
-import { fetchPublicHolidays, fetchSchoolHolidays } from './holidays-service.js';
+import { createHolidayService } from './holidays-service.js';
+import { publicHolidaysFallback, schoolHolidaysFallback } from './holidays-data.js';
 import { updateSummary, updateFreezeUI, isCurrentMonthFrozen } from './summary-ui.js';
+
+const __holidayService = createHolidayService({
+  publicFallback: publicHolidaysFallback,
+  schoolFallback: schoolHolidaysFallback,
+  fetchImpl: globalThis.fetch?.bind(globalThis),
+  logger: console,
+});
+const fetchPublicHolidays = __holidayService.fetchPublicHolidays;
+const fetchSchoolHolidays = __holidayService.fetchSchoolHolidays;
 
 let _supabase = null;
 let _logAuditEvent = null;
@@ -115,8 +125,20 @@ export async function updateCalendar() {
     console.warn('calendar-ui: holidays fetch error', e);
   }
 
-  const publicHolidayDates = new Set(publicHolidays.map((h) => h.date));
-  const schoolHolidayDates = new Set(schoolHolidays.map((h) => h.date));
+  const publicHolidayDates = new Set(Object.keys(publicHolidays));
+  const schoolHolidayDates = new Set(
+    (Array.isArray(schoolHolidays) ? schoolHolidays : []).flatMap((h) => {
+      const dates = [];
+      if (!h.start || !h.end) return dates;
+      const cur = new Date(h.start);
+      const end = new Date(h.end);
+      while (cur <= end) {
+        dates.push(cur.toISOString().slice(0, 10));
+        cur.setDate(cur.getDate() + 1);
+      }
+      return dates;
+    })
+  );
 
   // Empty cells before first day
   for (let i = 0; i < startOffset; i++) {
@@ -267,7 +289,6 @@ export async function saveDay() {
   const notes = document.getElementById('modalNotes')?.value?.trim() || null;
   const competition = document.getElementById('modalCompetition')?.checked || false;
 
-  // Validate: justification required for expenses > 0
   const peageFile = document.getElementById('peageFile')?.files?.[0];
   const hotelFile = document.getElementById('hotelFile')?.files?.[0];
   const achatFile = document.getElementById('achatFile')?.files?.[0];
@@ -288,7 +309,6 @@ export async function saveDay() {
     return;
   }
 
-  // Upload new files
   let peageUrl = existing.peage_url || null;
   let hotelUrl = existing.hotel_url || null;
   let achatUrl = existing.achat_url || null;
@@ -322,7 +342,6 @@ export async function saveDay() {
     return;
   }
 
-  // Update local state
   const newTimeData = { ...timeData };
   newTimeData[key] = saved?.[0] || payload;
   setTimeData(newTimeData);
