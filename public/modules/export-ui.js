@@ -491,11 +491,9 @@ export function createExportUI({
   }
 
   async function openMonthlySummaryPreviewModal() {
-    const currentCoach = getCurrentCoach();
     const currentMonth = getCurrentMonth();
-    if (!currentCoach || !currentMonth) { alert('Veuillez sélectionner un profil et un mois.'); return; }
-    // Delegates to exportExpenseHTML for now; can be extended with summary-specific HTML
-    exportExpenseHTML();
+    if (!currentMonth) { alert('Veuillez sélectionner un mois.'); return; }
+    exportMonthlyExpenses('csv', currentMonth);
   }
 
   // ─────────────────────────────────────────────────────────────────
