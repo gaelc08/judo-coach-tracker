@@ -15,6 +15,7 @@ export function initEventListeners(handlers) {
 }
 
 export function setupEventListeners() {
+  console.log('DEBUG setupEventListeners called');
   const {
     updateCalendar, updateSummary,
     openCoachModal, saveCoach, deleteCoach,
@@ -73,6 +74,7 @@ export function setupEventListeners() {
 
   // Coach select
   bindChange('coachSelect', (e) => {
+    console.log('DEBUG coachSelect change', e.target.value);
     const coach = coaches.find((c) => String(c.id) === String(e.target.value));
     setCurrentCoach(coach || null);
     updateCalendar?.();
