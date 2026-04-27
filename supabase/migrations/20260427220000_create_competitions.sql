@@ -28,13 +28,13 @@ CREATE POLICY "competitions_select" ON public.competitions
 
 -- Écriture réservée aux admins (via is_admin())
 CREATE POLICY "competitions_insert_admin" ON public.competitions
-  FOR INSERT TO authenticated WITH CHECK (public.is_admin(auth.uid()));
+  FOR INSERT TO authenticated WITH CHECK (public.is_admin());
 
 CREATE POLICY "competitions_update_admin" ON public.competitions
-  FOR UPDATE TO authenticated USING (public.is_admin(auth.uid()));
+  FOR UPDATE TO authenticated USING (public.is_admin());
 
 CREATE POLICY "competitions_delete_admin" ON public.competitions
-  FOR DELETE TO authenticated USING (public.is_admin(auth.uid()));
+  FOR DELETE TO authenticated USING (public.is_admin());
 
 -- Index
 CREATE INDEX IF NOT EXISTS competitions_date_idx ON public.competitions(date);
