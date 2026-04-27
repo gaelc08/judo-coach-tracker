@@ -44,7 +44,7 @@ export const supabaseKey = effectiveEnv === 'dev'
   : PROD_SUPABASE_KEY;
 
 export const VERSION_DATE = '2026-04-27';
-export const VERSION_INCREMENT = '27';
+export const VERSION_INCREMENT = '28';
 export const BUILD_ID = `${VERSION_DATE}-r${VERSION_INCREMENT}`;
 
 if (effectiveEnv === 'dev' && !localDevKeyOverride) {

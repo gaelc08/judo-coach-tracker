@@ -1,14 +1,10 @@
 /**
  * Supabase Edge Function — sync-competitions
  *
- * Scrapes https://www.judo-moselle.fr/evenement and upserts competitions
- * into the `competitions` table.
+ * Scrapes https://www.judo-moselle.fr/evenement (listing page only — single fetch)
+ * and upserts competitions into the `competitions` table.
  *
- * Authorization: Bearer <admin JWT> or Bearer <SUPABASE_SERVICE_ROLE_KEY>
- *
- * Deployment
- * ----------
- * supabase functions deploy sync-competitions --project-ref <your-project-ref>
+ * No per-event detail fetches — avoids timeout and outbound fetch issues.
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -20,8 +16,6 @@ const corsHeaders = {
 
 const BASE_URL = 'https://www.judo-moselle.fr'
 const LIST_URL = `${BASE_URL}/evenement`
-const DELAY_MS = 50
-const MAX_EVENTS = 30
 
 function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -30,68 +24,8 @@ function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   })
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-// ---- Simple HTML parser helpers ----
-
-function extractText(html: string, selector: string): string {
-  // Extract first match of a class-based selector content
-  const classMatch = selector.match(/\.([^\s.#]+)$/)
-  if (!classMatch) return ''
-  const className = classMatch[1]
-  const re = new RegExp(`class="[^"]*${className}[^"]*"[^>]*>([\\s\\S]*?)<\\/div>`, 'i')
-  const m = html.match(re)
-  if (!m) return ''
-  return m[1].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').replace(/&#[0-9]+;/g, '').trim()
-}
-
-function extractTextByTag(html: string, tag: string): string {
-  const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i')
-  const m = html.match(re)
-  if (!m) return ''
-  return m[1].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').trim()
-}
-
-function extractAllText(html: string, className: string): string[] {
-  const re = new RegExp(`class="[^"]*${className}[^"]*"[^>]*>([\\s\\S]*?)<\\/(?:div|p|span)>`, 'gi')
-  const results: string[] = []
-  let m
-  while ((m = re.exec(html)) !== null) {
-    const text = m[1].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').trim()
-    if (text) results.push(text)
-  }
-  return results
-}
-
-// Extract competition links from the listing page
-function extractEventLinks(html: string): Array<{ url: string; externalId: string; niveauCss: string }> {
-  const events: Array<{ url: string; externalId: string; niveauCss: string }> = []
-  // Match agenda list items — hrefs can be relative (/evenement/...) or absolute (https://www.judo-moselle.fr/evenement/...)
-  const itemRe = /<a\s+href="((?:https:\/\/www\.judo-moselle\.fr)?\/evenement\/([^/"]+)\/(\d+))"[^>]*class="agenda__list__item"[^>]*>([\s\S]*?)<\/a>/gi
-  let m
-  while ((m = itemRe.exec(html)) !== null) {
-    const rawUrl = m[1]
-    const externalId = m[3]
-    const itemHtml = m[4]
-    // Normalize to relative path
-    const url = rawUrl.startsWith('http') ? rawUrl.replace('https://www.judo-moselle.fr', '') : rawUrl
-    // Extract niveau from class of the date div
-    const dateClassRe = /class="agenda__list__item__date\s+(federal|departemental|regional|national|local)"/i
-    const dc = itemHtml.match(dateClassRe)
-    const niveauCss = dc ? dc[1].toLowerCase() : ''
-    events.push({ url, externalId, niveauCss })
-  }
-  return events
-}
-
-// Map CSS class → normalized niveau string
-function mapNiveau(css: string, htmlNiveau?: string): string {
-  if (htmlNiveau) {
-    const n = htmlNiveau.trim().toUpperCase()
-    if (['LOCAL', 'DEPARTEMENTAL', 'REGIONAL', 'NATIONAL', 'FEDERAL'].includes(n)) return n
-  }
+// Map CSS class → normalized niveau
+function mapNiveau(css: string): string {
   const map: Record<string, string> = {
     federal: 'FEDERAL',
     national: 'NATIONAL',
@@ -99,147 +33,91 @@ function mapNiveau(css: string, htmlNiveau?: string): string {
     departemental: 'DEPARTEMENTAL',
     local: 'LOCAL',
   }
-  return map[css] ?? css.toUpperCase()
+  return map[css.toLowerCase()] ?? css.toUpperCase()
 }
 
-// Parse a detail page HTML into a competition record
-function parseDetailPage(
-  html: string,
-  externalId: string,
-  url: string,
-  niveauCss: string
-): Record<string, unknown> | null {
-  try {
-    // Date — two observed formats:
-    // Format A (departemental): day=03, month=Mai, year=2026 (separate divs)
-    // Format B (federal/national): day="01 Mai 2026" (full date in day div)
-    const dayRaw = extractText(html, '.agenda__single__date__day') || ''
-    const monthRaw = extractText(html, '.agenda__single__date__month') || ''
-    const yearRaw = extractText(html, '.agenda__single__date__year') || ''
+// Parse "01.05" with current year context
+function parseDayMonth(raw: string): { day: string; month: string } | null {
+  const m = raw.trim().match(/^(\d{1,2})\.(\d{2})$/)
+  if (!m) return null
+  return { day: m[1].padStart(2, '0'), month: m[2] }
+}
 
-    let dateStr: string | null = null
+function inferYear(month: number, day: number): number {
+  const now = new Date()
+  const currentYear = now.getFullYear()
+  const currentMonth = now.getMonth() + 1
+  const currentDay = now.getDate()
+  // If the month.day is before today (by more than 7 days), it's next year
+  if (month < currentMonth || (month === currentMonth && day < currentDay - 7)) {
+    return currentYear + 1
+  }
+  return currentYear
+}
 
-    // Try Format B first: "01 Mai 2026" or "01.05.2026" in the day field
-    const fullDateMatch = dayRaw.match(/^(\d{1,2})[\.\s](\S+)[\.\s](\d{4})$/)
-    if (fullDateMatch) {
-      const d = fullDateMatch[1].padStart(2, '0')
-      const mNum = parseMonthFr(fullDateMatch[2])
-      const y = fullDateMatch[3]
-      if (mNum) dateStr = `${y}-${mNum}-${d}`
-    }
+function extractText(html: string, className: string): string {
+  const re = new RegExp(`class="[^"]*${className}[^"]*"[^>]*>([\\s\\S]*?)</(?:div|span|a)>`, 'i')
+  const m = html.match(re)
+  if (!m) return ''
+  return m[1].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').trim()
+}
 
-    // Format A: separate day / month / year divs
-    if (!dateStr && dayRaw && monthRaw && yearRaw) {
-      const monthNum = parseMonthFr(monthRaw)
-      const dayNum = dayRaw.replace(/\D/g, '').padStart(2, '0')
-      if (monthNum && dayNum && yearRaw.match(/^\d{4}$/)) {
-        dateStr = `${yearRaw}-${monthNum}-${dayNum}`
-      }
-    }
+function parseListPage(html: string): Array<Record<string, unknown>> {
+  const results: Array<Record<string, unknown>> = []
 
-    // Fallback: look for a date pattern in the page <title> or meta
-    if (!dateStr) {
-      const metaDate = html.match(/"dateEvent":\s*"(\d{4}-\d{2}-\d{2})"/)
-      if (metaDate) dateStr = metaDate[1]
-    }
+  // Match all list items
+  const itemRe = /<a\s+href="((?:https:\/\/www\.judo-moselle\.fr)?\/evenement\/([^/"]+)\/(\d+))"[^>]*class="agenda__list__item"[^>]*>([\s\S]*?)<\/a>/gi
+  let m: RegExpExecArray | null
 
-    if (!dateStr) return null
+  while ((m = itemRe.exec(html)) !== null) {
+    const rawUrl = m[1]
+    const externalId = m[3]
+    const itemHtml = m[4]
+    const url = rawUrl.startsWith('http') ? rawUrl.replace('https://www.judo-moselle.fr', '') : rawUrl
+
+    // Date
+    const dateRaw = extractText(itemHtml, 'agenda__list__item__date__day') ||
+                    extractText(itemHtml, 'agenda__list__item__date')
+    const parsed = parseDayMonth(dateRaw)
+    if (!parsed) continue
+
+    const dayNum = parseInt(parsed.day, 10)
+    const monthNum = parseInt(parsed.month, 10)
+    const year = inferYear(monthNum, dayNum)
+    const dateStr = `${year}-${parsed.month}-${parsed.day}`
 
     // Title
-    const title = extractTextByTag(html, 'h1')
-    if (!title) return null
+    const title = extractText(itemHtml, 'agenda__list__item__title')
+    if (!title) continue
 
-    // Lieu — parse from the adresses block using text lines
-    const adresseBlockRaw = (() => {
-      const re = /class="agenda__single__adresses"[^>]*>([\s\S]*?)<\/section>/i
-      const mm = html.match(re)
-      if (mm) return mm[1]
-      // Fallback: grab up to 1000 chars after the class
-      const re2 = /class="agenda__single__adresses"[^>]*>([\s\S]{0,1000})/i
-      const mm2 = html.match(re2)
-      return mm2 ? mm2[1] : ''
-    })()
-    const adresseLines = adresseBlockRaw
-      .replace(/<[^>]+>/g, '\n')
-      .replace(/&amp;/g, '&')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/Date d'ouverture[^\n]*/gi, '')
-      .replace(/Date de clôture[^\n]*/gi, '')
-      .replace(/Informations/gi, '')
-      .replace(/Contact[\s\S]*/i, '')  // stop at Contact section
-      .split('\n')
-      .map((l: string) => l.trim())
-      .filter((l: string) => l.length > 2)
-    const lieuNom = adresseLines[0] ?? null
-    const lieuAdresse = adresseLines[1] ?? null
-    // Try to find CP + ville — look for a line that's mostly digits (CP) and next = ville
-    let lieuVille: string | null = null
-    for (let i = 0; i < adresseLines.length; i++) {
-      if (/^\d{4,5}$/.test(adresseLines[i])) {
-        lieuVille = adresseLines[i + 1] ?? null
-        break
-      }
-      // Or combined "54710 LUDRES"
-      if (/^\d{4,5}\s+\w/.test(adresseLines[i])) {
-        lieuVille = adresseLines[i].replace(/^\d{4,5}\s+/, '')
-        break
-      }
-    }
+    // Lieu (often empty in list)
+    const lieu = extractText(itemHtml, 'agenda__list__item__lieu') || null
 
-    // Categories — multiple divs
-    const categoriesRaw = extractAllText(html, 'agenda__single__competition__age')
-    const categories = categoriesRaw.map((c) => c.toUpperCase()).filter(Boolean)
+    // Type (COMPETITION, STAGE, PASSAGE DE GRADE...)
+    const typeRaw = extractText(itemHtml, 'agenda__list__item__categorie') || null
 
-    // Niveau
-    const niveauHtml = extractText(html, '.agenda__single__competition__niveau')
-    const niveau = mapNiveau(niveauCss, niveauHtml)
+    // Niveau from CSS class
+    const dateClassRe = /class="agenda__list__item__date\s+(federal|departemental|regional|national|local)"/i
+    const dc = itemHtml.match(dateClassRe)
+    const niveau = dc ? mapNiveau(dc[1]) : 'LOCAL'
 
-    // Type
-    const typeCompetition = extractText(html, '.agenda__single__competition__type') || null
-
-    // Commentaire
-    const commentaire = extractText(html, '.agenda__single__commentaire') ||
-                        extractText(html, '.agenda__single__infos') || null
-
-    return {
+    results.push({
       external_id: externalId,
       title: title.trim(),
       date: dateStr,
-      lieu_nom: lieuNom,
-      lieu_adresse: lieuAdresse,
-      lieu_ville: lieuVille,
+      lieu_nom: lieu,
+      lieu_adresse: null,
+      lieu_ville: null,
       niveau,
-      categories: categories.length > 0 ? categories : null,
-      type_competition: typeCompetition ? typeCompetition.toUpperCase() : null,
-      commentaire,
+      categories: null,
+      type_competition: typeRaw ? typeRaw.toUpperCase() : null,
+      commentaire: null,
       url_source: `${BASE_URL}${url}`,
       updated_at: new Date().toISOString(),
-    }
-  } catch {
-    return null
+    })
   }
-}
 
-// French month names → zero-padded number string
-function parseMonthFr(month: string): string | null {
-  const m = month.trim().toLowerCase().replace(/\.$/, '')
-  const months: Record<string, string> = {
-    janvier: '01', jan: '01', '01': '01',
-    février: '02', fev: '02', fevrier: '02', '02': '02',
-    mars: '03', '03': '03',
-    avril: '04', '04': '04',
-    mai: '05', '05': '05',
-    juin: '06', '06': '06',
-    juillet: '07', jul: '07', '07': '07',
-    août: '08', aout: '08', '08': '08',
-    septembre: '09', sep: '09', '09': '09',
-    octobre: '10', oct: '10', '10': '10',
-    novembre: '11', nov: '11', '11': '11',
-    décembre: '12', dec: '12', decembre: '12', '12': '12',
-  }
-  // Also handle numeric "05" etc.
-  if (/^\d{1,2}$/.test(m)) return m.padStart(2, '0')
-  return months[m] ?? null
+  return results
 }
 
 // ---- Main handler ----
@@ -247,7 +125,6 @@ function parseMonthFr(month: string): string | null {
 Deno.serve(async (req: Request): Promise<Response> => {
   const requestId = crypto.randomUUID()
 
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -261,142 +138,90 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
     if (!supabaseUrl || !serviceRoleKey) {
-      return jsonResponse({ error: 'Server configuration error (Supabase)', requestId }, 500)
+      return jsonResponse({ error: 'Server configuration error', requestId }, 500)
     }
 
-    // Create an admin client (service role — never exposed to the browser)
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     })
 
-    // Verify the caller: accept admin JWT or service role key
+    // Auth: accept admin JWT or service_role JWT
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       return jsonResponse({ error: 'Missing Authorization header', requestId }, 401)
     }
-
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader
 
-    // Try to verify as a user JWT with admin claim
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token)
-    const isAdminUser = !userError && user && (
-      user.app_metadata?.is_admin === true ||
-      user.app_metadata?.is_admin === 'true'
-    )
-    // Also accept service_role JWT (role claim = 'service_role')
-    let tokenPayload: Record<string, unknown> = {}
+    // Check JWT role claim (service_role) or user admin claim
+    let isAuthorized = false
     try {
-      tokenPayload = JSON.parse(atob(token.split('.')[1]))
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      if (payload?.role === 'service_role') isAuthorized = true
     } catch { /* ignore */ }
-    const isServiceRole = tokenPayload?.role === 'service_role'
 
-    if (!isAdminUser && !isServiceRole) {
+    if (!isAuthorized) {
+      const { data: { user } } = await supabaseAdmin.auth.getUser(token)
+      isAuthorized = !!(user?.app_metadata?.is_admin === true || user?.app_metadata?.is_admin === 'true')
+    }
+
+    if (!isAuthorized) {
       return jsonResponse({ error: 'Forbidden: admin only', requestId }, 403)
     }
 
-    console.log('DEBUG sync-competitions start:', { requestId })
-
-    // ---- Scrape listing page ----
-    const listController = new AbortController()
-    const listTimeout = setTimeout(() => listController.abort(), 15000)
+    // ---- Single fetch of the listing page ----
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 20000)
     let listRes: Response | undefined
     try {
       listRes = await fetch(LIST_URL, {
-        headers: { 'Accept': 'text/html', 'User-Agent': 'JCC-Bot/1.0' },
-        signal: listController.signal,
+        headers: { 'Accept': 'text/html', 'User-Agent': 'Mozilla/5.0 (compatible; JCC-Bot/1.0)' },
+        signal: controller.signal,
       })
     } finally {
-      clearTimeout(listTimeout)
+      clearTimeout(timeout)
     }
+
     if (!listRes || !listRes.ok) {
-      return jsonResponse({ error: `Listing fetch failed: ${listRes?.status ?? 'aborted'}`, requestId }, 502)
+      return jsonResponse({ error: `Fetch failed: ${listRes?.status ?? 'aborted'}`, requestId }, 502)
     }
-    const listHtml = await listRes.text()
-    const allLinks = extractEventLinks(listHtml)
 
-    // Deduplicate by externalId
-    const seen = new Set<string>()
-    const links = allLinks.filter((l) => {
-      if (seen.has(l.externalId)) return false
-      seen.add(l.externalId)
-      return true
-    }).slice(0, MAX_EVENTS)
+    const html = await listRes.text()
+    console.log('DEBUG html length:', html.length, { requestId })
 
-    console.log('DEBUG sync-competitions links found:', allLinks.length, 'processing:', links.length, { requestId })
+    const competitions = parseListPage(html)
+    console.log('DEBUG parsed competitions:', competitions.length, { requestId })
 
-    // Fetch already-known external_ids to skip them on re-sync
-    const { data: existing } = await supabaseAdmin
-      .from('competitions')
-      .select('external_id')
-    const knownIds = new Set((existing ?? []).map((r: { external_id: string }) => r.external_id))
-    const newLinks = links.filter((l) => !knownIds.has(l.externalId))
-    console.log('DEBUG sync-competitions new links to fetch:', newLinks.length, { requestId })
+    if (competitions.length === 0) {
+      return jsonResponse({ synced: 0, errors: 0, skipped: 0, note: 'No events parsed from listing page', requestId })
+    }
 
-    // Cutoff: only process events with date >= today - 7 days
+    // Cutoff: only future events (date >= today - 7 days)
     const cutoff = new Date()
     cutoff.setDate(cutoff.getDate() - 7)
     const cutoffStr = cutoff.toISOString().slice(0, 10)
 
-    let synced = 0
-    let errors = 0
-    let skipped = 0
+    const toSync = competitions.filter((c) => (c.date as string) >= cutoffStr)
+    const skipped = competitions.length - toSync.length
 
-    for (const link of newLinks) {
-      await sleep(DELAY_MS)
-      try {
-        const detailController = new AbortController()
-        const detailTimeout = setTimeout(() => detailController.abort(), 8000)
-        let detailRes: Response | undefined
-        try {
-          detailRes = await fetch(`${BASE_URL}${link.url}`, {
-            headers: { 'Accept': 'text/html', 'User-Agent': 'JCC-Bot/1.0' },
-            signal: detailController.signal,
-          })
-        } finally {
-          clearTimeout(detailTimeout)
-        }
-        if (!detailRes || !detailRes.ok) {
-          console.warn(`DEBUG sync-competitions detail fetch failed: ${link.url} ${detailRes?.status ?? 'aborted'}`)
-          errors++
-          continue
-        }
-        const detailHtml = await detailRes!.text()
-        const competition = parseDetailPage(detailHtml, link.externalId, link.url, link.niveauCss)
-
-        if (!competition) {
-          console.warn(`DEBUG sync-competitions parse failed: ${link.url}`)
-          errors++
-          continue
-        }
-
-        // Skip past events
-        if ((competition.date as string) < cutoffStr) {
-          skipped++
-          continue
-        }
-
-        const { error: upsertError } = await supabaseAdmin
-          .from('competitions')
-          .upsert(competition, { onConflict: 'external_id' })
-
-        if (upsertError) {
-          console.error(`DEBUG sync-competitions upsert error: ${upsertError.message}`, { url: link.url })
-          errors++
-          continue
-        }
-
-        synced++
-      } catch (e) {
-        console.error(`DEBUG sync-competitions event error: ${String(e)}`, { url: link.url })
-        errors++
-      }
+    if (toSync.length === 0) {
+      return jsonResponse({ synced: 0, errors: 0, skipped, requestId })
     }
 
-    console.log('DEBUG sync-competitions done:', { requestId, synced, errors, skipped })
-    return jsonResponse({ synced, errors, skipped, requestId }, 200)
+    // Batch upsert
+    const { error: upsertError } = await supabaseAdmin
+      .from('competitions')
+      .upsert(toSync, { onConflict: 'external_id' })
+
+    if (upsertError) {
+      console.error('DEBUG upsert error:', upsertError.message, { requestId })
+      return jsonResponse({ synced: 0, errors: toSync.length, skipped, note: upsertError.message, requestId }, 500)
+    }
+
+    console.log('DEBUG sync done:', { synced: toSync.length, skipped, requestId })
+    return jsonResponse({ synced: toSync.length, errors: 0, skipped, requestId })
 
   } catch (e) {
-    console.error('DEBUG sync-competitions unexpected error:', { requestId, error: String(e) })
+    console.error('DEBUG unexpected error:', String(e), { requestId })
     return jsonResponse({ error: String(e), requestId }, 500)
   }
 })
