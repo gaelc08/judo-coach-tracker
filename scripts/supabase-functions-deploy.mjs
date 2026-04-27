@@ -18,7 +18,7 @@ const functionsToDeploy = [
   { name: 'delete-coach-user', noVerifyJwt: true },
   { name: 'alert-admin', noVerifyJwt: false },
   { name: 'export-monthly-expenses', noVerifyJwt: true },
-  { name: 'sync-competitions', noVerifyJwt: false },
+  { name: 'sync-competitions', noVerifyJwt: true },
 ];
 
 for (const fn of functionsToDeploy) {

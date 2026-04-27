@@ -269,7 +269,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       auth: { autoRefreshToken: false, persistSession: false },
     })
 
-    // Verify the caller is authenticated (admin JWT or service role key)
+    // Verify the caller: accept admin JWT or service role key
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       return jsonResponse({ error: 'Missing Authorization header', requestId }, 401)
@@ -277,21 +277,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader
 
-    // Allow direct service role key (for cron jobs)
-    let isAuthorized = token === serviceRoleKey
+    // Try to verify as a user JWT with admin claim
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token)
+    const isAdminUser = !userError && user && (
+      user.app_metadata?.is_admin === true ||
+      user.app_metadata?.is_admin === 'true'
+    )
+    // Also accept service_role JWT (role claim = 'service_role')
+    let tokenPayload: Record<string, unknown> = {}
+    try {
+      tokenPayload = JSON.parse(atob(token.split('.')[1]))
+    } catch { /* ignore */ }
+    const isServiceRole = tokenPayload?.role === 'service_role'
 
-    if (!isAuthorized) {
-      // Verify JWT and check admin claim
-      const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token)
-      if (userError || !user) {
-        return jsonResponse({ error: 'Unauthorized', requestId }, 401)
-      }
-      isAuthorized = user.app_metadata?.is_admin === true
-        || user.app_metadata?.is_admin === 'true'
-        || user.role === 'service_role'
-    }
-
-    if (!isAuthorized) {
+    if (!isAdminUser && !isServiceRole) {
       return jsonResponse({ error: 'Forbidden: admin only', requestId }, 403)
     }
 
