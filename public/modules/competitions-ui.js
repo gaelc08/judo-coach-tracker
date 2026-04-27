@@ -50,7 +50,25 @@ export function initCompetitionsUi(deps) {
 let _competitions = [];
 let _filteredNiveau = '';
 let _filteredCategory = '';
+let _filteredType = '';
 let _loading = false;
+let _selectedDate = null;
+let _currentMonth = null; // { year, month } (month is 0-based)
+
+function getCurrentMonth() {
+  if (!_currentMonth) {
+    const now = new Date();
+    _currentMonth = { year: now.getFullYear(), month: now.getMonth() };
+  }
+  return _currentMonth;
+}
+
+function getMonthCompetitions(competitions, { year, month }) {
+  const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+  return competitions.filter((c) => c.date && c.date.startsWith(prefix));
+}
+
+const TYPE_OPTIONS = ['COMPETITION', 'PASSAGE DE GRADE', 'KATA', 'FORMATION'];
 
 // ─── Render helpers ──────────────────────────────────────────────
 
@@ -113,6 +131,10 @@ function renderFilters(competitions, isAdmin) {
     `<option value="${c}"${_filteredCategory === c ? ' selected' : ''}>${escapeHtml(c)}</option>`
   ).join('');
 
+  const typeOptions = TYPE_OPTIONS.map((t) =>
+    `<option value="${t}"${_filteredType === t ? ' selected' : ''}>${escapeHtml(t)}</option>`
+  ).join('');
+
   const syncBtn = isAdmin
     ? `<button id="compSyncBtn" class="btn-secondary">🔄 Synchroniser</button>`
     : '';
@@ -134,6 +156,13 @@ function renderFilters(competitions, isAdmin) {
           ${categoryOptions}
         </select>
       </label>` : ''}
+      <label class="toolbar-label">
+        <span>Type</span>
+        <select id="compTypeFilter">
+          <option value="">Tous</option>
+          ${typeOptions}
+        </select>
+      </label>
       <div class="comp-toolbar-actions">
         ${syncBtn}
       </div>
@@ -144,8 +173,70 @@ function applyFilters(competitions) {
   return competitions.filter((c) => {
     if (_filteredNiveau && (c.niveau ?? '').toUpperCase() !== _filteredNiveau) return false;
     if (_filteredCategory && !(Array.isArray(c.categories) && c.categories.includes(_filteredCategory))) return false;
+    if (_filteredType && (c.type_competition ?? '') !== _filteredType) return false;
     return true;
   });
+}
+
+// ─── Calendar helpers ────────────────────────────────────────────
+
+function renderCalendar(monthComps, currentMonth, selectedDate) {
+  const { year, month } = currentMonth;
+  const monthNames = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  const dayNames = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+
+  // Map date → event count
+  const eventsByDay = {};
+  for (const c of monthComps) {
+    if (c.date) eventsByDay[c.date] = (eventsByDay[c.date] || 0) + 1;
+  }
+
+  // First weekday of month (Monday-first, 0=Mon … 6=Sun)
+  const firstDow = new Date(year, month, 1).getDay();
+  const startOffset = (firstDow + 6) % 7;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const dayHeaders = dayNames.map((d) => `<div class="comp-cal-header-day">${d}</div>`).join('');
+
+  let cells = '';
+  for (let i = 0; i < startOffset; i++) cells += '<div class="comp-cal-day comp-cal-day--empty"></div>';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const count = eventsByDay[dateStr] || 0;
+    let cls = 'comp-cal-day';
+    if (count > 0) cls += ' comp-cal-day--has-events';
+    if (selectedDate === dateStr) cls += ' comp-cal-day--selected';
+    const badge = count > 0 ? `<span class="comp-cal-day-badge">${count}</span>` : '';
+    cells += `<div class="${cls}" data-date="${dateStr}"><span class="comp-cal-day-num">${d}</span>${badge}</div>`;
+  }
+
+  return `
+    <div class="comp-calendar">
+      <div class="comp-cal-nav">
+        <button class="comp-cal-prev btn-secondary">← Préc.</button>
+        <span class="comp-cal-month-label">${monthNames[month]} ${year}</span>
+        <button class="comp-cal-next btn-secondary">Suiv. →</button>
+      </div>
+      <div class="comp-cal-grid">
+        ${dayHeaders}
+        ${cells}
+      </div>
+    </div>`;
+}
+
+function renderDayDetail(monthComps, date) {
+  if (!date) return '';
+  const isAdmin = _deps?.isAdminForUi?.() ?? false;
+  const dayComps = monthComps.filter((c) => c.date === date);
+  if (dayComps.length === 0) return '';
+  const [y, m, d] = date.split('-');
+  return `
+    <div class="comp-day-detail">
+      <h3 class="comp-day-detail-title">📅 Événements du ${d}/${m}/${y}</h3>
+      <div class="comp-day-detail-list">
+        ${dayComps.map((c) => renderCompetitionCard(c, isAdmin)).join('')}
+      </div>
+    </div>`;
 }
 
 async function renderSection() {
@@ -163,11 +254,15 @@ async function renderSection() {
     return;
   }
 
+  const currentMonth = getCurrentMonth();
   const filtered = applyFilters(_competitions);
+  const monthComps = getMonthCompetitions(filtered, currentMonth);
   const filtersHtml = renderFilters(_competitions, isAdmin);
-  const cardsHtml = filtered.length > 0
-    ? filtered.map((c) => renderCompetitionCard(c, isAdmin)).join('')
-    : `<div class="comp-status comp-empty">Aucune compétition trouvée.</div>`;
+  const calendarHtml = renderCalendar(monthComps, currentMonth, _selectedDate);
+  const dayDetailHtml = renderDayDetail(monthComps, _selectedDate);
+  const cardsHtml = monthComps.length > 0
+    ? monthComps.map((c) => renderCompetitionCard(c, isAdmin)).join('')
+    : `<div class="comp-status comp-empty">Aucune compétition ce mois.</div>`;
 
   container.innerHTML = `
     <div class="comp-header">
@@ -175,6 +270,8 @@ async function renderSection() {
       <p class="comp-subtitle">Source : <a href="https://www.judo-moselle.fr/evenement" target="_blank" rel="noopener">judo-moselle.fr</a></p>
     </div>
     ${filtersHtml}
+    ${calendarHtml}
+    ${dayDetailHtml}
     <div class="comp-list">
       ${cardsHtml}
     </div>`;
@@ -196,6 +293,48 @@ async function renderSection() {
     });
   }
 
+  const typeFilter = document.getElementById('compTypeFilter');
+  if (typeFilter) {
+    typeFilter.addEventListener('change', (e) => {
+      _filteredType = e.target.value;
+      renderSection();
+    });
+  }
+
+  // Wire up calendar navigation
+  const prevBtn = container.querySelector('.comp-cal-prev');
+  if (prevBtn) {
+    prevBtn.addEventListener('click', () => {
+      let { year, month } = _currentMonth || getCurrentMonth();
+      month--;
+      if (month < 0) { month = 11; year--; }
+      _currentMonth = { year, month };
+      _selectedDate = null;
+      renderSection();
+    });
+  }
+
+  const nextBtn = container.querySelector('.comp-cal-next');
+  if (nextBtn) {
+    nextBtn.addEventListener('click', () => {
+      let { year, month } = _currentMonth || getCurrentMonth();
+      month++;
+      if (month > 11) { month = 0; year++; }
+      _currentMonth = { year, month };
+      _selectedDate = null;
+      renderSection();
+    });
+  }
+
+  // Wire up calendar day clicks
+  container.querySelectorAll('.comp-cal-day--has-events').forEach((el) => {
+    el.addEventListener('click', () => {
+      const date = el.dataset.date;
+      _selectedDate = _selectedDate === date ? null : date;
+      renderSection();
+    });
+  });
+
   // Wire up sync button
   const syncBtn = document.getElementById('compSyncBtn');
   if (syncBtn && isAdmin) {
@@ -213,7 +352,6 @@ async function renderSection() {
       try {
         const token = _deps?.getCurrentAccessToken?.();
         await toggleClubSelected(id, newSelected, token);
-        // Update local state
         const comp = _competitions.find((c) => c.id === id);
         if (comp) comp.club_selected = newSelected;
         await renderSection();

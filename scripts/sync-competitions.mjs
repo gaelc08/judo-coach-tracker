@@ -56,6 +56,15 @@ function parseLocation(loc) {
   return { lieu_nom: meaningful[0], lieu_ville: meaningful[meaningful.length - 1] }
 }
 
+function inferTypeCompetition(label) {
+  const l = label.toUpperCase()
+  if (l.includes('GRADES')) return 'PASSAGE DE GRADE'
+  if (l.includes('KATA')) return 'KATA'
+  if (l.includes('FORMATION')) return 'FORMATION'
+  if (l.includes('BENJAMINS') || l.includes('MINIMES') || l.includes('CADETS') || l.includes('JUNIORS') || l.includes('SENIORS')) return 'COMPETITION'
+  return null
+}
+
 function inferNiveau(title, defaultNiveau) {
   const t = title.toUpperCase()
   if (/CHAMPIONNAT DE FRANCE|GRAND SLAM|OPEN NATIONAL/.test(t)) return 'NATIONAL'
@@ -90,7 +99,7 @@ function parseICS(text, cal, cutoffStr) {
       lieu_ville,
       niveau,
       categories: cal.categories.length > 0 ? cal.categories : null,
-      type_competition: null,
+      type_competition: inferTypeCompetition(cal.label),
       commentaire: description || null,
       url_source: `https://calendar.google.com/calendar/embed?src=${encodeURIComponent(cal.id)}`,
       updated_at: new Date().toISOString(),

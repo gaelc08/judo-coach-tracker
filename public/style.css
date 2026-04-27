@@ -1707,3 +1707,146 @@ button, .btn-primary, .btn-secondary, .btn-danger {
     margin-left: 0;
   }
 }
+
+/* ─── Calendrier compétitions ─────────────────────────────────────── */
+
+.comp-calendar {
+  background: rgba(255,255,255,0.97);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 12px;
+}
+
+.comp-cal-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 8px;
+}
+
+.comp-cal-month-label {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--judo-navy);
+}
+
+.comp-cal-nav .btn-secondary {
+  padding: 5px 12px;
+  font-size: 0.82rem;
+  background: var(--judo-navy);
+  color: white;
+  border: 1px solid var(--judo-navy);
+}
+
+.comp-cal-nav .btn-secondary:hover {
+  background: var(--judo-red-dark);
+  border-color: var(--judo-red-dark);
+}
+
+.comp-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.comp-cal-header-day {
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--judo-navy);
+  padding: 4px 0;
+  text-transform: uppercase;
+}
+
+.comp-cal-day {
+  min-height: 40px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  font-size: 0.82rem;
+  color: var(--gray-700);
+  user-select: none;
+  padding: 2px;
+}
+
+.comp-cal-day--empty {
+  pointer-events: none;
+}
+
+.comp-cal-day--has-events {
+  background: rgba(30, 58, 123, 0.12);
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--judo-navy);
+  transition: background 0.15s;
+}
+
+.comp-cal-day--has-events:hover {
+  background: rgba(30, 58, 123, 0.22);
+}
+
+.comp-cal-day--selected {
+  border: 2px solid var(--judo-red);
+  background: rgba(30, 58, 123, 0.18) !important;
+}
+
+.comp-cal-day-num {
+  line-height: 1;
+}
+
+.comp-cal-day-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--judo-gold);
+  color: var(--judo-navy);
+  font-size: 0.65rem;
+  font-weight: 900;
+  border-radius: 999px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  margin-top: 2px;
+}
+
+.comp-day-detail {
+  background: rgba(255,255,255,0.97);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 12px;
+  border-left: 4px solid var(--judo-gold);
+}
+
+.comp-day-detail-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--judo-navy);
+  margin-bottom: 10px;
+}
+
+.comp-day-detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+@media (max-width: 600px) {
+  .comp-cal-day {
+    min-height: 32px;
+    font-size: 0.75rem;
+  }
+  .comp-cal-header-day {
+    font-size: 0.65rem;
+  }
+  .comp-cal-day-badge {
+    font-size: 0.6rem;
+    min-width: 14px;
+    height: 14px;
+  }
+}
