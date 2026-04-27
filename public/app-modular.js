@@ -115,6 +115,9 @@ import { createExportUI } from './modules/export-ui.js';
 // ===== HelloAsso UI (fully extracted) =====
 import { createHelloAssoUI } from './modules/helloasso-ui.js';
 
+// ===== Competitions UI =====
+import { initCompetitionsUi, showCompetitionsSection, hideCompetitionsSection } from './modules/competitions-ui.js';
+
 console.log('DEBUG BUILD:', __BUILD_ID);
 
 // ===== REST Gateway =====
@@ -258,6 +261,12 @@ const __helloAssoUI = createHelloAssoUI({
 });
 
 const openHelloAssoModal = __helloAssoUI.openHelloAssoModal;
+
+// ===== Init competitions UI =====
+initCompetitionsUi({
+  getCurrentAccessToken: () => currentAccessToken,
+  isAdminForUi: __isAdminForUi,
+});
 
 // ===== Wire auth-listeners =====
 initAuthListeners({

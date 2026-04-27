@@ -14,6 +14,20 @@ export function initEventListeners(handlers) {
   _handlers = handlers;
 }
 
+// ===== Competitions section toggle =====
+let _competitionsVisible = false;
+
+function toggleCompetitionsSection(show) {
+  const section = document.getElementById('competitionsSection');
+  if (!section) return;
+  _competitionsVisible = show !== undefined ? show : !_competitionsVisible;
+  section.style.display = _competitionsVisible ? 'block' : 'none';
+  if (_competitionsVisible) {
+    // Dynamically import to avoid circular dep at load time
+    import('./competitions-ui.js').then((m) => m.showCompetitionsSection());
+  }
+}
+
 export function setupEventListeners() {
   const {
     updateCalendar, updateSummary,
@@ -90,9 +104,10 @@ export function setupEventListeners() {
   // Freeze
   bindClick('freezeBtn', () => toggleFreezeMonth?.());
 
-  // Audit / HelloAsso
+  // Audit / HelloAsso / Competitions
   bindClick('auditLogsBtn', () => openAuditLogsModal?.());
   bindClick('helloAssoBtn', () => openHelloAssoModal?.());
+  bindClick('competitionsBtn', () => toggleCompetitionsSection());
 
   // Export — IDs correspondent aux boutons dans index.html
   bindClick('exportMonthlyExpensesBtn',   () => openMonthlySummaryPreviewModal?.());

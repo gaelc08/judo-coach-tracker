@@ -256,7 +256,7 @@ export function setupAuthListeners() {
       const isAdmin = await isCurrentUserAdminDB();
       const adminEls = [
         'adminActionsPanel', 'addCoachBtn', 'editCoachBtn', 'inviteAdminBtn',
-        'freezeBtn', 'auditLogsBtn', 'helloAssoBtn', 'exportMonthlyExpensesBtn',
+        'freezeBtn', 'auditLogsBtn', 'helloAssoBtn', 'competitionsBtn', 'exportMonthlyExpensesBtn',
         'importGroup', 'backupBtn',
       ];
       adminEls.forEach(id => {
