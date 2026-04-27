@@ -67,9 +67,8 @@ export async function toggleClubSelected(id, selected, accessToken) {
  * @returns {Promise<{synced: number, errors: number, skipped: number}>}
  */
 export async function triggerSync(accessToken) {
-  // Derive Edge Function URL from Supabase project URL
-  // e.g. https://<ref>.supabase.co → https://<ref>.functions.supabase.co/sync-competitions
-  const fnUrl = supabaseUrl.replace('.supabase.co', '.functions.supabase.co') + '/sync-competitions';
+  // Correct Supabase Edge Function URL format: <project>.supabase.co/functions/v1/<name>
+  const fnUrl = supabaseUrl.replace(/\/$/, '') + '/functions/v1/sync-competitions';
 
   const res = await fetch(fnUrl, {
     method: 'POST',
