@@ -110,20 +110,39 @@ function parseDetailPage(
   niveauCss: string
 ): Record<string, unknown> | null {
   try {
-    // Date
-    const day = extractText(html, '.agenda__single__date__day') || ''
-    const month = extractText(html, '.agenda__single__date__month') || ''
-    const year = extractText(html, '.agenda__single__date__year') || ''
+    // Date — two observed formats:
+    // Format A (departemental): day=03, month=Mai, year=2026 (separate divs)
+    // Format B (federal/national): day="01 Mai 2026" (full date in day div)
+    const dayRaw = extractText(html, '.agenda__single__date__day') || ''
+    const monthRaw = extractText(html, '.agenda__single__date__month') || ''
+    const yearRaw = extractText(html, '.agenda__single__date__year') || ''
 
-    // Parse date — format varies: day=12, month=05 or "mai", year=2026
     let dateStr: string | null = null
-    if (day && month && year) {
-      const monthNum = parseMonthFr(month)
-      const dayNum = day.replace(/\D/g, '').padStart(2, '0')
-      if (monthNum && dayNum && year.match(/^\d{4}$/)) {
-        dateStr = `${year}-${monthNum}-${dayNum}`
+
+    // Try Format B first: "01 Mai 2026" or "01.05.2026" in the day field
+    const fullDateMatch = dayRaw.match(/^(\d{1,2})[\.\s](\S+)[\.\s](\d{4})$/)
+    if (fullDateMatch) {
+      const d = fullDateMatch[1].padStart(2, '0')
+      const mNum = parseMonthFr(fullDateMatch[2])
+      const y = fullDateMatch[3]
+      if (mNum) dateStr = `${y}-${mNum}-${d}`
+    }
+
+    // Format A: separate day / month / year divs
+    if (!dateStr && dayRaw && monthRaw && yearRaw) {
+      const monthNum = parseMonthFr(monthRaw)
+      const dayNum = dayRaw.replace(/\D/g, '').padStart(2, '0')
+      if (monthNum && dayNum && yearRaw.match(/^\d{4}$/)) {
+        dateStr = `${yearRaw}-${monthNum}-${dayNum}`
       }
     }
+
+    // Fallback: look for a date pattern in the page <title> or meta
+    if (!dateStr) {
+      const metaDate = html.match(/"dateEvent":\s*"(\d{4}-\d{2}-\d{2})"/)
+      if (metaDate) dateStr = metaDate[1]
+    }
+
     if (!dateStr) return null
 
     // Title

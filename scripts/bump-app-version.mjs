@@ -31,7 +31,10 @@ if (!currentDateMatch || !currentIncrementMatch) {
 const currentDate = currentDateMatch[1];
 const currentIncrement = currentIncrementMatch[1];
 const width = Math.max(2, currentIncrement.length);
-const nextIncrement = String(Number(currentIncrement) + 1).padStart(width, '0');
+// Reset to 01 on new day, increment otherwise
+const nextIncrement = currentDate === today
+  ? String(Number(currentIncrement) + 1).padStart(width, '0')
+  : '01';
 const nextBuildId = `${today}-r${nextIncrement}`;
 
 envContent = replaceOrThrow(
