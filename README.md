@@ -1,4 +1,4 @@
-# Judo Coach Tracker
+# JC Cattenom App
 
 Web app for the Judo Club de Cattenom-Rodemack to manage coach and volunteer activity, expenses, mileage, and related club administration.
 
@@ -20,9 +20,11 @@ For administrators:
 
 - static SPA in `public/` using HTML, CSS, and ES modules
 - no bundler and no build step for the frontend
+- modular architecture: `public/app-modular.js` orchestrates ~20 ES modules under `public/modules/`
 - Supabase for Auth, Postgres, Storage, and Edge Functions
 - GitHub Pages deployment for the frontend
 - installable PWA with offline fallback via service worker
+- HelloAsso integration for member synchronization
 
 ## Repository Layout
 
@@ -125,6 +127,7 @@ Current Edge Functions:
 - `export-monthly-expenses`
 - `invite-admin`
 - `invite-coach`
+- `sync-helloasso`
 
 ## Data and Security Notes
 

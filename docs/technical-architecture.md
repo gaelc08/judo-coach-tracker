@@ -1,14 +1,16 @@
-# Technical Architecture
+# Technical Architecture — JC Cattenom App
 
-This document summarizes the current architecture of the Judo Coach Tracker repository.
+This document summarizes the current architecture of the jccattenom-app repository.
 
 ## System Overview
 
 - frontend is a static single-page application in `public/`
 - browser code uses plain JavaScript ES modules with no build step
+- `public/app-modular.js` orchestrates ~20 ES modules under `public/modules/`
 - backend services are provided by Supabase Auth, Postgres, Storage, and Edge Functions
 - the app is deployed as a PWA and hosted through GitHub Pages with a custom domain
 - environment routing between dev and prod is handled in the browser by `public/modules/env.js`
+- HelloAsso integration for club member synchronization
 
 ## Runtime Topology
 
@@ -43,13 +45,32 @@ Primary frontend entry points:
 
 Important browser modules:
 - `public/modules/env.js`  dev/prod backend selection and persisted override logic
+- `public/modules/supabase-client.js`  singleton Supabase client with debug wrappers
+- `public/modules/app-context.js`  shared mutable state and cross-module helpers
 - `public/modules/auth-runtime.js`  auth session and invite-flow helpers
-- `public/modules/auth-admin.js`  admin detection helpers
+- `public/modules/auth-admin.js`  admin detection helpers (local claims + REST)
+- `public/modules/auth-listeners.js`  Supabase auth event subscriptions
+- `public/modules/admin-service.js`  admin role checks and alert notifications
 - `public/modules/profile-utils.js`  user/profile display and typing helpers
+- `public/modules/data-loader.js`  loads coaches, time_data, frozen_timesheets; populates dropdowns
+- `public/modules/calendar-ui.js`  calendar rendering, day modal, saveDay/deleteDay, file upload
+- `public/modules/coach-manager.js`  profile CRUD, invite flows, modal UI helpers
+- `public/modules/summary-ui.js`  monthly summary display, freeze management
+- `public/modules/export-ui.js`  export UI factory (timesheet + expense report)
+- `public/modules/export-runtime.js`  ExcelJS loader and export orchestration
+- `public/modules/display-format.js`  number and currency formatting helpers
+- `public/modules/shared-utils.js`  base64, email/month normalization, claim helpers
 - `public/modules/mileage-service.js`  mileage calculation logic
 - `public/modules/rest-gateway.js`  REST and privileged-operation helpers
+- `public/modules/holidays-service.js`  French public/school holiday fetching logic
+- `public/modules/holidays-data.js`  holiday data caching and helpers
+- `public/modules/helloasso-service.js`  HelloAsso member sync service
+- `public/modules/helloasso-ui.js`  HelloAsso UI components
 - `public/modules/audit-controller.js` and `public/modules/audit-ui.js`  audit-log rendering and formatting
 - `public/modules/pwa.js`  install prompt and PWA behavior
+- `public/modules/event-listeners.js`  global event wiring
+- `public/modules/debug-shims.js`  development debug helpers
+- `public/modules/invite-debug.js`  invite flow debug utilities
 
 Frontend characteristics:
 - all UI state is managed in the browser
@@ -85,11 +106,13 @@ Supabase responsibilities:
 - Edge Functions for privileged admin operations
 
 Current Edge Functions under `supabase/functions/`:
-- `alert-admin`
-- `app`
-- `delete-coach-user`
-- `invite-admin`
-- `invite-coach`
+- `alert-admin`  admin alert notifications
+- `app`  general-purpose app-level function
+- `delete-coach-user`  privileged user deletion
+- `export-monthly-expenses`  server-side monthly expense export
+- `invite-admin`  admin invitation flow
+- `invite-coach`  coach/volunteer invitation flow
+- `sync-helloasso`  HelloAsso member synchronization
 
 Backend configuration files:
 - `supabase/config.toml`
@@ -194,6 +217,13 @@ Important security characteristics:
 - admin operations are validated server-side
 - frozen months prevent unauthorized modifications
 - receipt and export flows still need the browser layer to sanitize generated HTML content before rendering previews or downloaded artifacts
+
+## HelloAsso Integration
+
+The app integrates with HelloAsso for club member synchronization:
+- `public/modules/helloasso-service.js` triggers server-side sync and reads synced member data from the browser
+- `public/modules/helloasso-ui.js` provides the UI for the sync workflow
+- `supabase/functions/sync-helloasso` is the server-side Edge Function that performs the actual sync against the HelloAsso API
 
 ## External Integrations
 
