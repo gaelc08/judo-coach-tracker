@@ -222,43 +222,36 @@ Deno.serve(async (req: Request): Promise<Response> => {
     cutoff.setDate(cutoff.getDate() - 7)
     const cutoffStr = cutoff.toISOString().slice(0, 10)
 
-    // Fetch all calendars in parallel
-    const results = await Promise.allSettled(
-      CALENDARS.map(async (cal) => {
-        const icsUrl = `https://calendar.google.com/calendar/ical/${encodeURIComponent(cal.id)}/public/basic.ics`
-        const controller = new AbortController()
-        const timeout = setTimeout(() => controller.abort(), 15000)
-        try {
-          const res = await fetch(icsUrl, {
-            headers: { 'User-Agent': 'JCC-Bot/1.0' },
-            signal: controller.signal,
-          })
-          if (!res.ok) throw new Error(`HTTP ${res.status}`)
-          const text = await res.text()
-          return parseICS(text, cal, cutoffStr)
-        } finally {
-          clearTimeout(timeout)
-        }
-      })
-    )
-
-    // Merge all events, deduplicate by external_id
+    // Fetch calendars sequentially to avoid memory/timeout issues
     const allEvents: Array<Record<string, unknown>> = []
     const seen = new Set<string>()
     let fetchErrors = 0
 
-    for (const result of results) {
-      if (result.status === 'fulfilled') {
-        for (const ev of result.value) {
+    for (const cal of CALENDARS) {
+      const icsUrl = `https://calendar.google.com/calendar/ical/${encodeURIComponent(cal.id)}/public/basic.ics`
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 12000)
+      try {
+        const res = await fetch(icsUrl, {
+          headers: { 'User-Agent': 'JCC-Bot/1.0' },
+          signal: controller.signal,
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const text = await res.text()
+        const events = parseICS(text, cal, cutoffStr)
+        for (const ev of events) {
           const eid = ev.external_id as string
           if (!seen.has(eid)) {
             seen.add(eid)
             allEvents.push(ev)
           }
         }
-      } else {
+        console.log(`DEBUG ${cal.label}: ${events.length} events`)
+      } catch (e) {
         fetchErrors++
-        console.error('Calendar fetch error:', result.reason, { requestId })
+        console.error(`Calendar fetch error [${cal.label}]:`, String(e))
+      } finally {
+        clearTimeout(timeout)
       }
     }
 
