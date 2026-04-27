@@ -1539,17 +1539,18 @@ button, .btn-primary, .btn-secondary, .btn-danger {
 .comp-header h2 {
   font-size: 1.15rem;
   font-weight: 700;
-  color: var(--judo-navy);
+  color: #ffffff;
   margin-bottom: 4px;
 }
 
 .comp-subtitle {
   font-size: 0.85rem;
-  color: var(--gray-600);
+  color: rgba(255,255,255,0.75);
 }
 
 .comp-subtitle a {
-  color: var(--judo-navy);
+  color: rgba(255,255,255,0.9);
+  text-decoration: underline;
 }
 
 .comp-toolbar {

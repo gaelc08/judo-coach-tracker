@@ -20,8 +20,8 @@ const corsHeaders = {
 
 const BASE_URL = 'https://www.judo-moselle.fr'
 const LIST_URL = `${BASE_URL}/evenement`
-const DELAY_MS = 200
-const MAX_EVENTS = 100
+const DELAY_MS = 100
+const MAX_EVENTS = 50
 
 function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -279,9 +279,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
     console.log('DEBUG sync-competitions start:', { requestId })
 
     // ---- Scrape listing page ----
+    const listController = new AbortController()
+    const listTimeout = setTimeout(() => listController.abort(), 15000)
     const listRes = await fetch(LIST_URL, {
       headers: { 'Accept': 'text/html', 'User-Agent': 'JCC-Bot/1.0' },
+      signal: listController.signal,
     })
+    clearTimeout(listTimeout)
     if (!listRes.ok) {
       return jsonResponse({ error: `Listing fetch failed: ${listRes.status}`, requestId }, 502)
     }
@@ -310,9 +314,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
     for (const link of links) {
       await sleep(DELAY_MS)
       try {
+        const detailController = new AbortController()
+        const detailTimeout = setTimeout(() => detailController.abort(), 8000)
         const detailRes = await fetch(`${BASE_URL}${link.url}`, {
           headers: { 'Accept': 'text/html', 'User-Agent': 'JCC-Bot/1.0' },
+          signal: detailController.signal,
         })
+        clearTimeout(detailTimeout)
         if (!detailRes.ok) {
           console.warn(`DEBUG sync-competitions detail fetch failed: ${link.url} ${detailRes.status}`)
           errors++

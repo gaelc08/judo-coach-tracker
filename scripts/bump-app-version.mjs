@@ -31,9 +31,7 @@ if (!currentDateMatch || !currentIncrementMatch) {
 const currentDate = currentDateMatch[1];
 const currentIncrement = currentIncrementMatch[1];
 const width = Math.max(2, currentIncrement.length);
-const nextIncrement = currentDate === today
-  ? String(Number(currentIncrement) + 1).padStart(width, '0')
-  : '01';
+const nextIncrement = String(Number(currentIncrement) + 1).padStart(width, '0');
 const nextBuildId = `${today}-r${nextIncrement}`;
 
 envContent = replaceOrThrow(
