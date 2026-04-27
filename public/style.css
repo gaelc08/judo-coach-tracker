@@ -1570,6 +1570,19 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   padding-bottom: 2px;
 }
 
+/* btn-secondary sur fond clair (toolbar, section competitions) */
+.comp-toolbar .btn-secondary {
+  background: var(--judo-navy);
+  color: white;
+  border: 1px solid var(--judo-navy);
+  backdrop-filter: none;
+}
+
+.comp-toolbar .btn-secondary:hover {
+  background: var(--judo-red-dark);
+  border-color: var(--judo-red-dark);
+}
+
 .comp-list {
   display: flex;
   flex-direction: column;

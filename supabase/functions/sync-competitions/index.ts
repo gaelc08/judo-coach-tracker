@@ -68,13 +68,15 @@ function extractAllText(html: string, className: string): string[] {
 // Extract competition links from the listing page
 function extractEventLinks(html: string): Array<{ url: string; externalId: string; niveauCss: string }> {
   const events: Array<{ url: string; externalId: string; niveauCss: string }> = []
-  // Match agenda list items
-  const itemRe = /<a\s+href="(\/evenement\/[^"]+\/(\d+))"[^>]*class="agenda__list__item"[^>]*>([\s\S]*?)<\/a>/gi
+  // Match agenda list items — hrefs can be relative (/evenement/...) or absolute (https://www.judo-moselle.fr/evenement/...)
+  const itemRe = /<a\s+href="((?:https:\/\/www\.judo-moselle\.fr)?\/evenement\/([^/"]+)\/(\d+))"[^>]*class="agenda__list__item"[^>]*>([\s\S]*?)<\/a>/gi
   let m
   while ((m = itemRe.exec(html)) !== null) {
-    const url = m[1]
-    const externalId = m[2]
-    const itemHtml = m[3]
+    const rawUrl = m[1]
+    const externalId = m[3]
+    const itemHtml = m[4]
+    // Normalize to relative path
+    const url = rawUrl.startsWith('http') ? rawUrl.replace('https://www.judo-moselle.fr', '') : rawUrl
     // Extract niveau from class of the date div
     const dateClassRe = /class="agenda__list__item__date\s+(federal|departemental|regional|national|local)"/i
     const dc = itemHtml.match(dateClassRe)
@@ -128,15 +130,42 @@ function parseDetailPage(
     const title = extractTextByTag(html, 'h1')
     if (!title) return null
 
-    // Lieu
-    const adresseBlock = extractText(html, '.agenda__single__adresses')
-    // Try to get individual fields
-    const lieuNom = extractText(html, '.agenda__single__adresses__nom') ||
-                    extractText(html, '.agenda__single__adresses__salle') || null
-    const lieuAdresse = extractText(html, '.agenda__single__adresses__adresse') ||
-                        extractText(html, '.agenda__single__adresses__rue') || null
-    const lieuVille = extractText(html, '.agenda__single__adresses__ville') ||
-                      extractText(html, '.agenda__single__adresses__cp') || null
+    // Lieu — parse from the adresses block using text lines
+    const adresseBlockRaw = (() => {
+      const re = /class="agenda__single__adresses"[^>]*>([\s\S]*?)<\/section>/i
+      const mm = html.match(re)
+      if (mm) return mm[1]
+      // Fallback: grab up to 1000 chars after the class
+      const re2 = /class="agenda__single__adresses"[^>]*>([\s\S]{0,1000})/i
+      const mm2 = html.match(re2)
+      return mm2 ? mm2[1] : ''
+    })()
+    const adresseLines = adresseBlockRaw
+      .replace(/<[^>]+>/g, '\n')
+      .replace(/&amp;/g, '&')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/Date d'ouverture[^\n]*/gi, '')
+      .replace(/Date de clôture[^\n]*/gi, '')
+      .replace(/Informations/gi, '')
+      .replace(/Contact[\s\S]*/i, '')  // stop at Contact section
+      .split('\n')
+      .map((l: string) => l.trim())
+      .filter((l: string) => l.length > 2)
+    const lieuNom = adresseLines[0] ?? null
+    const lieuAdresse = adresseLines[1] ?? null
+    // Try to find CP + ville — look for a line that's mostly digits (CP) and next = ville
+    let lieuVille: string | null = null
+    for (let i = 0; i < adresseLines.length; i++) {
+      if (/^\d{4,5}$/.test(adresseLines[i])) {
+        lieuVille = adresseLines[i + 1] ?? null
+        break
+      }
+      // Or combined "54710 LUDRES"
+      if (/^\d{4,5}\s+\w/.test(adresseLines[i])) {
+        lieuVille = adresseLines[i].replace(/^\d{4,5}\s+/, '')
+        break
+      }
+    }
 
     // Categories — multiple divs
     const categoriesRaw = extractAllText(html, 'agenda__single__competition__age')
@@ -157,7 +186,7 @@ function parseDetailPage(
       external_id: externalId,
       title: title.trim(),
       date: dateStr,
-      lieu_nom: lieuNom || (adresseBlock ? adresseBlock.split('\n')[0]?.trim() : null) || null,
+      lieu_nom: lieuNom,
       lieu_adresse: lieuAdresse,
       lieu_ville: lieuVille,
       niveau,
