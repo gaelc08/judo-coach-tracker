@@ -1,10 +1,10 @@
 /**
  * Supabase Edge Function — sync-competitions
  *
- * Scrapes https://www.judo-moselle.fr/evenement (listing page only — single fetch)
+ * Fetches the public ICS calendar from Google (57judo@gmail.com)
  * and upserts competitions into the `competitions` table.
  *
- * No per-event detail fetches — avoids timeout and outbound fetch issues.
+ * Single ICS fetch — no per-event requests, no scraping issues.
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -14,8 +14,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const BASE_URL = 'https://www.judo-moselle.fr'
-const LIST_URL = `${BASE_URL}/evenement`
+const ICS_URL = 'https://calendar.google.com/calendar/ical/57judo%40gmail.com/public/basic.ics'
 
 function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -24,100 +23,111 @@ function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   })
 }
 
-// Map CSS class → normalized niveau
-function mapNiveau(css: string): string {
-  const map: Record<string, string> = {
-    federal: 'FEDERAL',
-    national: 'NATIONAL',
-    regional: 'REGIONAL',
-    departemental: 'DEPARTEMENTAL',
-    local: 'LOCAL',
-  }
-  return map[css.toLowerCase()] ?? css.toUpperCase()
+// Unfold ICS lines (continuation lines start with space/tab)
+function unfoldICS(raw: string): string {
+  return raw.replace(/\r\n[ \t]/g, '').replace(/\n[ \t]/g, '')
 }
 
-// Parse "01.05" with current year context
-function parseDayMonth(raw: string): { day: string; month: string } | null {
-  const m = raw.trim().match(/^(\d{1,2})\.(\d{2})$/)
-  if (!m) return null
-  return { day: m[1].padStart(2, '0'), month: m[2] }
-}
-
-function inferYear(month: number, day: number): number {
-  const now = new Date()
-  const currentYear = now.getFullYear()
-  const currentMonth = now.getMonth() + 1
-  const currentDay = now.getDate()
-  // If the month.day is before today (by more than 7 days), it's next year
-  if (month < currentMonth || (month === currentMonth && day < currentDay - 7)) {
-    return currentYear + 1
-  }
-  return currentYear
-}
-
-function extractText(html: string, className: string): string {
-  const re = new RegExp(`class="[^"]*${className}[^"]*"[^>]*>([\\s\\S]*?)</(?:div|span|a)>`, 'i')
-  const m = html.match(re)
+// Get a property value from a VEVENT block
+function getProp(block: string, name: string): string {
+  // Handles NAME:value and NAME;PARAM=...:value
+  const re = new RegExp(`^${name}(?:;[^:]*)?:(.*)$`, 'm')
+  const m = block.match(re)
   if (!m) return ''
-  return m[1].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').trim()
+  return m[1]
+    .replace(/\\n/g, '\n')
+    .replace(/\\,/g, ',')
+    .replace(/\\;/g, ';')
+    .replace(/\\\\/g, '\\')
+    .trim()
 }
 
-function parseListPage(html: string): Array<Record<string, unknown>> {
-  const results: Array<Record<string, unknown>> = []
+// Parse ICS DATE or DATETIME to a YYYY-MM-DD string (Paris timezone aware)
+function parseICSDate(raw: string): string | null {
+  const cleaned = raw.trim()
+  // DATE-only: 20260501
+  if (/^\d{8}$/.test(cleaned)) {
+    return `${cleaned.slice(0,4)}-${cleaned.slice(4,6)}-${cleaned.slice(6,8)}`
+  }
+  // DATETIME UTC: 20260501T090000Z
+  if (/^\d{8}T\d{6}Z$/.test(cleaned)) {
+    const d = new Date(
+      `${cleaned.slice(0,4)}-${cleaned.slice(4,6)}-${cleaned.slice(6,8)}T${cleaned.slice(9,11)}:${cleaned.slice(11,13)}:${cleaned.slice(13,15)}Z`
+    )
+    // Convert to Paris date
+    const paris = d.toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' })
+    return paris  // returns YYYY-MM-DD
+  }
+  // DATETIME local (no Z): 20260501T090000
+  if (/^\d{8}T\d{6}$/.test(cleaned)) {
+    return `${cleaned.slice(0,4)}-${cleaned.slice(4,6)}-${cleaned.slice(6,8)}`
+  }
+  return null
+}
 
-  // Match all list items
-  const itemRe = /<a\s+href="((?:https:\/\/www\.judo-moselle\.fr)?\/evenement\/([^/"]+)\/(\d+))"[^>]*class="agenda__list__item"[^>]*>([\s\S]*?)<\/a>/gi
-  let m: RegExpExecArray | null
+// Parse location into nom + ville
+function parseLocation(loc: string): { lieu_nom: string | null; lieu_ville: string | null } {
+  if (!loc) return { lieu_nom: null, lieu_ville: null }
+  const parts = loc.split(/\\n|\n|,/).map((p) => p.trim()).filter(Boolean)
+  // Last part often "France" — ignore it
+  const meaningful = parts.filter((p) => !/^france$/i.test(p))
+  if (meaningful.length === 0) return { lieu_nom: null, lieu_ville: null }
+  if (meaningful.length === 1) return { lieu_nom: null, lieu_ville: meaningful[0] }
+  // Try to find a part that looks like "XXXXX CityName" (postal code + city)
+  const cityPart = meaningful.find((p) => /^\d{4,5}\s+\w/.test(p))
+  if (cityPart) {
+    const city = cityPart.replace(/^\d{4,5}\s+/, '')
+    const nom = meaningful.filter((p) => p !== cityPart)[0] ?? null
+    return { lieu_nom: nom, lieu_ville: city }
+  }
+  return { lieu_nom: meaningful[0], lieu_ville: meaningful[meaningful.length - 1] }
+}
 
-  while ((m = itemRe.exec(html)) !== null) {
-    const rawUrl = m[1]
-    const externalId = m[3]
-    const itemHtml = m[4]
-    const url = rawUrl.startsWith('http') ? rawUrl.replace('https://www.judo-moselle.fr', '') : rawUrl
+function parseICS(icalText: string): Array<Record<string, unknown>> {
+  const unfolded = unfoldICS(icalText)
+  const events: Array<Record<string, unknown>> = []
 
-    // Date
-    const dateRaw = extractText(itemHtml, 'agenda__list__item__date__day') ||
-                    extractText(itemHtml, 'agenda__list__item__date')
-    const parsed = parseDayMonth(dateRaw)
-    if (!parsed) continue
+  const eventBlocks = unfolded.split(/(?=BEGIN:VEVENT)/)
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - 7)
+  const cutoffStr = cutoff.toISOString().slice(0, 10)
 
-    const dayNum = parseInt(parsed.day, 10)
-    const monthNum = parseInt(parsed.month, 10)
-    const year = inferYear(monthNum, dayNum)
-    const dateStr = `${year}-${parsed.month}-${parsed.day}`
+  for (const block of eventBlocks) {
+    if (!block.includes('BEGIN:VEVENT')) continue
 
-    // Title
-    const title = extractText(itemHtml, 'agenda__list__item__title')
-    if (!title) continue
+    const uid = getProp(block, 'UID')
+    if (!uid) continue
 
-    // Lieu (often empty in list)
-    const lieu = extractText(itemHtml, 'agenda__list__item__lieu') || null
+    const summary = getProp(block, 'SUMMARY')
+    if (!summary) continue
 
-    // Type (COMPETITION, STAGE, PASSAGE DE GRADE...)
-    const typeRaw = extractText(itemHtml, 'agenda__list__item__categorie') || null
+    // Get DTSTART value (may have params: DTSTART;TZID=...:value)
+    const dtRaw = getProp(block, 'DTSTART')
+    const dateStr = parseICSDate(dtRaw)
+    if (!dateStr || dateStr < cutoffStr) continue
 
-    // Niveau from CSS class
-    const dateClassRe = /class="agenda__list__item__date\s+(federal|departemental|regional|national|local)"/i
-    const dc = itemHtml.match(dateClassRe)
-    const niveau = dc ? mapNiveau(dc[1]) : 'LOCAL'
+    const location = getProp(block, 'LOCATION')
+    const description = getProp(block, 'DESCRIPTION')
+    const { lieu_nom, lieu_ville } = parseLocation(location)
 
-    results.push({
-      external_id: externalId,
-      title: title.trim(),
+    // Use UID as external_id (stable across syncs)
+    events.push({
+      external_id: uid,
+      title: summary,
       date: dateStr,
-      lieu_nom: lieu,
+      lieu_nom,
       lieu_adresse: null,
-      lieu_ville: null,
-      niveau,
+      lieu_ville,
+      niveau: null,
       categories: null,
-      type_competition: typeRaw ? typeRaw.toUpperCase() : null,
-      commentaire: null,
-      url_source: `${BASE_URL}${url}`,
+      type_competition: null,
+      commentaire: description || null,
+      url_source: 'https://calendar.google.com/calendar/embed?src=57judo@gmail.com',
       updated_at: new Date().toISOString(),
     })
   }
 
-  return results
+  return events
 }
 
 // ---- Main handler ----
@@ -152,7 +162,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader
 
-    // Check JWT role claim (service_role) or user admin claim
     let isAuthorized = false
     try {
       const payload = JSON.parse(atob(token.split('.')[1]))
@@ -168,57 +177,48 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return jsonResponse({ error: 'Forbidden: admin only', requestId }, 403)
     }
 
-    // ---- Single fetch of the listing page ----
+    // ---- Fetch ICS ----
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 20000)
-    let listRes: Response | undefined
+    let icsRes: Response | undefined
     try {
-      listRes = await fetch(LIST_URL, {
-        headers: { 'Accept': 'text/html', 'User-Agent': 'Mozilla/5.0 (compatible; JCC-Bot/1.0)' },
+      icsRes = await fetch(ICS_URL, {
+        headers: { 'User-Agent': 'JCC-Bot/1.0' },
         signal: controller.signal,
       })
     } finally {
       clearTimeout(timeout)
     }
 
-    if (!listRes || !listRes.ok) {
-      return jsonResponse({ error: `Fetch failed: ${listRes?.status ?? 'aborted'}`, requestId }, 502)
+    if (!icsRes || !icsRes.ok) {
+      return jsonResponse({ error: `ICS fetch failed: ${icsRes?.status ?? 'aborted'}`, requestId }, 502)
     }
 
-    const html = await listRes.text()
-    console.log('DEBUG html length:', html.length, { requestId })
+    const icsText = await icsRes.text()
+    console.log('DEBUG ics length:', icsText.length, { requestId })
 
-    const competitions = parseListPage(html)
+    const competitions = parseICS(icsText)
     console.log('DEBUG parsed competitions:', competitions.length, { requestId })
 
     if (competitions.length === 0) {
-      return jsonResponse({ synced: 0, errors: 0, skipped: 0, note: 'No events parsed from listing page', requestId })
-    }
-
-    // Cutoff: only future events (date >= today - 7 days)
-    const cutoff = new Date()
-    cutoff.setDate(cutoff.getDate() - 7)
-    const cutoffStr = cutoff.toISOString().slice(0, 10)
-
-    const toSync = competitions.filter((c) => (c.date as string) >= cutoffStr)
-    const skipped = competitions.length - toSync.length
-
-    if (toSync.length === 0) {
-      return jsonResponse({ synced: 0, errors: 0, skipped, requestId })
+      return jsonResponse({ synced: 0, errors: 0, skipped: 0, note: 'No future events in ICS', requestId })
     }
 
     // Batch upsert
     const { error: upsertError } = await supabaseAdmin
       .from('competitions')
-      .upsert(toSync, { onConflict: 'external_id' })
+      .upsert(competitions, { onConflict: 'external_id' })
 
     if (upsertError) {
       console.error('DEBUG upsert error:', upsertError.message, { requestId })
-      return jsonResponse({ synced: 0, errors: toSync.length, skipped, note: upsertError.message, requestId }, 500)
+      return jsonResponse({ synced: 0, errors: competitions.length, skipped: 0, note: upsertError.message, requestId }, 500)
     }
 
-    console.log('DEBUG sync done:', { synced: toSync.length, skipped, requestId })
-    return jsonResponse({ synced: toSync.length, errors: 0, skipped, requestId })
+    // Clear old entries from the judo-moselle.fr scraping (different external_id format)
+    // (optional — just leave them, they'll be filtered by date anyway)
+
+    console.log('DEBUG sync done:', { synced: competitions.length, requestId })
+    return jsonResponse({ synced: competitions.length, errors: 0, skipped: 0, requestId })
 
   } catch (e) {
     console.error('DEBUG unexpected error:', String(e), { requestId })
