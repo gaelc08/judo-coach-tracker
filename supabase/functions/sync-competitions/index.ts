@@ -20,8 +20,8 @@ const corsHeaders = {
 
 const BASE_URL = 'https://www.judo-moselle.fr'
 const LIST_URL = `${BASE_URL}/evenement`
-const DELAY_MS = 100
-const MAX_EVENTS = 50
+const DELAY_MS = 50
+const MAX_EVENTS = 30
 
 function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -300,13 +300,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // ---- Scrape listing page ----
     const listController = new AbortController()
     const listTimeout = setTimeout(() => listController.abort(), 15000)
-    const listRes = await fetch(LIST_URL, {
-      headers: { 'Accept': 'text/html', 'User-Agent': 'JCC-Bot/1.0' },
-      signal: listController.signal,
-    })
-    clearTimeout(listTimeout)
-    if (!listRes.ok) {
-      return jsonResponse({ error: `Listing fetch failed: ${listRes.status}`, requestId }, 502)
+    let listRes: Response | undefined
+    try {
+      listRes = await fetch(LIST_URL, {
+        headers: { 'Accept': 'text/html', 'User-Agent': 'JCC-Bot/1.0' },
+        signal: listController.signal,
+      })
+    } finally {
+      clearTimeout(listTimeout)
+    }
+    if (!listRes || !listRes.ok) {
+      return jsonResponse({ error: `Listing fetch failed: ${listRes?.status ?? 'aborted'}`, requestId }, 502)
     }
     const listHtml = await listRes.text()
     const allLinks = extractEventLinks(listHtml)
@@ -319,7 +323,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return true
     }).slice(0, MAX_EVENTS)
 
-    console.log('DEBUG sync-competitions links found:', links.length, { requestId })
+    console.log('DEBUG sync-competitions links found:', allLinks.length, 'processing:', links.length, { requestId })
+
+    // Fetch already-known external_ids to skip them on re-sync
+    const { data: existing } = await supabaseAdmin
+      .from('competitions')
+      .select('external_id')
+    const knownIds = new Set((existing ?? []).map((r: { external_id: string }) => r.external_id))
+    const newLinks = links.filter((l) => !knownIds.has(l.externalId))
+    console.log('DEBUG sync-competitions new links to fetch:', newLinks.length, { requestId })
 
     // Cutoff: only process events with date >= today - 7 days
     const cutoff = new Date()
@@ -330,22 +342,26 @@ Deno.serve(async (req: Request): Promise<Response> => {
     let errors = 0
     let skipped = 0
 
-    for (const link of links) {
+    for (const link of newLinks) {
       await sleep(DELAY_MS)
       try {
         const detailController = new AbortController()
         const detailTimeout = setTimeout(() => detailController.abort(), 8000)
-        const detailRes = await fetch(`${BASE_URL}${link.url}`, {
-          headers: { 'Accept': 'text/html', 'User-Agent': 'JCC-Bot/1.0' },
-          signal: detailController.signal,
-        })
-        clearTimeout(detailTimeout)
-        if (!detailRes.ok) {
-          console.warn(`DEBUG sync-competitions detail fetch failed: ${link.url} ${detailRes.status}`)
+        let detailRes: Response | undefined
+        try {
+          detailRes = await fetch(`${BASE_URL}${link.url}`, {
+            headers: { 'Accept': 'text/html', 'User-Agent': 'JCC-Bot/1.0' },
+            signal: detailController.signal,
+          })
+        } finally {
+          clearTimeout(detailTimeout)
+        }
+        if (!detailRes || !detailRes.ok) {
+          console.warn(`DEBUG sync-competitions detail fetch failed: ${link.url} ${detailRes?.status ?? 'aborted'}`)
           errors++
           continue
         }
-        const detailHtml = await detailRes.text()
+        const detailHtml = await detailRes!.text()
         const competition = parseDetailPage(detailHtml, link.externalId, link.url, link.niveauCss)
 
         if (!competition) {
