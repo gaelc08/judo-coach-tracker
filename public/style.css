@@ -1523,3 +1523,173 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   z-index: 9999;
   user-select: none;
 }
+
+/* ===== Competitions section ===== */
+.competitions-section {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.comp-header {
+  margin-bottom: 4px;
+}
+
+.comp-header h2 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--judo-navy);
+  margin-bottom: 4px;
+}
+
+.comp-subtitle {
+  font-size: 0.85rem;
+  color: var(--gray-600);
+}
+
+.comp-subtitle a {
+  color: var(--judo-navy);
+}
+
+.comp-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  background: rgba(255,255,255,0.97);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.comp-toolbar-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding-bottom: 2px;
+}
+
+.comp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.comp-status {
+  background: rgba(255,255,255,0.97);
+  border-radius: var(--radius);
+  padding: 20px;
+  text-align: center;
+  color: var(--gray-600);
+  font-size: 0.92rem;
+}
+
+.comp-empty {
+  font-style: italic;
+}
+
+.comp-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  transition: box-shadow 0.15s;
+}
+
+.comp-card--selected {
+  border-left: 4px solid var(--judo-gold);
+}
+
+.comp-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.comp-card-date {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--judo-navy);
+  flex: 1 1 160px;
+}
+
+.comp-card-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.comp-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.comp-club-badge {
+  font-size: 0.78rem;
+  color: var(--judo-gold);
+  font-weight: 700;
+}
+
+.comp-select-btn {
+  margin-left: auto;
+  padding: 4px 10px;
+  font-size: 1rem;
+  line-height: 1;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.comp-select-btn--on {
+  background: var(--judo-gold-light) !important;
+  border-color: var(--judo-gold) !important;
+  color: var(--judo-navy) !important;
+}
+
+.comp-card-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--gray-900);
+}
+
+.comp-card-lieu,
+.comp-card-categories,
+.comp-card-type,
+.comp-card-commentaire {
+  font-size: 0.86rem;
+  color: var(--gray-700);
+}
+
+.comp-card-commentaire {
+  font-style: italic;
+  white-space: pre-wrap;
+  border-top: 1px solid var(--gray-200);
+  padding-top: 6px;
+  margin-top: 2px;
+}
+
+.comp-card-link a {
+  font-size: 0.82rem;
+  color: var(--judo-navy);
+  text-decoration: underline;
+}
+
+@media (max-width: 600px) {
+  .comp-toolbar {
+    flex-direction: column;
+  }
+  .comp-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .comp-select-btn {
+    margin-left: 0;
+  }
+}
