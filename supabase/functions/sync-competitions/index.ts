@@ -53,6 +53,18 @@ const CALENDARS = [
     niveau: 'REGIONAL',
   },
   {
+    id: '76tp6iij9jpfgm83f0emjeigu8@group.calendar.google.com',
+    label: 'KATA LGEJ',
+    categories: [],
+    niveau: 'REGIONAL',
+  },
+  {
+    id: 'hpnflmcd93p28art374kpp6l20@group.calendar.google.com',
+    label: 'FORMATION LGEJ',
+    categories: [],
+    niveau: 'REGIONAL',
+  },
+  {
     id: '57judo@gmail.com',
     label: 'Moselle Judo',
     categories: [],
