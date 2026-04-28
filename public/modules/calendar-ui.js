@@ -65,11 +65,12 @@ export function clearCoachForm() {
 export function updateCoachGreeting(user, coach, isAdmin) {
   const el = document.getElementById('coachGreeting');
   if (!el) return;
-  if (!user) { el.textContent = ''; return; }
+  if (!user) { el.textContent = ''; el.style.display = 'none'; return; }
   const displayName = coach ? __getCoachDisplayName(coach) : (user.email || user.id);
   el.textContent = isAdmin
     ? `Bonjour ${displayName} (admin)`
     : `Bonjour ${displayName}`;
+  el.style.display = '';
 }
 
 // ===== File upload =====
@@ -96,9 +97,13 @@ export async function updateCalendar() {
   calendar.innerHTML = '';
 
   if (!currentCoach || !currentMonth) {
+    document.querySelector('.legend.card')?.style && (document.querySelector('.legend.card').style.display = 'none');
     updateFreezeUI();
     return;
   }
+
+  // Afficher la légende quand un planning est affiché
+  document.querySelector('.legend.card')?.style && (document.querySelector('.legend.card').style.display = '');
 
   const [year, month] = currentMonth.split('-').map(Number);
   const daysInMonth = new Date(year, month, 0).getDate();
