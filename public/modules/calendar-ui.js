@@ -66,10 +66,13 @@ export function updateCoachGreeting(user, coach, isAdmin) {
   const el = document.getElementById('coachGreeting');
   if (!el) return;
   if (!user) { el.textContent = ''; el.style.display = 'none'; return; }
-  const displayName = coach ? __getCoachDisplayName(coach) : (user.email || user.id);
-  el.textContent = isAdmin
-    ? `Bonjour ${displayName} (admin)`
-    : `Bonjour ${displayName}`;
+  // Priorité : prénom du profil > prénom user_metadata > email
+  const firstName = coach?.first_name?.trim()
+    || user.user_metadata?.first_name?.trim()
+    || user.user_metadata?.firstname?.trim()
+    || null;
+  const displayName = firstName || (coach ? __getCoachDisplayName(coach) : (user.email || user.id));
+  el.textContent = `Bonjour ${displayName},`;
   el.style.display = '';
 }
 
