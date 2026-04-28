@@ -134,8 +134,8 @@ export async function saveCoach() {
 
   let res;
   const dbPromise = (editMode && editingCoachId)
-    ? _supabase.from('users').update([coachData]).eq('id', editingCoachId).select()
-    : _supabase.from('users').insert([coachData]).select();
+    ? _supabase.from('profiles').update([coachData]).eq('id', editingCoachId).select()
+    : _supabase.from('profiles').insert([coachData]).select();
 
   try {
     res = await Promise.race([dbPromise, timeoutPromise]);
@@ -191,7 +191,7 @@ export async function deleteCoach() {
     }
   }
 
-  const { error: e1 } = await _supabase.from('users').delete().eq('id', editingCoachId);
+  const { error: e1 } = await _supabase.from('profiles').delete().eq('id', editingCoachId);
   if (e1) { alert('Erreur lors de la suppression : ' + e1.message); return; }
 
   await _supabase.from('time_data').delete().eq('coach_id', editingCoachId);

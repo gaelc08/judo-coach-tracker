@@ -187,7 +187,7 @@ serve(async (req) => {
     }
 
     const { data: users, error: usersError } = await supabase
-      .from("users")
+      .from("profiles")
       .select("id, name, first_name, email, profile_type, hourly_rate, daily_allowance, km_rate, fiscal_power")
       .in("id", coachIds);
 

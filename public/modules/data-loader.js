@@ -42,11 +42,11 @@ export async function loadAllDataFromSupabase({ isAdminOverride } = {}) {
   // --- Coaches ---
   let newCoaches = [];
   if (isAdmin) {
-    const res = await _restSelect('users');
+    const res = await _restSelect('profiles');
     if (res.error) throw new Error(res.error.message);
     newCoaches = (res.data || []).map(d => ({ id: d.id, ...d }));
   } else {
-    let res = await _restSelect('users', { filters: [['owner_uid', 'eq', currentUser.id]] });
+    let res = await _restSelect('profiles', { filters: [['owner_uid', 'eq', currentUser.id]] });
     if (res.error) throw new Error(res.error.message);
     let rows = res.data || [];
 
@@ -62,7 +62,7 @@ export async function loadAllDataFromSupabase({ isAdminOverride } = {}) {
         body: '{}',
       });
       if (claimRes.ok) {
-        res = await _restSelect('users', { filters: [['owner_uid', 'eq', currentUser.id]] });
+        res = await _restSelect('profiles', { filters: [['owner_uid', 'eq', currentUser.id]] });
         if (res.error) throw new Error(res.error.message);
         rows = res.data || [];
       } else {
