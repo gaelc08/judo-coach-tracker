@@ -181,8 +181,14 @@ export function setupAuthListeners() {
     console.log('DEBUG onAuthStateChange:', event, session);
     setCurrentSession(session || null);
     setCurrentAccessToken(session?.access_token || null);
-    invalidateAdminCache();
     window.__lastSession = session;
+
+    // Ne pas recharger l'UI sur les refresh de token silencieux
+    if (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+      if (event !== 'INITIAL_SESSION') return; // TOKEN_REFRESHED = juste mettre à jour le token
+    }
+
+    invalidateAdminCache();
 
     if (currentAccessToken) {
       console.log('DEBUG access token present:', String(currentAccessToken).slice(0, 12) + '...');
