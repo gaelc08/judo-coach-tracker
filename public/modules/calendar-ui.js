@@ -238,9 +238,9 @@ export function openDayModal(dateStr) {
   if (compCb) compCb.checked = !!data.competition;
 
   // Existing justification links
-  _showJustificationLink('peageLink', data.peage_url);
-  _showJustificationLink('hotelLink', data.hotel_url);
-  _showJustificationLink('achatLink', data.achat_url);
+  _showJustificationLink('peageLink', data.justificationUrl);
+  _showJustificationLink('hotelLink', data.hotelJustificationUrl);
+  _showJustificationLink('achatLink', data.achatJustificationUrl);
 
   // Reset file inputs
   ['peageFile', 'hotelFile', 'achatFile'].forEach((id) => {
@@ -296,22 +296,22 @@ export async function saveDay() {
   const key = `${currentCoach.id}-${selectedDay}`;
   const existing = timeData[key] || {};
 
-  if (peage > 0 && !peageFile && !existing.peage_url) {
+  if (peage > 0 && !peageFile && !existing.justificationUrl) {
     alert('Veuillez joindre un justificatif de péage.');
     return;
   }
-  if (hotel > 0 && !hotelFile && !existing.hotel_url) {
+  if (hotel > 0 && !hotelFile && !existing.hotelJustificationUrl) {
     alert('Veuillez joindre un justificatif d\'hébergement.');
     return;
   }
-  if (achat > 0 && !achatFile && !existing.achat_url) {
+  if (achat > 0 && !achatFile && !existing.achatJustificationUrl) {
     alert('Veuillez joindre un justificatif d\'achat.');
     return;
   }
 
-  let peageUrl = existing.peage_url || null;
-  let hotelUrl = existing.hotel_url || null;
-  let achatUrl = existing.achat_url || null;
+  let peageUrl = existing.justificationUrl || null;
+  let hotelUrl = existing.hotelJustificationUrl || null;
+  let achatUrl = existing.achatJustificationUrl || null;
 
   if (peageFile) peageUrl = await __uploadExpenseJustification(peageFile, 'peage');
   if (hotelFile) hotelUrl = await __uploadExpenseJustification(hotelFile, 'hotel');
@@ -327,9 +327,9 @@ export async function saveDay() {
     achat,
     notes,
     competition,
-    peage_url: peageUrl,
-    hotel_url: hotelUrl,
-    achat_url: achatUrl,
+    justification_url: peageUrl,
+    hotel_justification_url: hotelUrl,
+    achat_justification_url: achatUrl,
   };
 
   const { data: saved, error } = await _supabase
