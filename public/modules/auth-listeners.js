@@ -265,7 +265,9 @@ export function setupAuthListeners() {
         if (id === 'adminActionsPanel' || id === 'importGroup') {
           el.style.display = isAdmin ? (id === 'importGroup' ? 'flex' : 'block') : 'none';
         } else {
-          el.style.display = isAdmin ? 'inline-block' : 'none';
+          // Si le bouton est dans la sidebar, utiliser 'block' (pas 'inline-block')
+          const inSidebar = el.closest('#appSidebar');
+          el.style.display = isAdmin ? (inSidebar ? 'block' : 'inline-block') : 'none';
         }
       });
 
