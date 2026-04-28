@@ -50,7 +50,7 @@ export function setupEventListeners() {
     inviteCoach, inviteAdmin,
     openDayModal, saveDay, deleteDay,
     toggleFreezeMonth,
-    openAuditLogsModal, openHelloAssoModal,
+    openAuditLogsModal, loadAuditLogs, openHelloAssoModal,
     exportDeclarationXLS, exportTimesheetHTML,
     exportExpenseHTML, exportMonthlyExpenses,
     openMileagePreviewModal, openMonthlySummaryPreviewModal,
@@ -222,6 +222,9 @@ export function setupEventListeners() {
 
   // Bouton Aide
   bindClick('helpBtn', () => document.getElementById('helpModal')?.classList.add('active'));
+
+  // Bouton Actualiser dans l'historique
+  bindClick('refreshAuditLogsBtn', () => _handlers.loadAuditLogs?.());
 
   // Calendar days (delegated on calendarGrid)
   const calendarGrid = document.getElementById('calendarGrid');

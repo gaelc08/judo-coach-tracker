@@ -297,6 +297,7 @@ initEventListeners({
   deleteDay,
   toggleFreezeMonth,
   openAuditLogsModal,
+  loadAuditLogs,
   openHelloAssoModal,
   exportDeclarationXLS,
   exportTimesheetHTML,
