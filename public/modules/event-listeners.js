@@ -180,6 +180,11 @@ export function setupEventListeners() {
     btn.onclick = () => btn.closest('.modal')?.classList.remove('active');
   });
 
+  // Fermer les modals via leurs boutons dédiés
+  ['closeAuditLogs', 'closeHelloAsso', 'closeHelp'].forEach((id) => {
+    bindClick(id, () => document.getElementById(id)?.closest('.modal')?.classList.remove('active'));
+  });
+
   // Calendar days (delegated on calendarGrid)
   const calendarGrid = document.getElementById('calendarGrid');
   if (calendarGrid) {
