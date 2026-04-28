@@ -21,6 +21,7 @@ let _setupEventListeners = null;
 let _inviteFlowActive = false;
 let __adminCache = { userId: null, value: null, atMs: 0 };
 let __adminInFlight = null;
+let __adminFirstNameCache = null; // cache prénom admin pour éviter flicker
 
 export function initAuthListeners({
   supabase,
@@ -290,13 +291,20 @@ export function setupAuthListeners() {
       }
 
       _updateCoachGreeting?.(user, !isAdmin && coaches.length > 0 ? coaches[0] : null, isAdmin);
-      // Pour l'admin, recharger le prénom depuis admin_profiles (l'appel async précédent peut avoir été écrasé)
+      // Pour l'admin, charger le prénom depuis admin_profiles — avec cache pour éviter le flicker
       if (isAdmin) {
-        _supabase.from('admin_profiles').select('first_name').maybeSingle()
-          .then(({ data: ap }) => {
-            if (ap?.first_name) _updateCoachGreeting?.(user, { first_name: ap.first_name }, isAdmin);
-          })
-          .catch(() => {});
+        if (__adminFirstNameCache) {
+          _updateCoachGreeting?.(user, { first_name: __adminFirstNameCache }, isAdmin);
+        } else {
+          _supabase.from('admin_profiles').select('first_name').maybeSingle()
+            .then(({ data: ap }) => {
+              if (ap?.first_name) {
+                __adminFirstNameCache = ap.first_name;
+                _updateCoachGreeting?.(user, { first_name: ap.first_name }, isAdmin);
+              }
+            })
+            .catch(() => {});
+        }
       }
 
       if (!__eventListenersSetup) {
