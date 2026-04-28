@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/brand.css">
-    <link rel="stylesheet" href="style.css?v=2026-04-28-r10">
+    <link rel="stylesheet" href="style.css?v=2026-04-28-r11">
   </head>
 <body>
   <div id="envBanner" class="env-banner" style="display:none"></div>
@@ -97,6 +97,7 @@
 
         <div class="sidebar-section sidebar-admin" style="display:none" id="sidebarAdminSection">
           <div class="sidebar-admin-title">⚙️ Administration</div>
+          <button id="adminProfileBtn" class="sidebar-nav-btn btn-secondary" style="display:none">👤 Mon profil admin</button>
           <button id="addCoachBtn" class="sidebar-nav-btn btn-secondary" style="display:none">+ Ajout utilisateur</button>
           <button id="editCoachBtn" class="sidebar-nav-btn btn-secondary" style="display:none">✏️ Modifier</button>
           <button id="inviteAdminBtn" class="sidebar-nav-btn btn-secondary" style="display:none">✉️ Inviter admin</button>
@@ -120,6 +121,10 @@
         <!-- Boutons déplacés dans la sidebar (#appSidebar) -->
       </div>
 
+      <!-- Calendar -->
+      <div id="frozenBanner" class="frozen-banner" style="display:none">🔒 Cette fiche est gelée — les modifications ne sont pas autorisées.</div>
+      <div id="calendar" class="calendar card"></div>
+
       <!-- Legend -->
       <div class="legend card">
         <span class="legend-item"><span class="legend-dot weekend"></span>Week-end</span>
@@ -129,10 +134,6 @@
         <span class="legend-item"><span class="legend-dot has-competition"></span>Compétition</span>
         <span class="legend-item"><span class="legend-dot has-purchase"></span>Achat</span>
       </div>
-
-      <!-- Calendar -->
-      <div id="frozenBanner" class="frozen-banner" style="display:none">🔒 Cette fiche est gelée — les modifications ne sont pas autorisées.</div>
-      <div id="calendar" class="calendar card"></div>
 
       <!-- Summary -->
       <div class="summary card">
@@ -191,6 +192,38 @@
 
 <!-- Competitions section -->
       <div id="competitionsSection" class="competitions-section" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- Admin profile modal -->
+  <div id="adminProfileModal" class="modal">
+    <div class="modal-content">
+      <h2>👤 Mon profil administrateur</h2>
+      <label>Nom
+        <input id="adminProfileName" type="text" placeholder="Nom">
+      </label>
+      <label>Prénom
+        <input id="adminProfileFirstName" type="text" placeholder="Prénom">
+      </label>
+      <label>Fonction
+        <input id="adminProfileFunction" type="text" placeholder="Ex : Président, Trésorier...">
+      </label>
+      <label>Adresse
+        <input id="adminProfileAddress" type="text" placeholder="Adresse postale">
+      </label>
+      <label>Véhicule
+        <input id="adminProfileVehicle" type="text" placeholder="Ex : Renault Clio">
+      </label>
+      <label>Puissance fiscale
+        <input id="adminProfileFiscalPower" type="number" min="1" max="20" placeholder="CV fiscaux">
+      </label>
+      <label>Taux km (€/km)
+        <input id="adminProfileKmRate" type="number" step="0.001" placeholder="0.35">
+      </label>
+      <div class="modal-actions">
+        <button id="saveAdminProfile" class="btn-primary">Sauvegarder</button>
+        <button id="cancelAdminProfile" class="btn-secondary">Annuler</button>
+      </div>
     </div>
   </div>
 
@@ -511,6 +544,6 @@
 
   <div id="appVersion" class="app-version"></div>
 
-  <script type="module" src="app-modular.js?v=2026-04-28-r10"></script>
+  <script type="module" src="app-modular.js?v=2026-04-28-r11"></script>
 </body>
 </html>

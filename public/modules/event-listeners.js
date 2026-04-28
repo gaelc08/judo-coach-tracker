@@ -129,6 +129,41 @@ export function setupEventListeners() {
   bindClick('helloAssoBtn', () => openHelloAssoModal?.());
   bindClick('competitionsBtn', () => toggleCompetitionsSection());
 
+  // Admin profile modal
+  bindClick('adminProfileBtn', async () => {
+    // Load existing profile
+    const { data } = await supabase.from('admin_profiles').select('*').limit(1).maybeSingle();
+    const f = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+    f('adminProfileName',        data?.name);
+    f('adminProfileFirstName',   data?.first_name);
+    f('adminProfileFunction',    data?.function_title);
+    f('adminProfileAddress',     data?.address);
+    f('adminProfileVehicle',     data?.vehicle);
+    f('adminProfileFiscalPower', data?.fiscal_power);
+    f('adminProfileKmRate',      data?.km_rate ?? 0.35);
+    document.getElementById('adminProfileModal')?.classList.add('active');
+  });
+  bindClick('cancelAdminProfile', () => document.getElementById('adminProfileModal')?.classList.remove('active'));
+  bindClick('saveAdminProfile', async () => {
+    const g = (id) => document.getElementById(id)?.value?.trim() || null;
+    const payload = {
+      name:           g('adminProfileName'),
+      first_name:     g('adminProfileFirstName'),
+      function_title: g('adminProfileFunction'),
+      address:        g('adminProfileAddress'),
+      vehicle:        g('adminProfileVehicle'),
+      fiscal_power:   g('adminProfileFiscalPower'),
+      km_rate:        parseFloat(document.getElementById('adminProfileKmRate')?.value) || 0.35,
+      updated_at:     new Date().toISOString(),
+    };
+    const user = (await supabase.auth.getUser()).data?.user;
+    if (!user) { alert('Non connecté.'); return; }
+    payload.owner_uid = user.id;
+    const { error } = await supabase.from('admin_profiles').upsert([payload], { onConflict: 'owner_uid' });
+    if (error) { alert('Erreur : ' + error.message); return; }
+    document.getElementById('adminProfileModal')?.classList.remove('active');
+  });
+
   // Export — IDs correspondent aux boutons dans index.html
   bindClick('exportMonthlyExpensesBtn',   () => openMonthlySummaryPreviewModal?.());
   bindClick('backupBtn',                  () => exportBackupJSON?.());
