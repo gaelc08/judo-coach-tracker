@@ -272,15 +272,7 @@ export function setupAuthListeners() {
       });
 
       if (select) select.disabled = !isAdmin;
-
-      // Charger le profil admin en amont (si admin) pour n'appeler le greeting qu'une fois avec le bon prénom
-      let adminFirstName = null;
-      if (isAdmin) {
-        try {
-          const { data: ap } = await _supabase.from('admin_profiles').select('first_name').maybeSingle();
-          adminFirstName = ap?.first_name || null;
-        } catch (_) {}
-      }
+      _updateCoachGreeting?.(user, null, isAdmin);
 
       const prevCoaches    = coaches.slice();
       const prevCurrentCoach = currentUser;
@@ -297,11 +289,15 @@ export function setupAuthListeners() {
         if (select) _loadCoaches?.();
       }
 
-      // Un seul appel au greeting avec le bon prénom
-      const greetingCoach = isAdmin
-        ? (adminFirstName ? { first_name: adminFirstName } : null)
-        : (coaches.length > 0 ? coaches[0] : null);
-      _updateCoachGreeting?.(user, greetingCoach, isAdmin);
+      _updateCoachGreeting?.(user, !isAdmin && coaches.length > 0 ? coaches[0] : null, isAdmin);
+      // Pour l'admin, recharger le prénom depuis admin_profiles (l'appel async précédent peut avoir été écrasé)
+      if (isAdmin) {
+        _supabase.from('admin_profiles').select('first_name').maybeSingle()
+          .then(({ data: ap }) => {
+            if (ap?.first_name) _updateCoachGreeting?.(user, { first_name: ap.first_name }, isAdmin);
+          })
+          .catch(() => {});
+      }
 
       if (!__eventListenersSetup) {
         _setupEventListeners?.();
