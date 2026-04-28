@@ -229,6 +229,8 @@ export function setupEventListeners() {
       const isVisible = adminPanelEl.style.display !== 'none' && adminPanelEl.style.display !== '';
       sidebarAdminEl.style.display = isVisible ? 'block' : 'none';
     };
+    // Sync état initial (le changement a peut-être eu lieu avant la création de l'observer)
+    syncAdminSection();
     const adminObserver = new MutationObserver(syncAdminSection);
     adminObserver.observe(adminPanelEl, { attributes: true, attributeFilter: ['style'] });
   }
