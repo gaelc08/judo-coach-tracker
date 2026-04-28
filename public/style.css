@@ -2336,3 +2336,17 @@ body.sidebar-open {
 #adminActionsPanel {
   display: none !important;
 }
+
+/* ===== Print : n'imprimer que la note de frais (iframe) ===== */
+@media print {
+  body > *:not(#mileagePreviewModal) { display: none !important; }
+  #mileagePreviewModal { display: block !important; position: static !important; }
+  #mileagePreviewModal .modal-content { box-shadow: none !important; max-height: none !important; }
+  .export-preview-toolbar { display: none !important; }
+  #mileagePreviewFrame {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 100vh !important;
+    border: none !important;
+  }
+}
