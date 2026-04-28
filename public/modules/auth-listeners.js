@@ -22,6 +22,7 @@ let _inviteFlowActive = false;
 let __adminCache = { userId: null, value: null, atMs: 0 };
 let __adminInFlight = null;
 let __adminFirstNameCache = null; // cache prénom admin pour éviter flicker
+let __uiInitializedForUser = null; // UID de l'utilisateur dont l'UI est déjà initialisée
 
 export function initAuthListeners({
   supabase,
@@ -260,6 +261,10 @@ export function setupAuthListeners() {
       document.getElementById('authContainer').style.display = 'none';
       document.getElementById('appContainer').style.display  = 'block';
 
+      // Ignorer si l'UI est déjà initialisée pour cet utilisateur
+      if (__uiInitializedForUser === user.id) return;
+      __uiInitializedForUser = user.id;
+
       const isAdmin = await isCurrentUserAdminDB();
       const adminEls = [
         'adminActionsPanel', 'adminProfileBtn', 'addCoachBtn', 'editCoachBtn', 'inviteAdminBtn',
@@ -336,6 +341,8 @@ export function setupAuthListeners() {
       setTimeData({});
       setAuditLogs([]);
       setCurrentCoach(null);
+      __uiInitializedForUser = null; // reset pour permettre une nouvelle init au prochain login
+      __adminFirstNameCache = null;
       if (select) select.innerHTML = '<option value="">-- Sélectionner --</option>';
       if (statusSpanInner) statusSpanInner.textContent = 'Non connecté.';
       document.getElementById('authContainer').style.display = 'flex';
