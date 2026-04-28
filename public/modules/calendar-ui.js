@@ -339,6 +339,8 @@ export async function saveDay() {
     justification_url: peageUrl,
     hotel_justification_url: hotelUrl,
     achat_justification_url: achatUrl,
+    owner_uid: currentUser?.id || null,
+    owner_email: currentUser?.email || null,
   };
 
   const { data: saved, error } = await _supabase
