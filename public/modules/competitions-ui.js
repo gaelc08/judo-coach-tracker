@@ -248,7 +248,7 @@ async function renderSection() {
   if (_loading) {
     container.innerHTML = `
       <div class="comp-header">
-        <h2>🏟️ Compétitions à venir</h2>
+        <h2>📅 Agenda</h2>
       </div>
       <div class="comp-status">Chargement…</div>`;
     return;
@@ -266,7 +266,7 @@ async function renderSection() {
 
   container.innerHTML = `
     <div class="comp-header">
-      <h2>🏟️ Compétitions à venir</h2>
+      <h2>📅 Agenda</h2>
       <p class="comp-subtitle">Source : <a href="https://www.judo-moselle.fr/evenement" target="_blank" rel="noopener">judo-moselle.fr</a></p>
     </div>
     ${filtersHtml}

@@ -305,6 +305,17 @@ export function setupAuthListeners() {
       }
       try { _updateCalendar?.(); _updateSummary?.(); } catch (e) { console.error('Failed to update UI:', e); }
 
+      // Afficher l'agenda par défaut si aucun profil sélectionné
+      if (!currentCoach) {
+        const section = document.getElementById('competitionsSection');
+        if (section && section.style.display === 'none') {
+          import('./competitions-ui.js').then((m) => {
+            section.style.display = 'block';
+            m.showCompetitionsSection();
+          }).catch(() => {});
+        }
+      }
+
     } else {
       setCurrentUser(null);
       setCurrentSession(null);
