@@ -149,6 +149,15 @@ export function setupEventListeners() {
   bindClick('saveDay',   () => saveDay?.());
   bindClick('deleteDay', () => deleteDay?.());
 
+  // Toggle travelGroup when competition checkbox changes
+  const competitionDayCb = document.getElementById('competitionDay');
+  if (competitionDayCb) {
+    competitionDayCb.addEventListener('change', () => {
+      const travelGroup = document.getElementById('travelGroup');
+      if (travelGroup) travelGroup.style.display = competitionDayCb.checked ? '' : 'none';
+    });
+  }
+
   // Close modal buttons (generic: any .modal-close-btn inside a .modal)
   document.querySelectorAll('.modal-close-btn').forEach((btn) => {
     btn.onclick = () => btn.closest('.modal')?.classList.remove('active');

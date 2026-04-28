@@ -225,31 +225,40 @@ export function openDayModal(dateStr) {
   const key = `${currentCoach.id}-${dateStr}`;
   const data = timeData[key] || {};
 
-  // Populate modal fields
-  _setField('modalDate', dateStr);
-  _setField('modalHours', data.hours || '');
-  _setField('modalKm', data.km || '');
-  _setField('modalPeage', data.peage || '');
-  _setField('modalHotel', data.hotel || '');
-  _setField('modalAchat', data.achat || '');
-  _setField('modalNotes', data.notes || '');
+  // Title
+  const title = document.getElementById('dayTitle');
+  if (title) title.textContent = `Modifier le ${dateStr}`;
 
-  const compCb = document.getElementById('modalCompetition');
+  // Populate modal fields (IDs matching index.html)
+  _setField('trainingHours', data.hours || '');
+  _setField('kilometers', data.km || '');
+  _setField('peage', data.peage || '');
+  _setField('hotel', data.hotel || '');
+  _setField('achat', data.achat || '');
+  _setField('competitionDescription', data.description || '');
+  _setField('departurePlace', data.departurePlace || '');
+  _setField('arrivalPlace', data.arrivalPlace || '');
+
+  const compCb = document.getElementById('competitionDay');
   if (compCb) compCb.checked = !!data.competition;
 
+  // Show/hide travelGroup based on competition checkbox
+  const travelGroup = document.getElementById('travelGroup');
+  if (travelGroup) travelGroup.style.display = data.competition ? '' : 'none';
+
   // Existing justification links
-  _showJustificationLink('peageLink', data.justificationUrl);
-  _showJustificationLink('hotelLink', data.hotelJustificationUrl);
-  _showJustificationLink('achatLink', data.achatJustificationUrl);
+  _showJustificationLink('peageJustificationLink', 'existingPeageJustification', data.justificationUrl);
+  _showJustificationLink('hotelJustificationLink', 'existingHotelJustification', data.hotelJustificationUrl);
+  _showJustificationLink('achatJustificationLink', 'existingAchatJustification', data.achatJustificationUrl);
 
   // Reset file inputs
-  ['peageFile', 'hotelFile', 'achatFile'].forEach((id) => {
+  ['peageJustification', 'hotelJustification', 'achatJustification'].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
 
   // Delete button: visible only if data exists
-  const deleteBtn = document.getElementById('deleteDayBtn');
+  const deleteBtn = document.getElementById('deleteDay');
   if (deleteBtn) deleteBtn.style.display = data && Object.keys(data).length ? '' : 'none';
 
   // Show modal
@@ -262,15 +271,11 @@ function _setField(id, value) {
   if (el) el.value = value ?? '';
 }
 
-function _showJustificationLink(linkId, url) {
-  const el = document.getElementById(linkId);
-  if (!el) return;
-  if (url) {
-    el.href = url;
-    el.style.display = '';
-  } else {
-    el.style.display = 'none';
-  }
+function _showJustificationLink(linkId, wrapperId, url) {
+  const link = document.getElementById(linkId);
+  const wrapper = document.getElementById(wrapperId);
+  if (link) link.href = url || '#';
+  if (wrapper) wrapper.style.display = url ? '' : 'none';
 }
 
 // ===== Save / Delete =====
@@ -281,17 +286,19 @@ export async function saveDay() {
     return;
   }
 
-  const hours = parseFloat(document.getElementById('modalHours')?.value) || 0;
-  const km = parseFloat(document.getElementById('modalKm')?.value) || 0;
-  const peage = parseFloat(document.getElementById('modalPeage')?.value) || 0;
-  const hotel = parseFloat(document.getElementById('modalHotel')?.value) || 0;
-  const achat = parseFloat(document.getElementById('modalAchat')?.value) || 0;
-  const notes = document.getElementById('modalNotes')?.value?.trim() || null;
-  const competition = document.getElementById('modalCompetition')?.checked || false;
+  const hours = parseFloat(document.getElementById('trainingHours')?.value) || 0;
+  const km = parseFloat(document.getElementById('kilometers')?.value) || 0;
+  const peage = parseFloat(document.getElementById('peage')?.value) || 0;
+  const hotel = parseFloat(document.getElementById('hotel')?.value) || 0;
+  const achat = parseFloat(document.getElementById('achat')?.value) || 0;
+  const description = document.getElementById('competitionDescription')?.value?.trim() || null;
+  const departurePlace = document.getElementById('departurePlace')?.value?.trim() || null;
+  const arrivalPlace = document.getElementById('arrivalPlace')?.value?.trim() || null;
+  const competition = document.getElementById('competitionDay')?.checked || false;
 
-  const peageFile = document.getElementById('peageFile')?.files?.[0];
-  const hotelFile = document.getElementById('hotelFile')?.files?.[0];
-  const achatFile = document.getElementById('achatFile')?.files?.[0];
+  const peageFile = document.getElementById('peageJustification')?.files?.[0];
+  const hotelFile = document.getElementById('hotelJustification')?.files?.[0];
+  const achatFile = document.getElementById('achatJustification')?.files?.[0];
 
   const key = `${currentCoach.id}-${selectedDay}`;
   const existing = timeData[key] || {};
@@ -325,7 +332,9 @@ export async function saveDay() {
     peage,
     hotel,
     achat,
-    notes,
+    description,
+    departure_place: departurePlace,
+    arrival_place: arrivalPlace,
     competition,
     justification_url: peageUrl,
     hotel_justification_url: hotelUrl,
