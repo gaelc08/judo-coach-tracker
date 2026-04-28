@@ -274,6 +274,18 @@ export function setupAuthListeners() {
       if (select) select.disabled = !isAdmin;
       _updateCoachGreeting?.(user, null, isAdmin);
 
+      // Charger le prénom admin depuis admin_profiles
+      if (isAdmin) {
+        _supabase.from('admin_profiles').select('first_name').maybeSingle()
+          .then(({ data: ap }) => {
+            if (ap?.first_name) {
+              const fakeCoach = { first_name: ap.first_name };
+              _updateCoachGreeting?.(user, fakeCoach, isAdmin);
+            }
+          })
+          .catch(() => {});
+      }
+
       const prevCoaches    = coaches.slice();
       const prevCurrentCoach = currentUser;
 
