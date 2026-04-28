@@ -77,23 +77,24 @@
       </div>
 
       <div id="adminActionsPanel" class="card admin-panel" style="display:none">
-        <div class="admin-panel-header">
-          <h2 class="admin-panel-title">Fonctions administrateur</h2>
-          <p class="admin-panel-subtitle">Gestion des profils, contrôles mensuels, exports et outils d'administration.</p>
-        </div>
-        <div class="admin-actions-grid">
-          <button id="addCoachBtn" class="btn-secondary" style="display:none">+ Ajout utilisateur</button>
-          <button id="editCoachBtn" class="btn-secondary" style="display:none">✏️ Modifier</button>
-          <button id="inviteAdminBtn" class="btn-secondary" style="display:none">✉️ Inviter admin</button>
-          <button id="freezeBtn" class="btn-secondary" style="display:none">🔒 Geler la fiche</button>
-          <button id="auditLogsBtn" class="btn-secondary" style="display:none">📜 Historique</button>
-          <button id="helloAssoBtn" class="btn-secondary" style="display:none">🥋 Membres HelloAsso</button>
-          <button id="competitionsBtn" class="btn-secondary" style="display:none">🏟️ Compétitions</button>
-          <button id="exportMonthlyExpensesBtn" class="btn-primary" style="display:none">📊 Voir synthèse du mois</button>
-          <button id="backupBtn" class="btn-secondary" style="display:none">💾 Exporter backup JSON</button>
-          <div id="importGroup" class="import-group admin-import-group" style="display:none">
-            <input id="importFile" type="file" accept=".json">
-            <button id="importBtn" class="btn-secondary">📥 Importer JSON</button>
+        <button class="admin-panel-toggle" id="adminPanelToggle" aria-expanded="false" aria-controls="adminPanelBody">
+          <span class="admin-panel-toggle-label">⚙️ Administration</span>
+          <span class="admin-panel-toggle-arrow" aria-hidden="true">▼</span>
+        </button>
+        <div class="admin-panel-body" id="adminPanelBody">
+          <div class="admin-actions-grid">
+            <button id="addCoachBtn" class="btn-secondary" style="display:none">+ Ajout utilisateur</button>
+            <button id="editCoachBtn" class="btn-secondary" style="display:none">✏️ Modifier</button>
+            <button id="inviteAdminBtn" class="btn-secondary" style="display:none">✉️ Inviter admin</button>
+            <button id="freezeBtn" class="btn-secondary" style="display:none">🔒 Geler la fiche</button>
+            <button id="auditLogsBtn" class="btn-secondary" style="display:none">📜 Historique</button>
+            <button id="helloAssoBtn" class="btn-secondary" style="display:none">🥋 Membres HelloAsso</button>
+            <button id="exportMonthlyExpensesBtn" class="btn-primary" style="display:none">📊 Voir synthèse du mois</button>
+            <button id="backupBtn" class="btn-secondary" style="display:none">💾 Exporter backup JSON</button>
+            <div id="importGroup" class="import-group admin-import-group" style="display:none">
+              <input id="importFile" type="file" accept=".json">
+              <button id="importBtn" class="btn-secondary">📥 Importer JSON</button>
+            </div>
           </div>
         </div>
       </div>
@@ -106,6 +107,12 @@
         <span class="legend-item"><span class="legend-dot has-data"></span>Entraînement</span>
         <span class="legend-item"><span class="legend-dot has-competition"></span>Compétition</span>
         <span class="legend-item"><span class="legend-dot has-purchase"></span>Achat</span>
+      </div>
+
+      <!-- Calendar tabs -->
+      <div class="calendar-tabs" id="calendarTabs" style="display:none">
+        <button class="calendar-tab active" id="tabPlanning" data-tab="planning">📅 Planning</button>
+        <button class="calendar-tab" id="tabCompetitions" data-tab="competitions">🏟️ Compétitions</button>
       </div>
 
       <!-- Calendar -->
@@ -172,7 +179,7 @@
         <button id="mileageBtn" class="btn-primary">🧾 Note de frais</button>
       </div>
 
-      <!-- Competitions section -->
+      <!-- Competitions section (unified calendar tab) -->
       <div id="competitionsSection" class="competitions-section" style="display:none"></div>
     </div>
   </div>

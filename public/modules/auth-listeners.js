@@ -256,7 +256,7 @@ export function setupAuthListeners() {
       const isAdmin = await isCurrentUserAdminDB();
       const adminEls = [
         'adminActionsPanel', 'addCoachBtn', 'editCoachBtn', 'inviteAdminBtn',
-        'freezeBtn', 'auditLogsBtn', 'helloAssoBtn', 'competitionsBtn', 'exportMonthlyExpensesBtn',
+        'freezeBtn', 'auditLogsBtn', 'helloAssoBtn', 'exportMonthlyExpensesBtn',
         'importGroup', 'backupBtn',
       ];
       adminEls.forEach(id => {
@@ -268,6 +268,10 @@ export function setupAuthListeners() {
           el.style.display = isAdmin ? 'inline-block' : 'none';
         }
       });
+
+      // Calendar tabs visible for all logged-in users
+      const calendarTabs = document.getElementById('calendarTabs');
+      if (calendarTabs) calendarTabs.style.display = 'flex';
 
       if (select) select.disabled = !isAdmin;
       _updateCoachGreeting?.(user, null, isAdmin);
@@ -307,6 +311,8 @@ export function setupAuthListeners() {
       if (statusSpanInner) statusSpanInner.textContent = 'Non connecté.';
       document.getElementById('authContainer').style.display = 'flex';
       document.getElementById('appContainer').style.display  = 'none';
+      const calendarTabsOut = document.getElementById('calendarTabs');
+      if (calendarTabsOut) calendarTabsOut.style.display = 'none';
       _updateCoachGreeting?.(null, null, true);
     }
   });
