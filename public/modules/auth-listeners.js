@@ -274,18 +274,6 @@ export function setupAuthListeners() {
       if (select) select.disabled = !isAdmin;
       _updateCoachGreeting?.(user, null, isAdmin);
 
-      // Charger le prénom admin depuis admin_profiles
-      if (isAdmin) {
-        _supabase.from('admin_profiles').select('first_name').maybeSingle()
-          .then(({ data: ap }) => {
-            if (ap?.first_name) {
-              const fakeCoach = { first_name: ap.first_name };
-              _updateCoachGreeting?.(user, fakeCoach, isAdmin);
-            }
-          })
-          .catch(() => {});
-      }
-
       const prevCoaches    = coaches.slice();
       const prevCurrentCoach = currentUser;
 
@@ -302,6 +290,14 @@ export function setupAuthListeners() {
       }
 
       _updateCoachGreeting?.(user, !isAdmin && coaches.length > 0 ? coaches[0] : null, isAdmin);
+      // Pour l'admin, recharger le prénom depuis admin_profiles (l'appel async précédent peut avoir été écrasé)
+      if (isAdmin) {
+        _supabase.from('admin_profiles').select('first_name').maybeSingle()
+          .then(({ data: ap }) => {
+            if (ap?.first_name) _updateCoachGreeting?.(user, { first_name: ap.first_name }, isAdmin);
+          })
+          .catch(() => {});
+      }
 
       if (!__eventListenersSetup) {
         _setupEventListeners?.();
