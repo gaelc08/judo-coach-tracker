@@ -2044,6 +2044,7 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   border-radius: var(--radius-sm);
   line-height: 1;
   flex-shrink: 0;
+  order: -1; /* toujours tout à gauche dans le flex header */
   transition: background 0.2s;
 }
 
@@ -2199,6 +2200,50 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   background: rgba(255,255,255,0.08);
   border: none;
   transform: none;
+}
+
+.sidebar-divider {
+  height: 1px;
+  background: rgba(255,255,255,0.12);
+  margin: 8px 16px;
+}
+
+.sidebar-label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 4px 16px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sidebar-label select,
+.sidebar-label input[type="month"] {
+  padding: 9px 12px;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: var(--radius-sm);
+  background: rgba(255,255,255,0.08);
+  color: white;
+  font-size: 0.9rem;
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.sidebar-label select:focus,
+.sidebar-label input[type="month"]:focus {
+  outline: none;
+  border-color: var(--judo-gold);
+  background: rgba(255,255,255,0.12);
+}
+
+.sidebar-label select option {
+  background: var(--judo-navy);
+  color: white;
 }
 
 .sidebar-admin-title {

@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/brand.css">
-    <link rel="stylesheet" href="style.css?v=2026-04-28-r3">
+    <link rel="stylesheet" href="style.css?v=2026-04-28-r4">
   </head>
 <body>
   <div id="envBanner" class="env-banner" style="display:none"></div>
@@ -74,6 +74,25 @@
           </div>
           <button class="sidebar-nav-btn" onclick="document.getElementById('appSidebar').classList.remove('is-open'); document.getElementById('sidebarOverlay').classList.remove('is-open'); document.querySelector('.app-body')?.scrollIntoView({behavior:'smooth'});">📅 Planning</button>
           <button id="competitionsBtn" class="sidebar-nav-btn btn-secondary" style="display:none">🏟️ Compétitions</button>
+
+          <div class="sidebar-divider"></div>
+
+          <label id="coachSelectorGroup" class="sidebar-label">
+            <span>👤 Entraîneur</span>
+            <select id="coachSelect">
+              <option value="">-- Sélectionner --</option>
+            </select>
+          </label>
+
+          <label class="sidebar-label">
+            <span>📅 Mois</span>
+            <input id="monthSelect" type="month">
+          </label>
+
+          <div class="sidebar-divider"></div>
+
+          <button id="timesheetBtn" class="sidebar-nav-btn btn-primary">🗓 Pointage mensuel</button>
+          <button id="mileageBtn" class="sidebar-nav-btn btn-primary">🧾 Note de frais</button>
         </div>
 
         <div class="sidebar-section sidebar-admin" style="display:none" id="sidebarAdminSection">
@@ -96,20 +115,6 @@
 
     <div class="app-body">
       <div id="coachGreeting" class="coach-greeting" style="display:none"></div>
-      <div class="toolbar card">
-        <label id="coachSelectorGroup" class="toolbar-label">
-          <span>Profil</span>
-          <select id="coachSelect">
-            <option value="">-- Sélectionner --</option>
-          </select>
-        </label>
-
-        <label class="toolbar-label">
-          <span>Mois</span>
-          <input id="monthSelect" type="month">
-        </label>
-
-      </div>
 
       <div id="adminActionsPanel" class="card admin-panel" style="display:none">
         <!-- Boutons déplacés dans la sidebar (#appSidebar) -->
@@ -184,12 +189,7 @@
         </div>
       </div>
 
-      <div class="actions card">
-        <button id="timesheetBtn" class="btn-primary">🗓 Pointage mensuel</button>
-        <button id="mileageBtn" class="btn-primary">🧾 Note de frais</button>
-      </div>
-
-      <!-- Competitions section -->
+<!-- Competitions section -->
       <div id="competitionsSection" class="competitions-section" style="display:none"></div>
     </div>
   </div>
@@ -511,6 +511,6 @@
 
   <div id="appVersion" class="app-version"></div>
 
-  <script type="module" src="app-modular.js?v=2026-04-28-r3"></script>
+  <script type="module" src="app-modular.js?v=2026-04-28-r4"></script>
 </body>
 </html>
