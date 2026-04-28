@@ -220,6 +220,9 @@ export function setupEventListeners() {
     bindClick(id, () => document.getElementById(id)?.closest('.modal')?.classList.remove('active'));
   });
 
+  // Bouton Aide
+  bindClick('helpBtn', () => document.getElementById('helpModal')?.classList.add('active'));
+
   // Calendar days (delegated on calendarGrid)
   const calendarGrid = document.getElementById('calendarGrid');
   if (calendarGrid) {
