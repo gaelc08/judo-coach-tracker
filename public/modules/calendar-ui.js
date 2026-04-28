@@ -26,10 +26,12 @@ const fetchSchoolHolidays = __holidayService.fetchSchoolHolidays;
 
 let _supabase = null;
 let _logAuditEvent = null;
+let _notifyAdminAlert = null;
 
-export function initCalendarUi({ supabase, logAuditEvent }) {
+export function initCalendarUi({ supabase, logAuditEvent, notifyAdminAlert }) {
   _supabase = supabase;
   _logAuditEvent = logAuditEvent;
+  _notifyAdminAlert = notifyAdminAlert;
 }
 
 // ===== Coach dropdown & form =====
@@ -370,6 +372,12 @@ export async function saveDay() {
     'time_data',
     __buildAuditPayload({ entityId: key, metadata: { date: selectedDay, hours, km } }),
   );
+
+  // Notifier l'admin par email (non-bloquant)
+  if (_notifyAdminAlert) {
+    const coachName = __getCoachDisplayName(currentCoach) || currentCoach.name || 'Inconnu';
+    _notifyAdminAlert(coachName, selectedDay, { hours, km, peage, hotel, achat, competition }).catch(() => {});
+  }
 
   document.getElementById('dayModal')?.classList.remove('active');
   await updateCalendar();

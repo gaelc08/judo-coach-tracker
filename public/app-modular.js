@@ -147,7 +147,7 @@ initAdminService({
 });
 
 // ===== Init calendar UI (inject supabase + audit logger) =====
-initCalendarUi({ supabase, logAuditEvent: __logAuditEvent });
+initCalendarUi({ supabase, logAuditEvent: __logAuditEvent, notifyAdminAlert });
 
 // ===== Init coach manager =====
 initCoachManager({ supabase, coachWriteViaRest: __coachWriteViaRest, logAuditEvent: __logAuditEvent });
