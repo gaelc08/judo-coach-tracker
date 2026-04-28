@@ -4,7 +4,7 @@
 
 import { supabaseUrl, supabaseKey } from './env.js';
 import {
-  currentUser, currentSession, currentAccessToken, coaches, __eventListenersSetup,
+  currentUser, currentSession, currentAccessToken, coaches, currentCoach, __eventListenersSetup,
   setCurrentUser, setCurrentSession, setCurrentAccessToken,
   setCoaches, setTimeData, setAuditLogs, setCurrentCoach, setEventListenersSetup,
 } from './app-context.js';
@@ -307,13 +307,11 @@ export function setupAuthListeners() {
 
       // Afficher l'agenda par défaut si aucun profil sélectionné
       if (!currentCoach) {
-        const section = document.getElementById('competitionsSection');
-        if (section && section.style.display === 'none') {
-          import('./competitions-ui.js').then((m) => {
-            section.style.display = 'block';
-            m.showCompetitionsSection();
-          }).catch(() => {});
-        }
+        import('./competitions-ui.js').then((m) => {
+          const section = document.getElementById('competitionsSection');
+          if (section) section.style.display = 'block';
+          m.showCompetitionsSection();
+        }).catch(() => {});
       }
 
     } else {
