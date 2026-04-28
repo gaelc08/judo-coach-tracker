@@ -179,7 +179,7 @@ export function updateSummary() {
     if (el) el.style.display = hideIds.includes(id) ? 'none' : '';
   });
 
-  setVal('totalHours',            numberDisplay(totalHours) + ' h');
+  setVal('totalHours',            numberDisplay(totalHours, 2) + ' h');
   setVal('hourlyRate',            currencyDisplay(hourlyRate));
   setVal('trainingPayment',       currencyDisplay(salaryHours));
   setVal('compDays',              competitionDays + ' j');
