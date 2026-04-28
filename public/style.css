@@ -1122,6 +1122,12 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   flex: 1 1 180px;
 }
 
+.export-preview-toolbar .btn-secondary {
+  background: var(--gray-200);
+  color: var(--gray-900);
+  border: 1px solid var(--gray-300);
+}
+
 .export-preview-frame {
   width: 100%;
   min-height: 70vh;
