@@ -112,11 +112,22 @@ export function createExportUI({
     }
     if (printBtn) {
       printBtn.onclick = () => {
-        try {
-          iframe?.contentWindow?.focus();
-          iframe?.contentWindow?.print();
-        } catch {
-          alert("Impossible d'imprimer cet aperçu. Utilisez Télécharger HTML.");
+        // Ouvrir le HTML complet dans un nouvel onglet et imprimer — plus fiable sur mobile
+        const blob = new Blob([downloadHtml], { type: 'text/html;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const win = window.open(url, '_blank');
+        if (win) {
+          win.onload = () => {
+            setTimeout(() => { win.print(); URL.revokeObjectURL(url); }, 300);
+          };
+        } else {
+          // Fallback si les popups sont bloquées
+          try {
+            iframe?.contentWindow?.focus();
+            iframe?.contentWindow?.print();
+          } catch {
+            alert("Activez les popups pour imprimer, ou utilisez Télécharger HTML.");
+          }
         }
       };
     }
