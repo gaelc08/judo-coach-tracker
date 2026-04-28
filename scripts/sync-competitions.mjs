@@ -62,7 +62,8 @@ function inferTypeCompetition(label) {
   if (l.includes('KATA')) return 'KATA'
   if (l.includes('FORMATION')) return 'FORMATION'
   if (l.includes('BENJAMINS') || l.includes('MINIMES') || l.includes('CADETS') || l.includes('JUNIORS') || l.includes('SENIORS')) return 'COMPETITION'
-  return null
+  if (l.includes('MOSELLE')) return 'COMPETITION'
+  return 'COMPETITION'
 }
 
 function inferNiveau(title, defaultNiveau) {
