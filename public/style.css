@@ -2315,7 +2315,10 @@ button, .btn-primary, .btn-secondary, .btn-danger {
 /* ===== body.sidebar-open: prevent scroll behind ===== */
 body.sidebar-open {
   overflow: hidden;
+  padding-right: var(--scrollbar-width, 0px);
 }
+
+/* Calcul compensatoire scrollbar via JS — fallback 0 */
 
 /* Hide empty adminActionsPanel (buttons moved to sidebar) */
 #adminActionsPanel:empty,

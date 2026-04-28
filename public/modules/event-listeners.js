@@ -197,6 +197,9 @@ export function setupEventListeners() {
   const sidebarOverlay = document.getElementById('sidebarOverlay');
 
   function openSidebar() {
+    // Compenser la disparition de la scrollbar pour éviter le décalage
+    const scrollW = window.innerWidth - document.documentElement.clientWidth;
+    document.documentElement.style.setProperty('--scrollbar-width', scrollW + 'px');
     sidebarEl?.classList.add('is-open');
     sidebarOverlay?.classList.add('is-open');
     document.body.classList.add('sidebar-open');
@@ -205,6 +208,7 @@ export function setupEventListeners() {
     sidebarEl?.classList.remove('is-open');
     sidebarOverlay?.classList.remove('is-open');
     document.body.classList.remove('sidebar-open');
+    document.documentElement.style.removeProperty('--scrollbar-width');
   }
 
   if (sidebarToggle) {

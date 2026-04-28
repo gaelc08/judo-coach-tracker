@@ -28,7 +28,7 @@ import {
   currentUser, currentSession, currentAccessToken,
   auditLogs, currentMonth, selectedDay, editMode, editingCoachId,
   setCurrentCoach, setCurrentMonth, setSelectedDay,
-  setEditMode, setEditingCoachId,
+  setEditMode, setEditingCoachId, setAuditLogs,
   __buildAuditPayload, __buildMonthlyAuditPayload, __getFreshAccessToken,
   __getCoachDisplayName, __getProfileType, __isVolunteerProfile, __getProfileLabel,
   __getCurrentUserDisplayName, __findExistingProfileByEmail,
@@ -186,7 +186,7 @@ let schoolHolidays = [];
 // ===== Audit controller =====
 const __auditController = createAuditController({
   getAuditLogs: () => auditLogs,
-  setAuditLogs: (nextRows) => { /* handled via app-context */ },
+  setAuditLogs: (nextRows) => { setAuditLogs(nextRows); },
   getCurrentCoach: () => currentCoach,
   getCurrentMonth: () => currentMonth,
   restSelect: __restSelect,
