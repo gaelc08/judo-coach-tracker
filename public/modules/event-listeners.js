@@ -22,6 +22,21 @@ function toggleCompetitionsSection(show) {
   if (!section) return;
   _competitionsVisible = show !== undefined ? show : !_competitionsVisible;
   section.style.display = _competitionsVisible ? 'block' : 'none';
+
+  // Masquer le planning quand compétitions est affiché
+  const planningEls = [
+    document.getElementById('coachSelectorGroup'),
+    document.getElementById('monthSelect')?.closest('label'),
+    document.getElementById('frozenBanner'),
+    document.getElementById('calendar'),
+    document.querySelector('.summary.card'),
+    document.querySelector('.legend.card'),
+    document.getElementById('coachGreeting'),
+  ];
+  planningEls.forEach((el) => {
+    if (el) el.style.display = _competitionsVisible ? 'none' : '';
+  });
+
   if (_competitionsVisible) {
     // Dynamically import to avoid circular dep at load time
     import('./competitions-ui.js').then((m) => m.showCompetitionsSection());
@@ -89,6 +104,8 @@ export function setupEventListeners() {
   bindChange('coachSelect', async (e) => {
     const coach = coaches.find((c) => String(c.id) === String(e.target.value));
     setCurrentCoach(coach || null);
+    // Fermer la section compétitions si ouverte
+    if (_competitionsVisible) toggleCompetitionsSection(false);
     await updateCalendar?.();
     updateSummary?.();
   });
