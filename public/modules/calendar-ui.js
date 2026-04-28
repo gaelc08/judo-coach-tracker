@@ -103,12 +103,14 @@ export async function updateCalendar() {
 
   if (!currentCoach || !currentMonth) {
     document.querySelector('.legend.card')?.style && (document.querySelector('.legend.card').style.display = 'none');
+    document.querySelector('.summary.card')?.style && (document.querySelector('.summary.card').style.display = 'none');
     updateFreezeUI();
     return;
   }
 
-  // Afficher la légende quand un planning est affiché
+  // Afficher la légende et le récapitulatif quand un planning est affiché
   document.querySelector('.legend.card')?.style && (document.querySelector('.legend.card').style.display = '');
+  document.querySelector('.summary.card')?.style && (document.querySelector('.summary.card').style.display = '');
 
   const [year, month] = currentMonth.split('-').map(Number);
   const daysInMonth = new Date(year, month, 0).getDate();
