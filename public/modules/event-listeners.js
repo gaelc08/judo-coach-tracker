@@ -99,6 +99,9 @@ export function setupEventListeners() {
   bindClick('cancelCoach',    () => {
     document.getElementById('coachModal')?.classList.remove('active');
   });
+  bindClick('cancelDay', () => {
+    document.getElementById('dayModal')?.classList.remove('active');
+  });
   bindClick('inviteAdminBtn', () => inviteAdmin?.());
 
   // Freeze
