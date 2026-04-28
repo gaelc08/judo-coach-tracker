@@ -173,4 +173,70 @@ export function setupEventListeners() {
       if (date) openDayModal?.(date);
     };
   }
+
+  // ===== Sidebar hamburger toggle =====
+  const sidebarToggle  = document.getElementById('sidebarToggle');
+  const sidebarEl      = document.getElementById('appSidebar');
+  const sidebarOverlay = document.getElementById('sidebarOverlay');
+
+  function openSidebar() {
+    sidebarEl?.classList.add('is-open');
+    sidebarOverlay?.classList.add('is-open');
+    document.body.classList.add('sidebar-open');
+  }
+  function closeSidebar() {
+    sidebarEl?.classList.remove('is-open');
+    sidebarOverlay?.classList.remove('is-open');
+    document.body.classList.remove('sidebar-open');
+  }
+
+  if (sidebarToggle) {
+    sidebarToggle.addEventListener('click', () => {
+      if (sidebarEl?.classList.contains('is-open')) closeSidebar();
+      else openSidebar();
+    });
+  }
+  if (sidebarOverlay) {
+    sidebarOverlay.addEventListener('click', closeSidebar);
+  }
+  // Close sidebar on nav button click (mobile UX)
+  sidebarEl?.querySelectorAll('.sidebar-nav-btn').forEach((btn) => {
+    btn.addEventListener('click', closeSidebar);
+  });
+
+  // ===== Sidebar admin section visibility (mirrors adminActionsPanel) =====
+  const adminPanelEl      = document.getElementById('adminActionsPanel');
+  const sidebarAdminEl    = document.getElementById('sidebarAdminSection');
+  if (adminPanelEl && sidebarAdminEl) {
+    const syncAdminSection = () => {
+      const isVisible = adminPanelEl.style.display !== 'none' && adminPanelEl.style.display !== '';
+      sidebarAdminEl.style.display = isVisible ? 'block' : 'none';
+    };
+    const adminObserver = new MutationObserver(syncAdminSection);
+    adminObserver.observe(adminPanelEl, { attributes: true, attributeFilter: ['style'] });
+  }
+
+  // ===== Dark mode toggle =====
+  const darkToggle = document.getElementById('darkModeToggle');
+  const THEME_KEY  = 'jct.theme';
+
+  function applyTheme(theme) {
+    document.documentElement.dataset.theme = theme;
+    if (darkToggle) darkToggle.textContent = theme === 'dark' ? '☀️' : '🌙';
+  }
+
+  // Restore persisted theme
+  try {
+    const saved = localStorage.getItem(THEME_KEY);
+    if (saved === 'dark' || saved === 'light') applyTheme(saved);
+  } catch {}
+
+  if (darkToggle) {
+    darkToggle.addEventListener('click', () => {
+      const current = document.documentElement.dataset.theme;
+      const next    = current === 'dark' ? 'light' : 'dark';
+      applyTheme(next);
+      try { localStorage.setItem(THEME_KEY, next); } catch {}
+    });
+  }
 }

@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/brand.css">
-    <link rel="stylesheet" href="style.css?v=2026-03-22-brand-v1">
+    <link rel="stylesheet" href="style.css?v=2026-04-28-r3">
   </head>
 <body>
   <div id="envBanner" class="env-banner" style="display:none"></div>
@@ -48,16 +48,51 @@
   <div id="appContainer" style="display:none">
     <header class="app-header">
       <div class="app-header-inner">
+        <button id="sidebarToggle" class="btn-hamburger" aria-label="Menu">☰</button>
         <img src="logo-jcc.png" alt="Judo Club de Cattenom-Rodemack" class="header-logo">
         <div class="header-title">
           <h1>Judo Club de Cattenom-Rodemack</h1>
           <span class="header-subtitle">Gestion des intervenants et frais</span>
         </div>
-        <button id="installAppBtn" class="btn-secondary" style="display:none">⬇️ Installer</button>
-        <button id="helpBtn" class="btn-help">❓ Aide</button>
-        <button id="logoutBtnApp" class="btn-logout">Déconnexion</button>
+        <div class="header-actions">
+          <button id="darkModeToggle" class="btn-icon" aria-label="Mode sombre" title="Mode sombre">🌙</button>
+          <button id="installAppBtn" class="btn-secondary" style="display:none">⬇️ Installer</button>
+          <button id="helpBtn" class="btn-help">❓ Aide</button>
+          <button id="logoutBtnApp" class="btn-logout">Déconnexion</button>
+        </div>
       </div>
     </header>
+
+    <div id="sidebarOverlay" class="sidebar-overlay"></div>
+
+    <div id="appSidebar" class="app-sidebar">
+      <div class="sidebar-inner">
+        <div class="sidebar-section sidebar-nav">
+          <div class="sidebar-brand">
+            <img src="logo-jcc.png" alt="Logo" class="sidebar-logo">
+            <span class="sidebar-club-name">Judo Club Cattenom-Rodemack</span>
+          </div>
+          <button class="sidebar-nav-btn" onclick="document.getElementById('appSidebar').classList.remove('is-open'); document.getElementById('sidebarOverlay').classList.remove('is-open'); document.querySelector('.app-body')?.scrollIntoView({behavior:'smooth'});">📅 Planning</button>
+          <button id="competitionsBtn" class="sidebar-nav-btn btn-secondary" style="display:none">🏟️ Compétitions</button>
+        </div>
+
+        <div class="sidebar-section sidebar-admin" style="display:none" id="sidebarAdminSection">
+          <div class="sidebar-admin-title">⚙️ Administration</div>
+          <button id="addCoachBtn" class="sidebar-nav-btn btn-secondary" style="display:none">+ Ajout utilisateur</button>
+          <button id="editCoachBtn" class="sidebar-nav-btn btn-secondary" style="display:none">✏️ Modifier</button>
+          <button id="inviteAdminBtn" class="sidebar-nav-btn btn-secondary" style="display:none">✉️ Inviter admin</button>
+          <button id="freezeBtn" class="sidebar-nav-btn btn-secondary" style="display:none">🔒 Geler la fiche</button>
+          <button id="auditLogsBtn" class="sidebar-nav-btn btn-secondary" style="display:none">📜 Historique</button>
+          <button id="helloAssoBtn" class="sidebar-nav-btn btn-secondary" style="display:none">🥋 Membres HelloAsso</button>
+          <button id="exportMonthlyExpensesBtn" class="sidebar-nav-btn btn-primary" style="display:none">📊 Voir synthèse du mois</button>
+          <button id="backupBtn" class="sidebar-nav-btn btn-secondary" style="display:none">💾 Exporter backup JSON</button>
+          <div id="importGroup" class="import-group admin-import-group" style="display:none">
+            <input id="importFile" type="file" accept=".json">
+            <button id="importBtn" class="btn-secondary">📥 Importer JSON</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <div class="app-body">
       <div id="coachGreeting" class="coach-greeting" style="display:none"></div>
@@ -77,25 +112,7 @@
       </div>
 
       <div id="adminActionsPanel" class="card admin-panel" style="display:none">
-        <div class="admin-panel-header">
-          <h2 class="admin-panel-title">Fonctions administrateur</h2>
-          <p class="admin-panel-subtitle">Gestion des profils, contrôles mensuels, exports et outils d'administration.</p>
-        </div>
-        <div class="admin-actions-grid">
-          <button id="addCoachBtn" class="btn-secondary" style="display:none">+ Ajout utilisateur</button>
-          <button id="editCoachBtn" class="btn-secondary" style="display:none">✏️ Modifier</button>
-          <button id="inviteAdminBtn" class="btn-secondary" style="display:none">✉️ Inviter admin</button>
-          <button id="freezeBtn" class="btn-secondary" style="display:none">🔒 Geler la fiche</button>
-          <button id="auditLogsBtn" class="btn-secondary" style="display:none">📜 Historique</button>
-          <button id="helloAssoBtn" class="btn-secondary" style="display:none">🥋 Membres HelloAsso</button>
-          <button id="competitionsBtn" class="btn-secondary" style="display:none">🏟️ Compétitions</button>
-          <button id="exportMonthlyExpensesBtn" class="btn-primary" style="display:none">📊 Voir synthèse du mois</button>
-          <button id="backupBtn" class="btn-secondary" style="display:none">💾 Exporter backup JSON</button>
-          <div id="importGroup" class="import-group admin-import-group" style="display:none">
-            <input id="importFile" type="file" accept=".json">
-            <button id="importBtn" class="btn-secondary">📥 Importer JSON</button>
-          </div>
-        </div>
+        <!-- Boutons déplacés dans la sidebar (#appSidebar) -->
       </div>
 
       <!-- Legend -->
@@ -494,6 +511,6 @@
 
   <div id="appVersion" class="app-version"></div>
 
-  <script type="module" src="app-modular.js?v=2026-04-28-r2"></script>
+  <script type="module" src="app-modular.js?v=2026-04-28-r3"></script>
 </body>
 </html>
