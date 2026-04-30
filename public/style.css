@@ -127,6 +127,7 @@ html {
   background: rgba(255,255,255,0.1);
   color: white;
   font-size: 1rem;
+  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   transition: border-color 0.2s, background 0.2s;
 }
@@ -185,6 +186,7 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   background: rgba(255,255,255,0.12);
   color: white;
   border: 1px solid rgba(255,255,255,0.25);
+  -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
 }
 
@@ -198,6 +200,7 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   background: var(--judo-navy);
   color: white;
   border: 1px solid var(--judo-navy);
+  -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
 
@@ -257,6 +260,7 @@ button, .btn-primary, .btn-secondary, .btn-danger {
 /* ===== App Header ===== */
 .app-header {
   background: rgba(15, 52, 96, 0.95);
+  -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
   border-bottom: 2px solid var(--judo-gold);
   position: sticky;
@@ -763,6 +767,7 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   z-index: 1000;
   justify-content: center;
   align-items: center;
+  -webkit-backdrop-filter: blur(3px);
   backdrop-filter: blur(3px);
 }
 
@@ -778,6 +783,7 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   max-width: 92vw;
   max-height: 90vh;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   box-shadow: var(--shadow-lg);
   border-top: 4px solid var(--judo-red);
 }
@@ -1334,6 +1340,7 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   width: 100%;
   max-height: 60vh;
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid var(--gray-300);
   border-radius: var(--radius-sm);
   background: white;
@@ -1354,6 +1361,7 @@ button, .btn-primary, .btn-secondary, .btn-danger {
 }
 
 .audit-table th {
+  position: -webkit-sticky;
   position: sticky;
   top: 0;
   background: var(--judo-navy);
@@ -1592,6 +1600,7 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   background: var(--judo-navy);
   color: white;
   border: 1px solid var(--judo-navy);
+  -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
 
@@ -2103,6 +2112,7 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   inset: 0;
   background: rgba(0,0,0,0.5);
   z-index: 200;
+  -webkit-backdrop-filter: blur(2px);
   backdrop-filter: blur(2px);
 }
 
@@ -2209,6 +2219,7 @@ button, .btn-primary, .btn-secondary, .btn-danger {
   background: transparent;
   border: none;
   color: rgba(255,255,255,0.8);
+  -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
 
@@ -2307,6 +2318,7 @@ button, .btn-primary, .btn-secondary, .btn-danger {
     width: 95vw;
     max-height: 90vh;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }
 
@@ -2336,4 +2348,3 @@ body.sidebar-open {
 #adminActionsPanel {
   display: none !important;
 }
-
