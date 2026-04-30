@@ -3,9 +3,15 @@
 -- Also create a function to upsert an admin's own profile entry in profiles
 -- when they save their admin_profiles record.
 
--- ─── Step 1: drop old constraint and add admin ───────────────────────────────
+-- ─── Step 1: drop old constraint (name may vary) and add admin ───────────────
 ALTER TABLE public.profiles
   DROP CONSTRAINT IF EXISTS coaches_profile_type_allowed;
+
+ALTER TABLE public.profiles
+  DROP CONSTRAINT IF EXISTS users_profile_type_allowed;
+
+ALTER TABLE public.profiles
+  DROP CONSTRAINT IF EXISTS profiles_profile_type_allowed;
 
 ALTER TABLE public.profiles
   ADD CONSTRAINT profiles_profile_type_allowed
@@ -74,10 +80,10 @@ GRANT EXECUTE ON FUNCTION public.sync_admin_profile_to_profiles() TO authenticat
 -- Admins can already read/write all profiles via existing policies.
 -- Non-admins cannot see profile_type='admin' rows (they already can't via RLS).
 
--- ─── Step 5: update role constraint to allow 'admin' ─────────────────────────
-ALTER TABLE public.profiles
-  DROP CONSTRAINT IF EXISTS users_role_allowed;
 
-ALTER TABLE public.profiles
-  ADD CONSTRAINT profiles_role_allowed
-  CHECK (role IN ('entraineur', 'benevole', 'admin'));
+
+
+
+
+
+

@@ -1,15 +1,12 @@
--- Create admin monthly expenses report
--- Includes:
--- 1. View for monthly expenses by coach
--- 2. RLS policy for admin access
--- 3. Edge function for CSV/JSON export
+-- Create admin monthly expenses report (view + export functions)
+-- Note: RLS cannot be applied to views; access is controlled via SECURITY DEFINER functions.
 
 -- 1. Create the view
 CREATE OR REPLACE VIEW public.admin_monthly_expenses AS
 SELECT
   DATE_TRUNC('month', t.date)::date AS month,
   c.id AS coach_id,
-  c.name || ' ' || c.first_name AS coach_name,
+  c.name || ' ' || COALESCE(c.first_name, '') AS coach_name,
   c.hourly_rate,
   c.km_rate,
   SUM(t.hours) AS total_hours,
@@ -20,93 +17,72 @@ SELECT
 FROM
   public.time_data t
 JOIN
-  public.users c ON t.coach_id = c.id
+  public.profiles c ON t.coach_id = c.id
 GROUP BY
   month, c.id, c.name, c.first_name, c.hourly_rate, c.km_rate
 ORDER BY
   month DESC, total_amount DESC;
 
--- 2. RLS policy for admin access
-CREATE POLICY "admins_access_monthly_expenses"
-ON public.admin_monthly_expenses
-FOR SELECT
-TO authenticated
-USING (public.is_admin());
-
--- 3. Create a function for CSV export
+-- 2. Create a function for CSV export (SECURITY DEFINER = admin-only via is_admin() check)
 CREATE OR REPLACE FUNCTION public.export_monthly_expenses_csv()
 RETURNS text
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path TO 'public'
 AS $$
-DECLARE
-  csv_output text;
 BEGIN
-  SELECT string_agg(format('%s,%s,%s,%s,%s,%s,%s,%s,%s',
-    to_char(month, 'YYYY-MM'),
-    coach_name,
-    total_hours,
-    hourly_rate,
-    salary_amount,
-    total_km,
-    km_rate,
-    km_amount,
-    total_amount
-  ), E'\n')
-  INTO csv_output
-  FROM public.admin_monthly_expenses
-  ORDER BY month DESC, total_amount DESC;
-
-  RETURN 'Mois,Entraîneur,Heures,Taux Horaire (€),Salaire (€),KM,Taux KM (€),Indemnités KM (€),Total (€)' || E'\n' || csv_output;
+  IF NOT public.is_admin() THEN
+    RAISE EXCEPTION 'Access denied';
+  END IF;
+  RETURN (
+    SELECT 'Mois,Entraîneur,Heures,Taux Horaire (€),Salaire (€),KM,Taux KM (€),Indemnités KM (€),Total (€)' || E'\n' ||
+      string_agg(format('%s,%s,%s,%s,%s,%s,%s,%s,%s',
+        to_char(month, 'YYYY-MM'),
+        coach_name,
+        total_hours,
+        hourly_rate,
+        salary_amount,
+        total_km,
+        km_rate,
+        km_amount,
+        total_amount
+      ), E'\n' ORDER BY month DESC, total_amount DESC)
+    FROM public.admin_monthly_expenses
+  );
 END;
 $$;
 
--- 4. Create a function for JSON export
+-- 3. Create a function for JSON export
 CREATE OR REPLACE FUNCTION public.export_monthly_expenses_json()
 RETURNS json
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path TO 'public'
 AS $$
-DECLARE
-  json_output json;
 BEGIN
-  SELECT json_agg(row_to_json(expenses))
-  INTO json_output
-  FROM (
-    SELECT
-      to_char(month, 'YYYY-MM') AS month,
-      coach_name,
-      total_hours,
-      hourly_rate,
-      salary_amount,
-      total_km,
-      km_rate,
-      km_amount,
-      total_amount
-    FROM public.admin_monthly_expenses
-    ORDER BY month DESC, total_amount DESC
-  ) expenses;
-
-  RETURN json_output;
+  IF NOT public.is_admin() THEN
+    RAISE EXCEPTION 'Access denied';
+  END IF;
+  RETURN (
+    SELECT json_agg(row_to_json(expenses))
+    FROM (
+      SELECT
+        to_char(month, 'YYYY-MM') AS month,
+        coach_name,
+        total_hours,
+        hourly_rate,
+        salary_amount,
+        total_km,
+        km_rate,
+        km_amount,
+        total_amount
+      FROM public.admin_monthly_expenses
+      ORDER BY month DESC, total_amount DESC
+    ) expenses
+  );
 END;
 $$;
 
--- 5. Grant access to the export functions
+-- 4. Grant access to the export functions
 GRANT EXECUTE ON FUNCTION public.export_monthly_expenses_csv TO authenticated;
 GRANT EXECUTE ON FUNCTION public.export_monthly_expenses_json TO authenticated;
-
--- 6. Create RLS policy for export functions
-CREATE POLICY "admins_export_monthly_expenses"
-ON public.export_monthly_expenses_csv
-FOR EXECUTE
-TO authenticated
-USING (public.is_admin());
-
-CREATE POLICY "admins_export_monthly_expenses"
-ON public.export_monthly_expenses_json
-FOR EXECUTE
-TO authenticated
-USING (public.is_admin());
-
--- 7. Create an edge function for API access (optional, can be called via REST)
--- This will be deployed separately via supabase functions deploy
