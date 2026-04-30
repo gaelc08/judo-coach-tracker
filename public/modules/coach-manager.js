@@ -67,10 +67,12 @@ export function openCoachModal(mode, coach = null) {
 export function updateCoachFormProfileUI(profileType = null) {
   const resolvedType = __getProfileType(profileType || document.getElementById('coachProfileType')?.value);
   const isVolunteer = resolvedType === 'benevole';
+  const isAdmin = resolvedType === 'admin';
   const title = document.getElementById('coachModalTitle');
   const rateGroup = document.getElementById('coachRateGroup');
   const allowanceGroup = document.getElementById('dailyAllowanceGroup');
-  if (title) title.textContent = isVolunteer ? 'Bénévole' : 'Entraîneur';
+  // Titre du modal : Bénévole / Administrateur / Entraîneur
+  if (title) title.textContent = isVolunteer ? 'B\u00e9n\u00e9vole' : (isAdmin ? 'Administrateur' : 'Entra\u00eeneur');
   if (rateGroup) rateGroup.style.display = isVolunteer ? 'none' : '';
   if (allowanceGroup) allowanceGroup.style.display = isVolunteer ? 'none' : '';
 }
@@ -91,13 +93,14 @@ export function clearCoachForm() {
 // ===== Save coach =====
 export async function saveCoach() {
   console.log('DEBUG saveCoach START');
-  if (!currentUser) { alert('Aucun utilisateur connecté.'); return; }
+  if (!currentUser) { alert('Aucun utilisateur connect\u00e9.'); return; }
   const isAdmin = await isCurrentUserAdminDB();
   if (!isAdmin) { alert("Seul l'administrateur peut effectuer cette action."); return; }
 
   const name = document.getElementById('coachName').value.trim();
   const profileType = __getProfileType(document.getElementById('coachProfileType').value);
   const isVolunteer = profileType === 'benevole';
+  const isAdminProfile = profileType === 'admin';
   const firstName = document.getElementById('coachFirstName').value.trim();
   const email = __normalizeEmail(document.getElementById('coachEmail').value);
   const address = document.getElementById('coachAddress').value.trim();
@@ -112,12 +115,14 @@ export async function saveCoach() {
 
   if (email) {
     const existing = __findExistingProfileByEmail(email, { excludeId: editMode ? editingCoachId : null });
-    if (existing) { alert(`Un profil avec l'e-mail ${email} existe déjà.`); return; }
+    if (existing) { alert(`Un profil avec l'e-mail ${email} existe d\u00e9j\u00e0.`); return; }
   }
 
   const coachData = {
     name,
-    role: isVolunteer ? 'benevole' : 'entraineur',
+    // Le champ `role` doit refléter fidèlement le type de profil pour que
+    // getProfileType() fonctionne même si profile_type est null en base.
+    role: isVolunteer ? 'benevole' : (isAdminProfile ? 'admin' : 'entraineur'),
     profile_type: profileType,
     first_name: firstName,
     email: email || null,
@@ -146,8 +151,8 @@ export async function saveCoach() {
     res = await _coachWriteViaRest(coachData, { editingId: editedId });
   }
 
-  if (res.error) { alert('Erreur lors de la sauvegarde : ' + res.error.message); return; }
-  if (!res.data?.length) { alert('Erreur : aucune donnée retournée.'); return; }
+  if (res.error) { alert('Erreur lors de la sauvegarde\u00a0: ' + res.error.message); return; }
+  if (!res.data?.length) { alert('Erreur\u00a0: aucune donn\u00e9e retourn\u00e9e.'); return; }
 
   const saved = { id: res.data[0].id, ...res.data[0] };
 
@@ -179,13 +184,13 @@ export async function saveCoach() {
 
 // ===== Delete coach =====
 export async function deleteCoach() {
-  if (!currentUser) { alert('Aucun utilisateur connecté.'); return; }
+  if (!currentUser) { alert('Aucun utilisateur connect\u00e9.'); return; }
   const isAdmin = await isCurrentUserAdminDB();
   if (!isAdmin) { alert("Seul l'administrateur peut supprimer un profil."); return; }
-  if (!editingCoachId) { alert('Aucun profil sélectionné.'); return; }
+  if (!editingCoachId) { alert('Aucun profil s\u00e9lectionn\u00e9.'); return; }
 
   const coach = coaches.find((c) => c.id === editingCoachId);
-  if (!confirm(`Supprimer le profil « ${coach?.name || editingCoachId} » ? Cette action est irréversible.`)) return;
+  if (!confirm(`Supprimer le profil \u00ab ${coach?.name || editingCoachId} \u00bb ? Cette action est irr\u00e9versible.`)) return;
 
   if (coach?.owner_uid) {
     try {
@@ -201,7 +206,7 @@ export async function deleteCoach() {
   }
 
   const { error: e1 } = await _supabase.from('profiles').delete().eq('id', editingCoachId);
-  if (e1) { alert('Erreur lors de la suppression : ' + e1.message); return; }
+  if (e1) { alert('Erreur lors de la suppression\u00a0: ' + e1.message); return; }
 
   await _supabase.from('time_data').delete().eq('coach_id', editingCoachId);
 
@@ -219,9 +224,9 @@ export async function deleteCoach() {
 
 // ===== Invite coach =====
 export async function inviteCoach(email) {
-  if (!currentUser) { alert('Aucun utilisateur connecté.'); return; }
+  if (!currentUser) { alert('Aucun utilisateur connect\u00e9.'); return; }
   const isAdmin = await isCurrentUserAdminDB();
-  if (!isAdmin) { alert("Seul l'administrateur peut inviter un entraîneur."); return; }
+  if (!isAdmin) { alert("Seul l'administrateur peut inviter un entra\u00eeneur."); return; }
   const normalizedEmail = __normalizeEmail(email);
   if (!normalizedEmail) { alert("Adresse e-mail invalide."); return; }
   const accessToken = await __getFreshAccessToken(_supabase);
@@ -233,16 +238,16 @@ export async function inviteCoach(email) {
       body: JSON.stringify({ email: normalizedEmail, redirectTo: window.location.origin + window.location.pathname }),
     });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok) { alert('Erreur lors de l\'invitation : ' + (json.error || res.statusText)); return; }
-    alert(`Invitation envoyée à ${normalizedEmail}.`);
+    if (!res.ok) { alert('Erreur lors de l\'invitation\u00a0: ' + (json.error || res.statusText)); return; }
+    alert(`Invitation envoy\u00e9e \u00e0 ${normalizedEmail}.`);
   } catch (e) {
-    alert('Erreur : ' + e.message);
+    alert('Erreur\u00a0: ' + e.message);
   }
 }
 
 // ===== Invite admin =====
 export async function inviteAdmin(email) {
-  if (!currentUser) { alert('Aucun utilisateur connecté.'); return; }
+  if (!currentUser) { alert('Aucun utilisateur connect\u00e9.'); return; }
   const isAdmin = await isCurrentUserAdminDB();
   if (!isAdmin) { alert("Seul l'administrateur peut inviter un administrateur."); return; }
   const normalizedEmail = __normalizeEmail(email);
@@ -256,9 +261,9 @@ export async function inviteAdmin(email) {
       body: JSON.stringify({ email: normalizedEmail, redirectTo: window.location.origin + window.location.pathname }),
     });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok) { alert('Erreur lors de l\'invitation admin : ' + (json.error || res.statusText)); return; }
-    alert(`Invitation admin envoyée à ${normalizedEmail}.`);
+    if (!res.ok) { alert('Erreur lors de l\'invitation admin\u00a0: ' + (json.error || res.statusText)); return; }
+    alert(`Invitation admin envoy\u00e9e \u00e0 ${normalizedEmail}.`);
   } catch (e) {
-    alert('Erreur : ' + e.message);
+    alert('Erreur\u00a0: ' + e.message);
   }
 }
