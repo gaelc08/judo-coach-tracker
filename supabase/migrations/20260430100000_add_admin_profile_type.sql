@@ -87,3 +87,14 @@ GRANT EXECUTE ON FUNCTION public.sync_admin_profile_to_profiles() TO authenticat
 
 
 
+
+-- Step 5: update role constraint to allow 'admin'
+ALTER TABLE public.profiles
+  DROP CONSTRAINT IF EXISTS users_role_allowed;
+
+ALTER TABLE public.profiles
+  DROP CONSTRAINT IF EXISTS profiles_role_allowed;
+
+ALTER TABLE public.profiles
+  ADD CONSTRAINT profiles_role_allowed
+  CHECK (role IN ('entraineur', 'benevole', 'admin'));
