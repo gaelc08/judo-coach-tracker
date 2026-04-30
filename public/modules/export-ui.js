@@ -35,6 +35,7 @@ export function createExportUI({
   getProfileLabel,
   getProfileType,
   isVolunteerProfile,
+  isAdminProfile,
   getMileageScaleDescription,
   getMonthlyMileageBreakdown,
   getMileageYearBreakdown,
@@ -151,7 +152,7 @@ export function createExportUI({
     const currentUser = getCurrentUser();
 
     if (!currentCoach || !currentMonth) { alert('Veuillez sélectionner un profil et un mois.'); return; }
-    if (isVolunteerProfile(currentCoach)) { alert("L'export de déclaration salaire n'est pas disponible pour un profil bénévole."); return; }
+    if (isVolunteerProfile(currentCoach) || isAdminProfile(currentCoach)) { alert("L'export de déclaration salaire n'est pas disponible pour un profil bénévole ou administrateur."); return; }
 
     const [year, month] = currentMonth.split('-');
     const rows = Object.keys(timeData)
@@ -321,7 +322,7 @@ export function createExportUI({
     const logoUrl = new URL('logo-jcc.png', window.location.href).href;
     const coachDisplayName = getCoachDisplayName(currentCoach) || currentCoach.name;
     const profileLabel = getProfileLabel(currentCoach, { capitalized: true });
-    const signatureLabel = isVolunteerProfile(currentCoach) ? 'Signature du bénévole' : 'Signature du salarié';
+    const signatureLabel = isVolunteerProfile(currentCoach) || isAdminProfile(currentCoach) ? 'Signature du bénévole / administrateur' : 'Signature du salarié';
     const totalMileageAmount = rows.reduce((s, r) => s + (r.mileageAmount || 0), 0);
     const totalTollAmount = rows.reduce((s, r) => s + (r.tollAmount || 0), 0);
     const totalHotelAmount = rows.reduce((s, r) => s + (r.hotelAmount || 0), 0);
@@ -397,7 +398,7 @@ export function createExportUI({
     const logoUrl = new URL('logo-jcc.png', window.location.href).href;
     const coachDisplayName = getCoachDisplayName(currentCoach) || currentCoach.name;
     const profileLabel = getProfileLabel(currentCoach, { capitalized: true });
-    const signatureLabel = isVolunteerProfile(currentCoach) ? 'Signature du bénévole' : 'Signature du salarié';
+    const signatureLabel = isVolunteerProfile(currentCoach) || isAdminProfile(currentCoach) ? 'Signature du bénévole / administrateur' : 'Signature du salarié';
     const hourlyRate = Number(currentCoach.hourly_rate) || 0;
     const dailyAllowance = Number(currentCoach.daily_allowance) || 0;
     const esc = (v, fb = '') => escapeHtml(v || fb);
@@ -539,7 +540,7 @@ export function createExportUI({
       const totalKm = keys.reduce((s, k) => s + (Number(timeData[k].km) || 0), 0);
       const mileage = getMonthlyMileageBreakdown(coach, currentMonth);
       const totalMileageAmount = mileage?.total || 0;
-      const salary = isVolunteerProfile(coach) ? 0 : totalHours * (coach.hourly_rate || 0);
+      const salary = isVolunteerProfile(coach) || isAdminProfile(coach) ? 0 : totalHours * (coach.hourly_rate || 0);
       return { coach, totalHours, totalCompetitions, totalKm, totalMileageAmount, salary };
     }).filter((r) => r.totalHours > 0 || r.totalKm > 0);
 
@@ -557,7 +558,7 @@ export function createExportUI({
         <td style="text-align:center">${r.totalCompetitions}</td>
         <td style="text-align:center">${r.totalKm}</td>
         <td style="text-align:right">${fmt(r.totalMileageAmount)} €</td>
-        <td style="text-align:right">${isVolunteerProfile(r.coach) ? '—' : fmt(r.salary) + ' €'}</td>
+        <td style="text-align:right">${isVolunteerProfile(r.coach) || isAdminProfile(r.coach) ? '—' : fmt(r.salary) + ' €'}</td>
       </tr>`).join('');
 
     const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">

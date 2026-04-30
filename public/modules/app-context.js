@@ -2,7 +2,7 @@
 // Shared mutable state and helper builders used across all modules.
 
 import { __normalizeEmail, __normalizeMonth, __hasAdminClaim } from './shared-utils.js';
-import { getCoachDisplayName, getCurrentUserDisplayName, getProfileType, isVolunteerProfile, getProfileLabel, findExistingProfileByEmail } from './profile-utils.js';
+import { getCoachDisplayName, getCurrentUserDisplayName, getProfileType, isVolunteerProfile, isAdminProfile, getProfileLabel, findExistingProfileByEmail } from './profile-utils.js';
 import { parseFiscalPower, getMileageScaleBand, getLegacyKmRateFromFiscalPower, formatNumberFr, getMileageScaleDescription, calculateAnnualMileageAmount, getMileageYearBreakdown, getMonthlyMileageBreakdown } from './mileage-service.js';
 
 // ===== In-memory state =====
@@ -43,6 +43,7 @@ export function setEditingCoachId(v) { editingCoachId = v; }
 export const __getCoachDisplayName = getCoachDisplayName;
 export const __getProfileType = getProfileType;
 export const __isVolunteerProfile = isVolunteerProfile;
+export const __isAdminProfile = isAdminProfile;
 export const __getProfileLabel = getProfileLabel;
 
 export function __getCurrentUserDisplayName(user, preferredCoach = null) {

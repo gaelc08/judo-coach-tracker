@@ -295,6 +295,13 @@ export function setupAuthListeners() {
         if (!isAdmin && coaches.length > 0) {
           setCurrentCoach(coaches[0]);
           if (select) select.value = String(coaches[0].id);
+        } else if (isAdmin && coaches.length > 0) {
+          // Auto-sélectionner le profil de l'admin connecté s'il en a un
+          const ownProfile = coaches.find((c) => c.owner_uid === user.id);
+          if (ownProfile) {
+            setCurrentCoach(ownProfile);
+            if (select) select.value = String(ownProfile.id);
+          }
         }
       } catch (e) {
         console.error('Failed to load data:', e);
@@ -307,7 +314,7 @@ export function setupAuthListeners() {
         if (__adminFirstNameCache) {
           _updateCoachGreeting?.(user, { first_name: __adminFirstNameCache }, isAdmin);
         } else {
-          _supabase.from('admin_profiles').select('first_name').maybeSingle()
+          _supabase.from('admin_profiles').select('first_name').eq('owner_uid', user.id).maybeSingle()
             .then(({ data: ap }) => {
               if (ap?.first_name) {
                 __adminFirstNameCache = ap.first_name;

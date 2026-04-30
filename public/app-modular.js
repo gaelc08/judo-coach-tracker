@@ -307,6 +307,7 @@ initEventListeners({
   openMonthlySummaryPreviewModal,
   importCoachData,
   exportBackupJSON,
+  reloadData: loadAllDataFromSupabase,
 });
 
 // ===== Environment banner & version badge =====

@@ -36,18 +36,29 @@ export function getProfileType(profileOrType) {
     ? profileOrType
     : (profileOrType?.profile_type || profileOrType?.role);
   const normalized = String(raw || 'coach').trim().toLowerCase();
-  return normalized === 'benevole' ? 'benevole' : 'coach';
+  if (normalized === 'benevole') return 'benevole';
+  if (normalized === 'admin') return 'admin';
+  return 'coach';
 }
 
 export function isVolunteerProfile(profileOrType) {
   return getProfileType(profileOrType) === 'benevole';
 }
 
+export function isAdminProfile(profileOrType) {
+  return getProfileType(profileOrType) === 'admin';
+}
+
 export function getProfileLabel(profileOrType, { capitalized = false, plural = false } = {}) {
   const type = getProfileType(profileOrType);
-  let label = plural
-    ? (type === 'benevole' ? 'bénévoles' : 'entraîneurs')
-    : (type === 'benevole' ? 'bénévole' : 'entraîneur');
+  let label;
+  if (type === 'benevole') {
+    label = plural ? 'bénévoles' : 'bénévole';
+  } else if (type === 'admin') {
+    label = plural ? 'administrateurs' : 'administrateur';
+  } else {
+    label = plural ? 'entraîneurs' : 'entraîneur';
+  }
 
   if (capitalized) {
     label = label.charAt(0).toUpperCase() + label.slice(1);

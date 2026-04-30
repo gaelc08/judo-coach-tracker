@@ -132,7 +132,8 @@ export function setupEventListeners() {
   // Admin profile modal
   bindClick('adminProfileBtn', async () => {
     // Load existing profile
-    const { data } = await supabase.from('admin_profiles').select('*').limit(1).maybeSingle();
+    const { data: _apUser } = await supabase.auth.getUser();
+    const { data } = await supabase.from('admin_profiles').select('*').eq('owner_uid', _apUser?.user?.id ?? '').maybeSingle();
     const f = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
     f('adminProfileName',        data?.name);
     f('adminProfileFirstName',   data?.first_name);
@@ -161,6 +162,10 @@ export function setupEventListeners() {
     payload.owner_uid = user.id;
     const { error } = await supabase.from('admin_profiles').upsert([payload], { onConflict: 'owner_uid' });
     if (error) { alert('Erreur : ' + error.message); return; }
+    // Synchroniser le profil admin dans la table profiles
+    await supabase.rpc('sync_admin_profile_to_profiles').catch((e) => console.warn('sync_admin_profile_to_profiles failed:', e));
+    // Recharger les profils pour mettre à jour la liste et l'auto-sélection
+    if (_handlers.reloadData) await _handlers.reloadData().catch(() => {});
     document.getElementById('adminProfileModal')?.classList.remove('active');
   });
 
