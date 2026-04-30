@@ -5,13 +5,14 @@
 import { supabaseUrl, supabaseKey } from './env.js';
 import { __normalizeEmail, __escapeHtml } from './shared-utils.js';
 import {
-  coaches, currentUser, currentAccessToken,
-  setCoaches, editMode, editingCoachId, setEditMode, setEditingCoachId,
+  coaches, currentUser, currentAccessToken, currentCoach,
+  setCoaches, setCurrentCoach, editMode, editingCoachId, setEditMode, setEditingCoachId,
   __getProfileType, __isVolunteerProfile, __getLegacyKmRateFromFiscalPower,
   __buildAuditPayload, __findExistingProfileByEmail, __getFreshAccessToken,
 } from './app-context.js';
 import { isCurrentUserAdminDB } from './admin-service.js';
 import { updateSummary } from './summary-ui.js';
+import { updateCalendar } from './calendar-ui.js';
 import { loadCoaches } from './data-loader.js';
 
 let _supabase = null;
@@ -130,26 +131,33 @@ export async function saveCoach() {
   };
 
   const wasEditMode = !!(editMode && editingCoachId);
+  const editedId = editingCoachId;
   const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 8000));
 
   let res;
-  const dbPromise = (editMode && editingCoachId)
-    ? _supabase.from('profiles').update([coachData]).eq('id', editingCoachId).select()
+  const dbPromise = wasEditMode
+    ? _supabase.from('profiles').update([coachData]).eq('id', editedId).select()
     : _supabase.from('profiles').insert([coachData]).select();
 
   try {
     res = await Promise.race([dbPromise, timeoutPromise]);
   } catch (e) {
     console.warn('DEBUG saveCoach Supabase timeout, falling back to REST:', e.message);
-    res = await _coachWriteViaRest(coachData, { editingId: editingCoachId });
+    res = await _coachWriteViaRest(coachData, { editingId: editedId });
   }
 
   if (res.error) { alert('Erreur lors de la sauvegarde : ' + res.error.message); return; }
   if (!res.data?.length) { alert('Erreur : aucune donnée retournée.'); return; }
 
   const saved = { id: res.data[0].id, ...res.data[0] };
+
   if (wasEditMode) {
-    setCoaches(coaches.map((c) => (c.id === editingCoachId ? saved : c)));
+    setCoaches(coaches.map((c) => (c.id === editedId ? saved : c)));
+    // Si le profil édité est le profil actuellement sélectionné, mettre à jour currentCoach
+    // pour que l'affichage (puissance fiscale, label, barème km, etc.) soit immédiatement correct.
+    if (currentCoach?.id === editedId) {
+      setCurrentCoach(saved);
+    }
   } else {
     setCoaches([...coaches, saved]);
   }
@@ -166,6 +174,7 @@ export async function saveCoach() {
   setEditingCoachId(null);
   loadCoaches();
   updateSummary();
+  updateCalendar();
 }
 
 // ===== Delete coach =====
@@ -205,6 +214,7 @@ export async function deleteCoach() {
   setEditingCoachId(null);
   loadCoaches();
   updateSummary();
+  updateCalendar();
 }
 
 // ===== Invite coach =====
