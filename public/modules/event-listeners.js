@@ -146,27 +146,37 @@ export function setupEventListeners() {
   });
   bindClick('cancelAdminProfile', () => document.getElementById('adminProfileModal')?.classList.remove('active'));
   bindClick('saveAdminProfile', async () => {
-    const g = (id) => document.getElementById(id)?.value?.trim() || null;
-    const payload = {
-      name:           g('adminProfileName'),
-      first_name:     g('adminProfileFirstName'),
-      function_title: g('adminProfileFunction'),
-      address:        g('adminProfileAddress'),
-      vehicle:        g('adminProfileVehicle'),
-      fiscal_power:   g('adminProfileFiscalPower'),
-      km_rate:        parseFloat(document.getElementById('adminProfileKmRate')?.value) || 0.35,
-      updated_at:     new Date().toISOString(),
-    };
-    const user = (await supabase.auth.getUser()).data?.user;
-    if (!user) { alert('Non connecté.'); return; }
-    payload.owner_uid = user.id;
-    const { error } = await supabase.from('admin_profiles').upsert([payload], { onConflict: 'owner_uid' });
-    if (error) { alert('Erreur : ' + error.message); return; }
-    // Synchroniser le profil admin dans la table profiles
-    await supabase.rpc('sync_admin_profile_to_profiles').catch((e) => console.warn('sync_admin_profile_to_profiles failed:', e));
-    // Recharger les profils pour mettre à jour la liste et l'auto-sélection
-    if (_handlers.reloadData) await _handlers.reloadData().catch(() => {});
-    document.getElementById('adminProfileModal')?.classList.remove('active');
+    const btn = document.getElementById('saveAdminProfile');
+    if (btn) btn.disabled = true;
+    try {
+      const g = (id) => document.getElementById(id)?.value?.trim() || null;
+      const payload = {
+        name:           g('adminProfileName'),
+        first_name:     g('adminProfileFirstName'),
+        function_title: g('adminProfileFunction'),
+        address:        g('adminProfileAddress'),
+        vehicle:        g('adminProfileVehicle'),
+        fiscal_power:   g('adminProfileFiscalPower'),
+        km_rate:        parseFloat(document.getElementById('adminProfileKmRate')?.value) || 0.35,
+        updated_at:     new Date().toISOString(),
+      };
+      const user = (await supabase.auth.getUser()).data?.user;
+      if (!user) { alert('Non connecté.'); return; }
+      payload.owner_uid = user.id;
+      const { error } = await supabase.from('admin_profiles').upsert([payload], { onConflict: 'owner_uid' });
+      if (error) { alert('Erreur : ' + error.message); return; }
+      // Synchroniser le profil admin dans la table profiles
+      await supabase.rpc('sync_admin_profile_to_profiles').catch((e) => console.warn('sync_admin_profile_to_profiles failed:', e));
+      // Recharger la liste des profils
+      if (_handlers.reloadData) {
+        await _handlers.reloadData({ isAdminOverride: true }).catch((e) => console.warn('reloadData failed:', e));
+      }
+      document.getElementById('adminProfileModal')?.classList.remove('active');
+    } catch (e) {
+      alert('Erreur inattendue : ' + e.message);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
   });
 
   // Export — IDs correspondent aux boutons dans index.html
