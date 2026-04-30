@@ -166,7 +166,7 @@ export function setupEventListeners() {
       const { error } = await supabase.from('admin_profiles').upsert([payload], { onConflict: 'owner_uid' });
       if (error) { alert('Erreur : ' + error.message); return; }
       // Synchroniser le profil admin dans la table profiles
-      await supabase.rpc('sync_admin_profile_to_profiles').catch((e) => console.warn('sync_admin_profile_to_profiles failed:', e));
+      try { await supabase.rpc('sync_admin_profile_to_profiles'); } catch (e) { console.warn('sync_admin_profile_to_profiles failed:', e); }
       // Recharger la liste des profils
       if (_handlers.reloadData) {
         await _handlers.reloadData({ isAdminOverride: true }).catch((e) => console.warn('reloadData failed:', e));
