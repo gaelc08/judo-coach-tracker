@@ -196,7 +196,7 @@ export function updateSummary() {
 
   // Met à jour le payload CEA avec les valeurs calculées
   _updateCEAButton({
-    nomCoach:              `${getCoachCivilite(currentCoach)} ${currentCoach.name || ''} ${currentCoach.prenom || ''}`.trim(),         currentCoach.name || currentCoach.prenom || currentCoach.id,
+    nomCoach:         `${getCoachCivilite(currentCoach)} ${currentCoach.name || ''} ${currentCoach.first_name || ''}`.trim(),
     mois:             currentMonth,
     heures:           totalHours,
     tauxHoraire:      hourlyRate,
@@ -256,7 +256,6 @@ export function initCEACopyButton() {
     }
   });
 
-  // Sélecteur corrigé : le bloc synthèse dans index.html a la classe .summary (pas d'ID)
   const target =
     document.getElementById('summarySection') ||
     document.getElementById('summary') ||
@@ -265,7 +264,6 @@ export function initCEACopyButton() {
   if (target) {
     target.appendChild(btn);
   } else {
-    // Fallback : réessaye après un court délai (DOM pas encore rendu)
     setTimeout(() => {
       const t = document.querySelector('.summary');
       if (t) t.appendChild(btn);
