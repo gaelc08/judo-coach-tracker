@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JC Cattenom → CEA URSSAF Autofill
 // @namespace    https://github.com/gaelc08/jccattenom-app
-// @version      2.8.0
+// @version      2.9.0
 // @description  Lit la synthèse du mois depuis l'app JC Cattenom et pré-remplit le portail CEA URSSAF
 // @author       Gaël CANTARERO
 // @match        *://*/*
@@ -73,14 +73,21 @@
   }
 
   function detectStep() {
-    // Step3 : champs spécifiques CEA présents dans le DOM
+    // Étape 3 : champs rémunération présents
     if (
       document.getElementById('inRemunerationEuro') ||
       document.getElementById('inNombreHeures')      ||
       document.getElementById('inPayeSalaire')
     ) return 'step3';
 
-    // Step1 : select salarié ou inputs date
+    // Étape 2 : que des radios + bouton Suivant (pas de select ni d'input text)
+    const hasOnlyRadios = document.getElementById('btnSuivant') &&
+      document.getElementById('prestation.salaire1') &&
+      !document.getElementById('inRemunerationEuro') &&
+      !document.querySelector('select');
+    if (hasOnlyRadios) return 'step2';
+
+    // Étape 1 : select salarié ou inputs date
     const hasSelectOrDate = !!(
       document.querySelector('select') ||
       Array.from(document.querySelectorAll('input[type="text"]'))
@@ -101,8 +108,24 @@
 
   function fillNumeric(el, value) {
     if (!el || value == null) return false;
-    // Valeur entière ou décimale : on sépare euros et centimes si besoin
     return fillInput(el, String(value).replace('.', ','));
+  }
+
+  // Convertit des heures décimales (ex: 42.5) ou un nombre entier en format hhh:mn
+  function toHHMN(heures) {
+    const total = parseFloat(String(heures).replace(',', '.'));
+    if (isNaN(total)) return String(heures);
+    const h = Math.floor(total);
+    const mn = Math.round((total - h) * 60);
+    return `${h}:${String(mn).padStart(2, '0')}`;
+  }
+
+  // 1er jour du mois suivant au format dd/mm/yyyy
+  function datePaiement(mois) {
+    const [year, month] = mois.split('-').map(Number);
+    const next = new Date(year, month, 1); // month est déjà 0-indexé + 1 = mois suivant
+    const pad = n => String(n).padStart(2, '0');
+    return `${pad(next.getDate())}/${pad(next.getMonth() + 1)}/${next.getFullYear()}`;
   }
 
   function findInputNearLabel(labelText) {
@@ -122,9 +145,7 @@
 
   function extractMotsCle(nom) {
     return (nom || '')
-      .toUpperCase()
-      .trim()
-      .split(/\s+/)
+      .toUpperCase().trim().split(/\s+/)
       .filter(m => m.length > 1 && !CIVILITES.includes(m));
   }
 
@@ -139,8 +160,7 @@
         if (motsCle.length > 0 && matches.length === motsCle.length) {
           sel.value = opt.value;
           sel.dispatchEvent(new Event('change', { bubbles: true }));
-          filled++;
-          break;
+          filled++; break;
         }
       }
     }
@@ -148,9 +168,7 @@
     if (filled === 0 && data.nomCoach) {
       for (const inp of document.querySelectorAll('input[type="text"]')) {
         if (/salar|nom|prénom|prenom/i.test(inp.name + inp.id + inp.placeholder)) {
-          fillInput(inp, data.nomCoach);
-          filled++;
-          break;
+          fillInput(inp, data.nomCoach); filled++; break;
         }
       }
     }
@@ -179,7 +197,16 @@
     return filled;
   }
 
-  // Sépare un montant en [euros, centimes] sous forme de strings
+  // Étape 2 : tout laisser par défaut, juste cliquer Suivant
+  function fillStep2() {
+    const btn = document.getElementById('btnSuivant');
+    if (btn) {
+      setTimeout(() => btn.click(), 300);
+      return true;
+    }
+    return false;
+  }
+
   function splitMontant(valeur) {
     const str = String(valeur != null ? valeur : '0').replace(',', '.');
     const [e, c = '00'] = parseFloat(str).toFixed(2).split('.');
@@ -189,14 +216,29 @@
   function fillStep3(data) {
     let filled = 0;
 
-    // --- Salaire (paye) : champ texte unique inPayeSalaire ---
-    const inPaye = document.getElementById('inPayeSalaire');
-    if (inPaye && data.salaireBrut != null) {
-      fillNumeric(inPaye, data.salaireBrut);
-      filled++;
+    // Date de paiement = 1er du mois suivant
+    if (data.mois) {
+      const dp = datePaiement(data.mois);
+      // Chercher un input date de paiement (inPayeSalaire ou label proche)
+      const inPaye = document.getElementById('inPayeSalaire');
+      if (inPaye) {
+        // Si le champ attend une date (placeholder ou label contient "paiement"/"versement")
+        const label = inPaye.closest('tr')?.querySelector('td:first-child')?.textContent || '';
+        if (/paiement|versement|date/i.test(label + inPaye.name + inPaye.id)) {
+          fillInput(inPaye, dp); filled++;
+        } else {
+          // Sinon c'est le salaire brut
+          fillNumeric(inPaye, data.salaireBrut); filled++;
+        }
+      }
+      // Chercher un input date de paiement générique
+      const datePaieInput = findInputNearLabel('paiement') || findInputNearLabel('versement');
+      if (datePaieInput && datePaieInput !== document.getElementById('inPayeSalaire')) {
+        fillInput(datePaieInput, dp); filled++;
+      }
     }
 
-    // --- Rémunération : euros + centimes séparés ---
+    // Rémunération euros + centimes
     const inEuro = document.getElementById('inRemunerationEuro');
     const inCent = document.getElementById('inRemunerationCent');
     if ((inEuro || inCent) && data.salaireBrut != null) {
@@ -205,31 +247,25 @@
       if (inCent) { fillInput(inCent, cents); filled++; }
     }
 
-    // --- Radio remunerationBrut : cocher la 1ère option (brut) ---
+    // Radio remunerationBrut : cocher option 1 (brut)
     const radioBrut = document.getElementById('prestation.remunerationBrut1');
     if (radioBrut && !radioBrut.checked) {
       radioBrut.checked = true;
       radioBrut.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
-    // --- Nombre d'heures ---
+    // Nombre d'heures au format hhh:mn
     const inHeures = document.getElementById('inNombreHeures');
     if (inHeures && data.heures != null) {
-      fillNumeric(inHeures, data.heures);
+      fillInput(inHeures, toHHMN(data.heures));
       filled++;
     }
 
-    // --- Manifestations (compétitions) ---
-    const inNbManif  = document.getElementById('inNombreManifestation');
-    const inMtManif  = document.getElementById('inMontantManifestation');
-    if (inNbManif && data.joursComp != null) {
-      fillNumeric(inNbManif, data.joursComp);
-      filled++;
-    }
-    if (inMtManif && data.salaireComp != null) {
-      fillNumeric(inMtManif, data.salaireComp);
-      filled++;
-    }
+    // Manifestations (compétitions)
+    const inNbManif = document.getElementById('inNombreManifestation');
+    const inMtManif = document.getElementById('inMontantManifestation');
+    if (inNbManif && data.joursComp != null)  { fillNumeric(inNbManif, data.joursComp);  filled++; }
+    if (inMtManif && data.salaireComp != null) { fillNumeric(inMtManif, data.salaireComp); filled++; }
 
     return filled;
   }
@@ -251,6 +287,15 @@
         const n = fillStep1(payload);
         setStatus(n > 0 ? `✅ ${n} champ(s) rempli(s) — vérifiez puis Suivant` : '⚠ Aucun champ trouvé.');
       });
+    } else if (step === 'step2') {
+      zone.innerHTML = `
+        <div class="jcc-step-label">📍 Étape 2 — Options (défaut)</div>
+        <button class="jcc-btn" id="jcc-step-btn">▶ Passer à l’étape suivante</button>
+      `;
+      zone.querySelector('#jcc-step-btn').addEventListener('click', () => {
+        const ok = fillStep2();
+        setStatus(ok ? '⏩ Passage à l’étape 3…' : '⚠ Bouton Suivant introuvable.', !ok);
+      });
     } else if (step === 'step3') {
       zone.innerHTML = `
         <div class="jcc-step-label">📍 Étape 3 — Rémunération</div>
@@ -262,7 +307,7 @@
         setStatus(n > 0 ? `✅ ${n} champ(s) rempli(s)` : '⚠ Aucun champ trouvé.');
       });
     } else {
-      zone.innerHTML = `<div class="jcc-step-label" style="color:#e67e22">Étape non reconnue — navigue vers étape 1 ou 3</div>`;
+      zone.innerHTML = `<div class="jcc-step-label" style="color:#e67e22">Étape non reconnue</div>`;
     }
   }
 
@@ -325,12 +370,13 @@
     const rows = [
       ['Coach',             payload.nomCoach],
       ['Mois',              payload.mois],
-      ['Heures',            payload.heures != null ? payload.heures + ' h' : '—'],
+      ['Heures',            payload.heures != null ? toHHMN(payload.heures) : '—'],
       ['Taux horaire',      payload.tauxHoraire != null ? payload.tauxHoraire + ' €' : '—'],
       ['Salaire formation', payload.salaireFormation != null ? payload.salaireFormation + ' €' : '—'],
       ['Jours compét.',     payload.joursComp != null ? payload.joursComp + ' j' : '—'],
       ['Salaire compét.',   payload.salaireComp != null ? payload.salaireComp + ' €' : '—'],
       ['Total brut',        payload.salaireBrut != null ? payload.salaireBrut + ' €' : '—'],
+      ['Date paiement',     payload.mois ? datePaiement(payload.mois) : '—'],
     ];
     t.innerHTML = rows.map(([l,v]) => `<tr><td>${l}</td><td>${v ?? '—'}</td></tr>`).join('');
   }
