@@ -15,6 +15,7 @@ import {
 import { isCurrentUserAdminDB } from './admin-service.js';
 import { __isAdminForUi } from './admin-service.js';
 import { currencyDisplay, numberDisplay } from './display-format.js';
+import { getCoachCivilite } from './profile-utils.js';
 
 let _logAuditEvent = null;
 export function initSummaryUi({ logAuditEvent }) {
@@ -195,7 +196,7 @@ export function updateSummary() {
 
   // Met à jour le payload CEA avec les valeurs calculées
   _updateCEAButton({
-    nomCoach:         currentCoach.name || currentCoach.prenom || currentCoach.id,
+    nomCoach:              `${getCoachCivilite(currentCoach)} ${currentCoach.name || ''} ${currentCoach.prenom || ''}`.trim(),         currentCoach.name || currentCoach.prenom || currentCoach.id,
     mois:             currentMonth,
     heures:           totalHours,
     tauxHoraire:      hourlyRate,
