@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JCC Cattenom → CEA URSSAF Autofill
 // @namespace    https://github.com/gaelc08/jccattenom-app
-// @version      2.3.0
+// @version      2.4.0
 // @description  Lit la synthèse du mois depuis l'app JCC Cattenom et pré-remplit le portail CEA URSSAF
 // @author       Gaël CANTARERO
 // @match        *://*/*
@@ -103,24 +103,50 @@
     return null;
   }
 
+  // Civilités à ignorer lors du matching
+  const CIVILITES = ['MR', 'MME', 'M.', 'MME.', 'DR', 'DR.', 'MLLE'];
+
+  /**
+   * Extrait les mots significatifs d'un nom affiché par getCoachDisplayName
+   * Format attendu depuis l'app : "NOM Prénom" (ex: "CHERRIER Valentin")
+   * Format CEA : "MR NOM Prénom" ou "MME NOM Prénom"
+   * On ignore les civilités et on cherche chaque mot dans l'option du select.
+   */
+  function extractMotsCle(nom) {
+    return (nom || '')
+      .toUpperCase()
+      .trim()
+      .split(/\s+/)
+      .filter(m => m.length > 1 && !CIVILITES.includes(m));
+  }
+
   function fillStep1(data) {
     let filled = 0;
-    const nom = (data.nomCoach || '').toLowerCase();
+
+    // Mots-clés depuis le nom de l'app (format "NOM Prénom")
+    const motsCle = extractMotsCle(data.nomCoach);
 
     for (const sel of document.querySelectorAll('select')) {
       for (const opt of sel.options) {
-        if (opt.text.toLowerCase().includes(nom)) {
+        const optTxt = opt.text.toUpperCase();
+        // On veut que tous les mots-clés soient présents dans l'option
+        const matches = motsCle.filter(m => optTxt.includes(m));
+        if (motsCle.length > 0 && matches.length === motsCle.length) {
           sel.value = opt.value;
           sel.dispatchEvent(new Event('change', { bubbles: true }));
-          filled++; break;
+          filled++;
+          break;
         }
       }
     }
 
-    if (filled === 0 && nom) {
+    // Fallback : si le select n'a pas matché, on essaie un input texte
+    if (filled === 0 && data.nomCoach) {
       for (const inp of document.querySelectorAll('input[type="text"]')) {
         if (/salar|nom|prénom|prenom/i.test(inp.name + inp.id + inp.placeholder)) {
-          fillInput(inp, data.nomCoach); filled++; break;
+          fillInput(inp, data.nomCoach);
+          filled++;
+          break;
         }
       }
     }
