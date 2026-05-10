@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         JCC Cattenom → CEA URSSAF Autofill
 // @namespace    https://github.com/gaelc08/jccattenom-app
-// @version      1.0.0
-// @description  Lit la synthèse du mois depuis l'app JCC Cattenom et pré-remplit les champs de saisie du portail CEA URSSAF
+// @version      2.0.0
+// @description  Lit la synthèse du mois depuis l'app JCC Cattenom et pré-remplit le portail CEA URSSAF (étape 1 : salarié+période, étape 3 : rémunération)
 // @author       Gaël CANTARERO
 // @match        https://www.cea.urssaf.fr/*
 // @match        https://cea.urssaf.fr/*
@@ -16,31 +16,16 @@
 
   const STORAGE_KEY = 'jcc_cea_payload';
 
-  // ─── STYLES ───────────────────────────────────────────────────────────────
   GM_addStyle(`
     #jcc-panel {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      z-index: 99999;
-      background: #1c2b3a;
-      color: #e8f0f7;
-      border-radius: 12px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-      font-family: 'Segoe UI', sans-serif;
-      font-size: 13px;
-      min-width: 280px;
-      max-width: 340px;
-      overflow: hidden;
+      position: fixed; bottom: 20px; right: 20px; z-index: 99999;
+      background: #1c2b3a; color: #e8f0f7; border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4); font-family: 'Segoe UI', sans-serif;
+      font-size: 13px; min-width: 290px; max-width: 350px; overflow: hidden;
     }
     #jcc-panel-header {
-      background: #0d3b5e;
-      padding: 10px 14px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      cursor: pointer;
-      user-select: none;
+      background: #0d3b5e; padding: 10px 14px; display: flex;
+      align-items: center; justify-content: space-between; cursor: pointer; user-select: none;
     }
     #jcc-panel-header span { font-weight: 600; font-size: 14px; }
     #jcc-panel-body { padding: 12px 14px; }
@@ -48,103 +33,225 @@
     #jcc-panel td { padding: 3px 0; }
     #jcc-panel td:first-child { color: #8bacc8; width: 60%; }
     #jcc-panel td:last-child { text-align: right; font-weight: 500; }
-    #jcc-fill-btn, #jcc-import-btn {
-      width: 100%;
-      border: none;
-      border-radius: 7px;
-      padding: 8px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s;
-      margin-bottom: 6px;
+    .jcc-btn {
+      width: 100%; border: none; border-radius: 7px; padding: 8px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: background 0.2s; margin-bottom: 6px;
     }
-    #jcc-fill-btn { background: #1a6fa8; color: white; }
+    #jcc-import-btn  { background: #2d4a3e; color: #7ec8a0; }
+    #jcc-import-btn:hover { background: #3a5e4f; }
+    #jcc-step1-btn   { background: #1a6fa8; color: white; }
+    #jcc-step1-btn:hover { background: #1e84c8; }
+    #jcc-step1-btn:disabled { background: #555; cursor: default; }
+    #jcc-fill-btn    { background: #1a6fa8; color: white; }
     #jcc-fill-btn:hover { background: #1e84c8; }
     #jcc-fill-btn:disabled { background: #555; cursor: default; }
-    #jcc-import-btn { background: #2d4a3e; color: #7ec8a0; }
-    #jcc-import-btn:hover { background: #3a5e4f; }
     #jcc-status { margin-top: 6px; font-size: 11px; color: #7ec8a0; min-height: 16px; text-align: center; }
     #jcc-status.error { color: #f08080; }
     .jcc-badge { background: #e67e22; color: white; border-radius: 9999px; padding: 1px 7px; font-size: 11px; font-weight: 700; }
+    .jcc-step-label { font-size: 11px; color: #8bacc8; margin-bottom: 4px; text-align: center; }
   `);
 
-  // ─── PAYLOAD ──────────────────────────────────────────────────────────────
   let payload = null;
 
   function loadPayload() {
-    try {
-      const raw = GM_getValue(STORAGE_KEY, null);
-      if (raw) payload = JSON.parse(raw);
-    } catch (e) { payload = null; }
+    try { const r = GM_getValue(STORAGE_KEY, null); if (r) payload = JSON.parse(r); } catch(e) { payload = null; }
+  }
+  function savePayload(data) { payload = data; GM_setValue(STORAGE_KEY, JSON.stringify(data)); }
+
+  // ── Détecte sur quelle étape on est ──────────────────────────────────────
+  // Étape 1 : "Salarié et Période"  — contient un select de salarié + champs date
+  // Étape 3 : "Rémunération"        — contient les champs salaire brut / heures
+  function detectStep() {
+    const title = document.title + ' ' + document.body.innerText.slice(0, 500);
+    if (/salarié.*période|choix du salarié|choix de la période/i.test(title)) return 'step1';
+    if (/rémunération/i.test(title)) return 'step3';
+    return 'other';
   }
 
-  function savePayload(data) {
-    payload = data;
-    GM_setValue(STORAGE_KEY, JSON.stringify(data));
+  // ── Utilitaire : remplir un <input> ou <select> ───────────────────────────
+  function fillInput(el, value) {
+    if (!el || value == null) return false;
+    el.value = String(value);
+    el.dispatchEvent(new Event('input',  { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
   }
 
-  // ─── UI PANEL ─────────────────────────────────────────────────────────────
+  // Remplir un input numérique (remplace . par , pour le portail FR)
+  function fillNumeric(el, value) {
+    if (!el || value == null) return false;
+    return fillInput(el, String(value).replace('.', ','));
+  }
+
+  // Cherche un input dans le contexte d'un label contenant labelText
+  function findInputNearLabel(labelText) {
+    for (const el of document.querySelectorAll('td, th, label, span, div')) {
+      if (el.textContent.trim().toLowerCase().includes(labelText.toLowerCase())) {
+        const input =
+          el.nextElementSibling?.querySelector('input') ||
+          el.closest('tr')?.querySelector('input') ||
+          el.closest('td')?.nextElementSibling?.querySelector('input');
+        if (input) return input;
+      }
+    }
+    return null;
+  }
+
+  // ── Étape 1 : Salarié + Période ───────────────────────────────────────────
+  // Le portail affiche un champ texte ou select avec le nom du salarié.
+  // Les dates sont deux <input type="text"> format JJ/MM/AAAA.
+  function fillStep1(data) {
+    let filled = 0;
+
+    // ── Nom du salarié ──
+    // Le portail CEA pré-sélectionne souvent le salarié via un <select> ou un champ texte.
+    // On cherche le select contenant le nom (insensible à la casse, nom ou prénom).
+    const nom = (data.nomCoach || '').toLowerCase();
+    const selects = document.querySelectorAll('select');
+    for (const sel of selects) {
+      for (const opt of sel.options) {
+        if (opt.text.toLowerCase().includes(nom)) {
+          sel.value = opt.value;
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+          filled++;
+          break;
+        }
+      }
+    }
+
+    // ── Période d'emploi : du JJ/MM/AAAA au JJ/MM/AAAA ──
+    if (data.mois) {
+      const [year, month] = data.mois.split('-').map(Number);
+      const lastDay = new Date(year, month, 0).getDate();
+      const pad = n => String(n).padStart(2, '0');
+      const dateDebut = `${pad(1)}/${pad(month)}/${year}`;
+      const dateFin   = `${pad(lastDay)}/${pad(month)}/${year}`;
+
+      // Cherche les inputs de date (généralement deux champs texte consécutifs)
+      const dateInputs = Array.from(document.querySelectorAll('input[type="text"]'))
+        .filter(i => /date|du|au|période|debut|fin/i.test(i.name + i.id + i.placeholder + (i.closest('td')?.previousElementSibling?.textContent || '')));
+
+      if (dateInputs.length >= 2) {
+        fillInput(dateInputs[0], dateDebut) && filled++;
+        fillInput(dateInputs[1], dateFin)   && filled++;
+      } else {
+        // Fallback : les deux premiers inputs texte du formulaire après le select salarié
+        const allText = Array.from(document.querySelectorAll('input[type="text"]'));
+        if (allText[0]) fillInput(allText[0], dateDebut) && filled++;
+        if (allText[1]) fillInput(allText[1], dateFin)   && filled++;
+      }
+    }
+
+    return filled;
+  }
+
+  // ── Étape 3 : Rémunération ────────────────────────────────────────────────
+  function fillStep3(data) {
+    let filled = 0;
+
+    const trySelector = (selector, value) => {
+      const el = document.querySelector(selector);
+      return el ? (fillNumeric(el, value) ? (filled++, true) : false) : false;
+    };
+
+    // Salaire brut
+    if (!trySelector('input[name="salairebrut"]',     data.salaireBrut))
+    if (!trySelector('input[id*="salairebrut"]',      data.salaireBrut))
+    if (!trySelector('input[id*="salaireBrut"]',      data.salaireBrut))
+    if (!trySelector('input[id*="remunerationBrute"]',data.salaireBrut)) {
+      const el = findInputNearLabel('salaire brut');
+      if (el) { fillNumeric(el, data.salaireBrut); filled++; }
+    }
+
+    // Nombre d'heures
+    if (!trySelector('input[name="nbheures"]',  data.heures))
+    if (!trySelector('input[id*="nbHeures"]',   data.heures))
+    if (!trySelector('input[id*="heures"]',     data.heures)) {
+      const el = findInputNearLabel("heures");
+      if (el) { fillNumeric(el, data.heures); filled++; }
+    }
+
+    // Taux horaire (si présent sur la page)
+    if (!trySelector('input[name="tauxhoraire"]', data.tauxHoraire))
+    if (!trySelector('input[id*="tauxHoraire"]',  data.tauxHoraire)) {
+      const el = findInputNearLabel("taux horaire");
+      if (el) { fillNumeric(el, data.tauxHoraire); filled++; }
+    }
+
+    return filled;
+  }
+
+  // ── Panel UI ──────────────────────────────────────────────────────────────
   function buildPanel() {
     loadPayload();
+    const step = detectStep();
 
     const panel = document.createElement('div');
     panel.id = 'jcc-panel';
 
-    const header = document.createElement('div');
-    header.id = 'jcc-panel-header';
-    header.innerHTML = `<span>\uD83E\uDD4B JCC Cattenom \u2192 CEA</span><span class="jcc-badge">AUTO</span>`;
+    panel.innerHTML = `
+      <div id="jcc-panel-header">
+        <span>🥋 JCC Cattenom → CEA</span>
+        <span class="jcc-badge">AUTO</span>
+      </div>
+      <div id="jcc-panel-body">
+        <button class="jcc-btn" id="jcc-import-btn">📋 Coller les données depuis l'app</button>
+        <table id="jcc-data-table"></table>
+        ${step === 'step1' ? `
+          <div class="jcc-step-label">📍 Étape 1 — Salarié &amp; Période</div>
+          <button class="jcc-btn" id="jcc-step1-btn">▶ Remplir salarié + période</button>
+        ` : step === 'step3' ? `
+          <div class="jcc-step-label">📍 Étape 3 — Rémunération</div>
+          <button class="jcc-btn" id="jcc-fill-btn">▶ Remplir salaire &amp; heures</button>
+        ` : `
+          <div class="jcc-step-label" style="color:#e67e22">Navigue vers l'étape 1 ou 3</div>
+        `}
+        <div id="jcc-status"></div>
+      </div>
+    `;
 
-    const body = document.createElement('div');
-    body.id = 'jcc-panel-body';
-
-    const importBtn = document.createElement('button');
-    importBtn.id = 'jcc-import-btn';
-    importBtn.textContent = '\uD83D\uDCCB Coller les données depuis l\'app';
-
-    const table = document.createElement('table');
-    table.id = 'jcc-data-table';
-
-    const fillBtn = document.createElement('button');
-    fillBtn.id = 'jcc-fill-btn';
-    fillBtn.textContent = '\u25B6 Remplir les champs CEA';
-
-    const status = document.createElement('div');
-    status.id = 'jcc-status';
-
-    body.appendChild(importBtn);
-    body.appendChild(table);
-    body.appendChild(fillBtn);
-    body.appendChild(status);
-    panel.appendChild(header);
-    panel.appendChild(body);
     document.body.appendChild(panel);
 
-    // Toggle panel
-    header.addEventListener('click', () => {
+    // Toggle
+    panel.querySelector('#jcc-panel-header').addEventListener('click', () => {
+      const body = panel.querySelector('#jcc-panel-body');
       body.style.display = body.style.display === 'none' ? '' : 'none';
     });
 
     // Import clipboard
-    importBtn.addEventListener('click', async () => {
+    panel.querySelector('#jcc-import-btn').addEventListener('click', async () => {
       try {
         const text = await navigator.clipboard.readText();
         const data = JSON.parse(text);
         if (data.salaireBrut == null && data.heures == null) throw new Error('Format invalide');
         savePayload(data);
         renderTable();
-        setStatus('\u2705 Données importées !');
-      } catch (e) {
-        setStatus('\u274C Clipboard invalide. Utilisez "Copier pour CEA" dans l\'app.', true);
+        setStatus('✅ Données importées !');
+      } catch(e) {
+        setStatus('❌ Clipboard invalide — utilisez "Copier pour CEA" dans l\'app.', true);
       }
     });
 
-    // Remplissage
-    fillBtn.addEventListener('click', () => {
-      if (!payload) { setStatus('\u26A0 Importez d\'abord les données depuis l\'app.', true); return; }
-      const filled = fillCEAFields(payload);
-      setStatus(filled > 0 ? `\u2705 ${filled} champ(s) rempli(s)` : '\u26A0 Aucun champ trouvé sur cette page.');
-    });
+    // Étape 1
+    const s1btn = panel.querySelector('#jcc-step1-btn');
+    if (s1btn) {
+      s1btn.addEventListener('click', () => {
+        if (!payload) { setStatus('⚠ Importez d\'abord les données.', true); return; }
+        const n = fillStep1(payload);
+        setStatus(n > 0 ? `✅ ${n} champ(s) rempli(s) — vérifiez puis cliquez Suivant` : '⚠ Aucun champ trouvé. Vérifiez DevTools.');
+      });
+    }
+
+    // Étape 3
+    const s3btn = panel.querySelector('#jcc-fill-btn');
+    if (s3btn) {
+      s3btn.addEventListener('click', () => {
+        if (!payload) { setStatus('⚠ Importez d\'abord les données.', true); return; }
+        const n = fillStep3(payload);
+        setStatus(n > 0 ? `✅ ${n} champ(s) rempli(s)` : '⚠ Aucun champ trouvé sur cette page.');
+      });
+    }
 
     renderTable();
   }
@@ -152,26 +259,21 @@
   function renderTable() {
     const table = document.getElementById('jcc-data-table');
     if (!table) return;
-    table.innerHTML = '';
     if (!payload) {
       table.innerHTML = '<tr><td colspan="2" style="color:#8bacc8;font-style:italic;text-align:center;padding:8px">Aucune donnée chargée</td></tr>';
       return;
     }
-    const fmt = v => (v != null ? v : '\u2014');
-    [
-      ['Coach',               fmt(payload.nomCoach)],
-      ['Mois',                fmt(payload.mois)],
-      ['Heures travaillées',  payload.heures != null ? `${payload.heures} h` : '\u2014'],
-      ['Taux horaire',        payload.tauxHoraire != null ? `${payload.tauxHoraire} \u20AC` : '\u2014'],
-      ['Salaire formation',   payload.salaireFormation != null ? `${payload.salaireFormation} \u20AC` : '\u2014'],
-      ['Jours compétition',   payload.joursComp != null ? `${payload.joursComp} j` : '\u2014'],
-      ['Salaire compét.',     payload.salaireComp != null ? `${payload.salaireComp} \u20AC` : '\u2014'],
-      ['Total brut URSSAF',   payload.salaireBrut != null ? `${payload.salaireBrut} \u20AC` : '\u2014'],
-    ].forEach(([label, val]) => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${label}</td><td>${val}</td>`;
-      table.appendChild(tr);
-    });
+    const rows = [
+      ['Coach',             payload.nomCoach],
+      ['Mois',              payload.mois],
+      ['Heures',            payload.heures != null ? payload.heures + ' h' : '—'],
+      ['Taux horaire',      payload.tauxHoraire != null ? payload.tauxHoraire + ' €' : '—'],
+      ['Salaire formation', payload.salaireFormation != null ? payload.salaireFormation + ' €' : '—'],
+      ['Jours compét.',     payload.joursComp != null ? payload.joursComp + ' j' : '—'],
+      ['Salaire compét.',   payload.salaireComp != null ? payload.salaireComp + ' €' : '—'],
+      ['Total brut',        payload.salaireBrut != null ? payload.salaireBrut + ' €' : '—'],
+    ];
+    table.innerHTML = rows.map(([l,v]) => `<tr><td>${l}</td><td>${v ?? '—'}</td></tr>`).join('');
   }
 
   function setStatus(msg, isError = false) {
@@ -179,69 +281,9 @@
     if (!s) return;
     s.textContent = msg;
     s.className = isError ? 'error' : '';
-    setTimeout(() => { if (s) s.textContent = ''; }, 4000);
+    setTimeout(() => { if (s) s.textContent = ''; }, 5000);
   }
 
-  // ─── REMPLISSAGE CEA ──────────────────────────────────────────────────────
-  // Sélecteurs basés sur l'inspection du portail CEA.
-  // Si un champ n'est pas rempli, inspecte son name/id dans DevTools et ajuste ici.
-  function fillCEAFields(data) {
-    let filled = 0;
-
-    const tryFill = (selector, value) => {
-      if (value == null) return;
-      const el = document.querySelector(selector);
-      if (!el) return;
-      el.value = String(value).replace('.', ',');
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-      el.dispatchEvent(new Event('change', { bubbles: true }));
-      filled++;
-    };
-
-    const tryFillByLabel = (labelText, value) => {
-      if (value == null) return;
-      for (const el of document.querySelectorAll('label, th, td, span')) {
-        if (el.textContent.trim().toLowerCase().includes(labelText.toLowerCase())) {
-          const input =
-            el.nextElementSibling?.querySelector?.('input') ||
-            el.closest('tr')?.querySelector('input') ||
-            el.closest('td')?.nextElementSibling?.querySelector('input');
-          if (input) {
-            input.value = String(value).replace('.', ',');
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-            input.dispatchEvent(new Event('change', { bubbles: true }));
-            filled++;
-            return;
-          }
-        }
-      }
-    };
-
-    // Salaire brut (champ principal déclaration CEA)
-    tryFill('input[name="salairebrut"]',        data.salaireBrut);
-    tryFill('input[id*="salairebrut"]',          data.salaireBrut);
-    tryFill('input[id*="salaireBrut"]',          data.salaireBrut);
-    tryFill('input[id*="remunerationBrute"]',    data.salaireBrut);
-
-    // Heures travaillées
-    tryFill('input[name="nbheures"]',            data.heures);
-    tryFill('input[id*="nbHeures"]',             data.heures);
-    tryFill('input[id*="heures"]',               data.heures);
-
-    // Taux horaire
-    tryFill('input[name="tauxhoraire"]',         data.tauxHoraire);
-    tryFill('input[id*="tauxHoraire"]',          data.tauxHoraire);
-
-    // Fallback label
-    tryFillByLabel('salaire brut',               data.salaireBrut);
-    tryFillByLabel('nombre d\'heures',           data.heures);
-    tryFillByLabel('heures travaillées',         data.heures);
-    tryFillByLabel('taux horaire',               data.tauxHoraire);
-
-    return filled;
-  }
-
-  // ─── INIT ─────────────────────────────────────────────────────────────────
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', buildPanel);
   } else {
