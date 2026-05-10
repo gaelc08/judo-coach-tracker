@@ -1,14 +1,13 @@
 // ==UserScript==
 // @name         JCC Cattenom → CEA URSSAF Autofill
 // @namespace    https://github.com/gaelc08/jccattenom-app
-// @version      2.0.0
+// @version      2.1.0
 // @description  Lit la synthèse du mois depuis l'app JCC Cattenom et pré-remplit le portail CEA URSSAF (étape 1 : salarié+période, étape 3 : rémunération)
 // @author       Gaël CANTARERO
 // @match        https://www.cea.urssaf.fr/*
 // @match        https://cea.urssaf.fr/*
 // @grant        GM_getValue
 // @grant        GM_setValue
-// @grant        GM_addStyle
 // ==/UserScript==
 
 (function () {
@@ -16,7 +15,9 @@
 
   const STORAGE_KEY = 'jcc_cea_payload';
 
-  GM_addStyle(`
+  // ── Injection CSS native (remplace GM_addStyle incompatible) ─────────────
+  const style = document.createElement('style');
+  style.textContent = `
     #jcc-panel {
       position: fixed; bottom: 20px; right: 20px; z-index: 99999;
       background: #1c2b3a; color: #e8f0f7; border-radius: 12px;
@@ -50,18 +51,20 @@
     #jcc-status.error { color: #f08080; }
     .jcc-badge { background: #e67e22; color: white; border-radius: 9999px; padding: 1px 7px; font-size: 11px; font-weight: 700; }
     .jcc-step-label { font-size: 11px; color: #8bacc8; margin-bottom: 4px; text-align: center; }
-  `);
+  `;
+  document.head.appendChild(style);
 
   let payload = null;
 
   function loadPayload() {
-    try { const r = GM_getValue(STORAGE_KEY, null); if (r) payload = JSON.parse(r); } catch(e) { payload = null; }
+    try {
+      const r = GM_getValue(STORAGE_KEY, null);
+      if (r) payload = JSON.parse(r);
+    } catch(e) { payload = null; }
   }
   function savePayload(data) { payload = data; GM_setValue(STORAGE_KEY, JSON.stringify(data)); }
 
   // ── Détecte sur quelle étape on est ──────────────────────────────────────
-  // Étape 1 : "Salarié et Période"  — contient un select de salarié + champs date
-  // Étape 3 : "Rémunération"        — contient les champs salaire brut / heures
   function detectStep() {
     const title = document.title + ' ' + document.body.innerText.slice(0, 500);
     if (/salarié.*période|choix du salarié|choix de la période/i.test(title)) return 'step1';
@@ -78,13 +81,11 @@
     return true;
   }
 
-  // Remplir un input numérique (remplace . par , pour le portail FR)
   function fillNumeric(el, value) {
     if (!el || value == null) return false;
     return fillInput(el, String(value).replace('.', ','));
   }
 
-  // Cherche un input dans le contexte d'un label contenant labelText
   function findInputNearLabel(labelText) {
     for (const el of document.querySelectorAll('td, th, label, span, div')) {
       if (el.textContent.trim().toLowerCase().includes(labelText.toLowerCase())) {
@@ -99,14 +100,9 @@
   }
 
   // ── Étape 1 : Salarié + Période ───────────────────────────────────────────
-  // Le portail affiche un champ texte ou select avec le nom du salarié.
-  // Les dates sont deux <input type="text"> format JJ/MM/AAAA.
   function fillStep1(data) {
     let filled = 0;
 
-    // ── Nom du salarié ──
-    // Le portail CEA pré-sélectionne souvent le salarié via un <select> ou un champ texte.
-    // On cherche le select contenant le nom (insensible à la casse, nom ou prénom).
     const nom = (data.nomCoach || '').toLowerCase();
     const selects = document.querySelectorAll('select');
     for (const sel of selects) {
@@ -120,7 +116,18 @@
       }
     }
 
-    // ── Période d'emploi : du JJ/MM/AAAA au JJ/MM/AAAA ──
+    // Fallback champ texte salarié (portail CEA utilise parfois un input autocomplete)
+    if (filled === 0 && nom) {
+      const inputs = document.querySelectorAll('input[type="text"]');
+      for (const inp of inputs) {
+        if (/salar|nom|prénom|prenom/i.test(inp.name + inp.id + inp.placeholder)) {
+          fillInput(inp, data.nomCoach);
+          filled++;
+          break;
+        }
+      }
+    }
+
     if (data.mois) {
       const [year, month] = data.mois.split('-').map(Number);
       const lastDay = new Date(year, month, 0).getDate();
@@ -128,7 +135,6 @@
       const dateDebut = `${pad(1)}/${pad(month)}/${year}`;
       const dateFin   = `${pad(lastDay)}/${pad(month)}/${year}`;
 
-      // Cherche les inputs de date (généralement deux champs texte consécutifs)
       const dateInputs = Array.from(document.querySelectorAll('input[type="text"]'))
         .filter(i => /date|du|au|période|debut|fin/i.test(i.name + i.id + i.placeholder + (i.closest('td')?.previousElementSibling?.textContent || '')));
 
@@ -136,7 +142,6 @@
         fillInput(dateInputs[0], dateDebut) && filled++;
         fillInput(dateInputs[1], dateFin)   && filled++;
       } else {
-        // Fallback : les deux premiers inputs texte du formulaire après le select salarié
         const allText = Array.from(document.querySelectorAll('input[type="text"]'));
         if (allText[0]) fillInput(allText[0], dateDebut) && filled++;
         if (allText[1]) fillInput(allText[1], dateFin)   && filled++;
@@ -155,7 +160,6 @@
       return el ? (fillNumeric(el, value) ? (filled++, true) : false) : false;
     };
 
-    // Salaire brut
     if (!trySelector('input[name="salairebrut"]',     data.salaireBrut))
     if (!trySelector('input[id*="salairebrut"]',      data.salaireBrut))
     if (!trySelector('input[id*="salaireBrut"]',      data.salaireBrut))
@@ -164,7 +168,6 @@
       if (el) { fillNumeric(el, data.salaireBrut); filled++; }
     }
 
-    // Nombre d'heures
     if (!trySelector('input[name="nbheures"]',  data.heures))
     if (!trySelector('input[id*="nbHeures"]',   data.heures))
     if (!trySelector('input[id*="heures"]',     data.heures)) {
@@ -172,7 +175,6 @@
       if (el) { fillNumeric(el, data.heures); filled++; }
     }
 
-    // Taux horaire (si présent sur la page)
     if (!trySelector('input[name="tauxhoraire"]', data.tauxHoraire))
     if (!trySelector('input[id*="tauxHoraire"]',  data.tauxHoraire)) {
       const el = findInputNearLabel("taux horaire");
@@ -213,13 +215,11 @@
 
     document.body.appendChild(panel);
 
-    // Toggle
     panel.querySelector('#jcc-panel-header').addEventListener('click', () => {
       const body = panel.querySelector('#jcc-panel-body');
       body.style.display = body.style.display === 'none' ? '' : 'none';
     });
 
-    // Import clipboard
     panel.querySelector('#jcc-import-btn').addEventListener('click', async () => {
       try {
         const text = await navigator.clipboard.readText();
@@ -233,7 +233,6 @@
       }
     });
 
-    // Étape 1
     const s1btn = panel.querySelector('#jcc-step1-btn');
     if (s1btn) {
       s1btn.addEventListener('click', () => {
@@ -243,7 +242,6 @@
       });
     }
 
-    // Étape 3
     const s3btn = panel.querySelector('#jcc-fill-btn');
     if (s3btn) {
       s3btn.addEventListener('click', () => {
