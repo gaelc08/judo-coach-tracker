@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JC Cattenom → CEA URSSAF Autofill
 // @namespace    https://github.com/gaelc08/jccattenom-app
-// @version      2.7.0
+// @version      2.8.0
 // @description  Lit la synthèse du mois depuis l'app JC Cattenom et pré-remplit le portail CEA URSSAF
 // @author       Gaël CANTARERO
 // @match        *://*/*
@@ -73,18 +73,14 @@
   }
 
   function detectStep() {
-    // Step3 : uniquement si des inputs salaire/heures sont RÉELLEMENT présents dans le DOM
-    const hasNumericInputs = !!(
-      document.querySelector('input[name*="salairebrut" i]')      ||
-      document.querySelector('input[name*="salaire" i]')           ||
-      document.querySelector('input[id*="salaireBrut" i]')         ||
-      document.querySelector('input[id*="remunerationBrute" i]')   ||
-      document.querySelector('input[name*="nbheures" i]')          ||
-      document.querySelector('input[id*="nbHeures" i]')
-    );
-    if (hasNumericInputs) return 'step3';
+    // Step3 : champs spécifiques CEA présents dans le DOM
+    if (
+      document.getElementById('inRemunerationEuro') ||
+      document.getElementById('inNombreHeures')      ||
+      document.getElementById('inPayeSalaire')
+    ) return 'step3';
 
-    // Step1 : un <select> présent (liste salariés) ou inputs de date
+    // Step1 : select salarié ou inputs date
     const hasSelectOrDate = !!(
       document.querySelector('select') ||
       Array.from(document.querySelectorAll('input[type="text"]'))
@@ -105,6 +101,7 @@
 
   function fillNumeric(el, value) {
     if (!el || value == null) return false;
+    // Valeur entière ou décimale : on sépare euros et centimes si besoin
     return fillInput(el, String(value).replace('.', ','));
   }
 
@@ -182,33 +179,58 @@
     return filled;
   }
 
+  // Sépare un montant en [euros, centimes] sous forme de strings
+  function splitMontant(valeur) {
+    const str = String(valeur != null ? valeur : '0').replace(',', '.');
+    const [e, c = '00'] = parseFloat(str).toFixed(2).split('.');
+    return [e, c];
+  }
+
   function fillStep3(data) {
     let filled = 0;
-    const try$ = (sel, val) => {
-      const el = document.querySelector(sel);
-      return el ? (fillNumeric(el, val) ? (filled++, true) : false) : false;
-    };
 
-    if (!try$('input[name="salairebrut"]',      data.salaireBrut))
-    if (!try$('input[id*="salairebrut"]',       data.salaireBrut))
-    if (!try$('input[id*="salaireBrut"]',       data.salaireBrut))
-    if (!try$('input[id*="remunerationBrute"]', data.salaireBrut)) {
-      const el = findInputNearLabel('salaire brut');
-      if (el) { fillNumeric(el, data.salaireBrut); filled++; }
+    // --- Salaire (paye) : champ texte unique inPayeSalaire ---
+    const inPaye = document.getElementById('inPayeSalaire');
+    if (inPaye && data.salaireBrut != null) {
+      fillNumeric(inPaye, data.salaireBrut);
+      filled++;
     }
 
-    if (!try$('input[name="nbheures"]', data.heures))
-    if (!try$('input[id*="nbHeures"]',  data.heures))
-    if (!try$('input[id*="heures"]',    data.heures)) {
-      const el = findInputNearLabel('heures');
-      if (el) { fillNumeric(el, data.heures); filled++; }
+    // --- Rémunération : euros + centimes séparés ---
+    const inEuro = document.getElementById('inRemunerationEuro');
+    const inCent = document.getElementById('inRemunerationCent');
+    if ((inEuro || inCent) && data.salaireBrut != null) {
+      const [euros, cents] = splitMontant(data.salaireBrut);
+      if (inEuro) { fillInput(inEuro, euros); filled++; }
+      if (inCent) { fillInput(inCent, cents); filled++; }
     }
 
-    if (!try$('input[name="tauxhoraire"]', data.tauxHoraire))
-    if (!try$('input[id*="tauxHoraire"]',  data.tauxHoraire)) {
-      const el = findInputNearLabel('taux horaire');
-      if (el) { fillNumeric(el, data.tauxHoraire); filled++; }
+    // --- Radio remunerationBrut : cocher la 1ère option (brut) ---
+    const radioBrut = document.getElementById('prestation.remunerationBrut1');
+    if (radioBrut && !radioBrut.checked) {
+      radioBrut.checked = true;
+      radioBrut.dispatchEvent(new Event('change', { bubbles: true }));
     }
+
+    // --- Nombre d'heures ---
+    const inHeures = document.getElementById('inNombreHeures');
+    if (inHeures && data.heures != null) {
+      fillNumeric(inHeures, data.heures);
+      filled++;
+    }
+
+    // --- Manifestations (compétitions) ---
+    const inNbManif  = document.getElementById('inNombreManifestation');
+    const inMtManif  = document.getElementById('inMontantManifestation');
+    if (inNbManif && data.joursComp != null) {
+      fillNumeric(inNbManif, data.joursComp);
+      filled++;
+    }
+    if (inMtManif && data.salaireComp != null) {
+      fillNumeric(inMtManif, data.salaireComp);
+      filled++;
+    }
+
     return filled;
   }
 
@@ -285,7 +307,6 @@
     renderTable();
     updateStepUI(detectStep());
 
-    // MutationObserver : surveille les changements de contenu (SPA CEA)
     let _debounce = null;
     const observer = new MutationObserver(() => {
       clearTimeout(_debounce);
