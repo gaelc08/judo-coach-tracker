@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JC Cattenom → CEA URSSAF Autofill
 // @namespace    https://github.com/gaelc08/jccattenom-app
-// @version      2.10.0
+// @version      2.10.1
 // @description  Lit la synthèse du mois depuis l'app JC Cattenom et pré-remplit le portail CEA URSSAF
 // @author       Gaël CANTARERO
 // @match        *://*/*
@@ -38,12 +38,14 @@
       background: #0d3b5e; padding: 10px 14px; display: flex;
       align-items: center; justify-content: space-between; cursor: pointer; user-select: none;
     }
-    #jcc-panel-header span { font-weight: 600; font-size: 14px; }
+    #jcc-panel-header span { font-weight: 600; font-size: 14px; color: #ffffff; }
     #jcc-panel-body { padding: 12px 14px; }
     #jcc-panel table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
-    #jcc-panel td { padding: 3px 0; }
-    #jcc-panel td:first-child { color: #8bacc8; width: 60%; }
-    #jcc-panel td:last-child { text-align: right; font-weight: 500; }
+    #jcc-panel tr { border-bottom: 1px solid rgba(255,255,255,0.06); }
+    #jcc-panel tr:last-child { border-bottom: none; }
+    #jcc-panel td { padding: 5px 2px; }
+    #jcc-panel td:first-child { color: #a8c8e8; width: 55%; font-size: 12px; }
+    #jcc-panel td:last-child { text-align: right; font-weight: 700; color: #ffffff; font-size: 13px; }
     .jcc-btn {
       width: 100%; border: none; border-radius: 7px; padding: 8px;
       font-size: 13px; font-weight: 600; cursor: pointer;
@@ -57,7 +59,10 @@
     #jcc-status { margin-top: 6px; font-size: 11px; color: #7ec8a0; min-height: 16px; text-align: center; }
     #jcc-status.error { color: #f08080; }
     .jcc-badge { background: #e67e22; color: white; border-radius: 9999px; padding: 1px 7px; font-size: 11px; font-weight: 700; }
-    .jcc-step-label { font-size: 11px; color: #8bacc8; margin-bottom: 4px; text-align: center; }
+    .jcc-step-label { font-size: 11px; color: #a8c8e8; margin-bottom: 4px; text-align: center; }
+    .jcc-divider { border: none; border-top: 1px solid rgba(255,255,255,0.1); margin: 8px 0; }
+    .jcc-total td:first-child { color: #7ec8a0 !important; font-weight: 600; }
+    .jcc-total td:last-child  { color: #7ec8a0 !important; font-size: 14px !important; }
   `;
   document.head.appendChild(style);
 
@@ -73,21 +78,18 @@
   }
 
   function detectStep() {
-    // Étape 3 : champs rémunération présents
     if (
       document.getElementById('inRemunerationEuro') ||
       document.getElementById('inNombreHeures')      ||
       document.getElementById('inPayeSalaire')
     ) return 'step3';
 
-    // Étape 2 : que des radios + btnSuivant, pas de select ni champs rémunération
     if (
       document.getElementById('btnSuivant') &&
       document.getElementById('prestation.salaire1') &&
       !document.querySelector('select')
     ) return 'step2';
 
-    // Étape 1 : select salarié ou inputs date
     const hasSelectOrDate = !!(
       document.querySelector('select') ||
       Array.from(document.querySelectorAll('input[type="text"]'))
@@ -111,7 +113,6 @@
     return fillInput(el, String(value).replace('.', ','));
   }
 
-  // Convertit des heures décimales (ex: 42.5) en format hhh:mn
   function toHHMN(heures) {
     const total = parseFloat(String(heures).replace(',', '.'));
     if (isNaN(total)) return String(heures);
@@ -120,10 +121,9 @@
     return `${h}:${String(mn).padStart(2, '0')}`;
   }
 
-  // 1er jour du mois suivant au format dd/mm/yyyy
   function datePaiement(mois) {
     const [year, month] = mois.split('-').map(Number);
-    const next = new Date(year, month, 1); // month non décalé = mois suivant en Date JS
+    const next = new Date(year, month, 1);
     const pad = n => String(n).padStart(2, '0');
     return `${pad(next.getDate())}/${pad(next.getMonth() + 1)}/${next.getFullYear()}`;
   }
@@ -184,7 +184,6 @@
     return filled;
   }
 
-  // Étape 2 : tout laisser par défaut, juste cliquer Suivant
   function fillStep2() {
     const btn = document.getElementById('btnSuivant');
     if (btn) { setTimeout(() => btn.click(), 300); return true; }
@@ -200,21 +199,18 @@
   function fillStep3(data) {
     let filled = 0;
 
-    // --- Date de paiement : 1er du mois suivant dans inPayeSalaire ---
     const inPaye = document.getElementById('inPayeSalaire');
     if (inPaye && data.mois) {
       fillInput(inPaye, datePaiement(data.mois));
       filled++;
     }
 
-    // --- Radio : sélectionner NET (remunerationBrut2) ---
     const radioNet = document.getElementById('prestation.remunerationBrut2');
     if (radioNet && !radioNet.checked) {
       radioNet.checked = true;
       radioNet.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
-    // --- Rémunération : euros + centimes séparés ---
     const inEuro = document.getElementById('inRemunerationEuro');
     const inCent = document.getElementById('inRemunerationCent');
     if ((inEuro || inCent) && data.salaireBrut != null) {
@@ -223,14 +219,12 @@
       if (inCent) { fillInput(inCent, cents); filled++; }
     }
 
-    // --- Nombre d'heures au format hhh:mn ---
     const inHeures = document.getElementById('inNombreHeures');
     if (inHeures && data.heures != null) {
       fillInput(inHeures, toHHMN(data.heures));
       filled++;
     }
 
-    // --- Manifestations (compétitions) ---
     const inNbManif = document.getElementById('inNombreManifestation');
     const inMtManif = document.getElementById('inMontantManifestation');
     if (inNbManif && data.joursComp  != null) { fillNumeric(inNbManif, data.joursComp);   filled++; }
@@ -259,11 +253,11 @@
     } else if (step === 'step2') {
       zone.innerHTML = `
         <div class="jcc-step-label">📍 Étape 2 — Options (défaut)</div>
-        <button class="jcc-btn" id="jcc-step-btn">▶ Passer à l’étape suivante</button>
+        <button class="jcc-btn" id="jcc-step-btn">▶ Passer à l'étape suivante</button>
       `;
       zone.querySelector('#jcc-step-btn').addEventListener('click', () => {
         const ok = fillStep2();
-        setStatus(ok ? '⏩ Passage à l’étape 3…' : '⚠ Bouton Suivant introuvable.', !ok);
+        setStatus(ok ? '⏩ Passage à l'étape 3…' : '⚠ Bouton Suivant introuvable.', !ok);
       });
     } else if (step === 'step3') {
       zone.innerHTML = `
@@ -294,6 +288,7 @@
       <div id="jcc-panel-body">
         <button class="jcc-btn" id="jcc-import-btn">📋 Coller les données depuis l'app</button>
         <table id="jcc-data-table"></table>
+        <hr class="jcc-divider">
         <div id="jcc-step-zone"></div>
         <div id="jcc-status"></div>
       </div>
@@ -333,21 +328,23 @@
     const t = document.getElementById('jcc-data-table');
     if (!t) return;
     if (!payload) {
-      t.innerHTML = '<tr><td colspan="2" style="color:#8bacc8;font-style:italic;text-align:center;padding:8px">Aucune donnée chargée</td></tr>';
+      t.innerHTML = '<tr><td colspan="2" style="color:#a8c8e8;font-style:italic;text-align:center;padding:8px">Aucune donnée chargée</td></tr>';
       return;
     }
     const rows = [
-      ['Coach',             payload.nomCoach],
-      ['Mois',              payload.mois],
-      ['Date paiement',     payload.mois ? datePaiement(payload.mois) : '—'],
-      ['Heures',            payload.heures != null ? toHHMN(payload.heures) : '—'],
-      ['Taux horaire',      payload.tauxHoraire != null ? payload.tauxHoraire + ' €' : '—'],
-      ['Salaire formation', payload.salaireFormation != null ? payload.salaireFormation + ' €' : '—'],
-      ['Jours compét.',     payload.joursComp != null ? payload.joursComp + ' j' : '—'],
-      ['Salaire compét.',   payload.salaireComp != null ? payload.salaireComp + ' €' : '—'],
-      ['Total net',         payload.salaireBrut != null ? payload.salaireBrut + ' €' : '—'],
+      ['Coach',             payload.nomCoach,            false],
+      ['Mois',              payload.mois,                false],
+      ['Date paiement',     payload.mois ? datePaiement(payload.mois) : '—', false],
+      ['Heures',            payload.heures != null ? toHHMN(payload.heures) : '—', false],
+      ['Taux horaire',      payload.tauxHoraire != null ? payload.tauxHoraire + ' €' : '—', false],
+      ['Salaire formation', payload.salaireFormation != null ? payload.salaireFormation + ' €' : '—', false],
+      ['Jours compét.',     payload.joursComp != null ? payload.joursComp + ' j' : '—', false],
+      ['Salaire compét.',   payload.salaireComp != null ? payload.salaireComp + ' €' : '—', false],
+      ['Total net',         payload.salaireBrut != null ? payload.salaireBrut + ' €' : '—', true],
     ];
-    t.innerHTML = rows.map(([l,v]) => `<tr><td>${l}</td><td>${v ?? '—'}</td></tr>`).join('');
+    t.innerHTML = rows.map(([l, v, highlight]) =>
+      `<tr${highlight ? ' class="jcc-total"' : ''}><td>${l}</td><td>${v ?? '—'}</td></tr>`
+    ).join('');
   }
 
   function setStatus(msg, isError = false) {
