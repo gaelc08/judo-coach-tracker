@@ -34,6 +34,8 @@ export function fillCoachForm(coach) {
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val ?? ''; };
   set('coachName',        coach.name);
   set('coachFirstName',   coach.first_name);
+  const civiliteEl = document.getElementById('coachCivilite');
+  if (civiliteEl) civiliteEl.value = coach.civilite || 'MR';
   set('coachEmail',       coach.email);
   set('coachAddress',     coach.address);
   set('coachVehicle',     coach.vehicle);
@@ -81,6 +83,8 @@ export function clearCoachForm() {
   document.getElementById('coachProfileType').value = 'coach';
   document.getElementById('coachName').value = '';
   document.getElementById('coachFirstName').value = '';
+  const civiliteResetEl = document.getElementById('coachCivilite');
+  if (civiliteResetEl) civiliteResetEl.value = 'MR';
   document.getElementById('coachEmail').value = '';
   document.getElementById('coachAddress').value = '';
   document.getElementById('coachVehicle').value = '';
@@ -110,6 +114,7 @@ export async function saveCoach() {
   const allowance = isVolunteer ? 0 : (parseFloat(document.getElementById('dailyAllowance').value) || 0);
   const kmRate = isVolunteer ? 0 : (__getLegacyKmRateFromFiscalPower(fiscalPower) || 0);
   const ownerUid = document.getElementById('coachOwnerUid')?.value?.trim() || null;
+  const civilite = document.getElementById('coachCivilite')?.value || 'MR';
 
   if (!name) { alert('Veuillez saisir un nom.'); return; }
 
@@ -124,6 +129,7 @@ export async function saveCoach() {
     // getProfileType() fonctionne même si profile_type est null en base.
     role: isVolunteer ? 'benevole' : (isAdminProfile ? 'admin' : 'entraineur'),
     profile_type: profileType,
+    civilite,
     first_name: firstName,
     email: email || null,
     address: address || null,
