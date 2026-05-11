@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         JC Cattenom → CEA URSSAF Autofill
 // @namespace    https://github.com/gaelc08/jccattenom-app
-// @version      2026.05.11-03
+// @version      2026.05.11-04
 // @description  Lit la synthèse du mois depuis l'app JC Cattenom et pré-remplit le portail CEA URSSAF
 // @author       Gaël CANTARERO
-// @match        https://www.cea.urssaf.fr/ceaweb/employeur/prestation/creerPrestation.do*
+// @match        https://www.cea.urssaf.fr/*
 // @updateURL    https://raw.githubusercontent.com/gaelc08/jccattenom-app/main/scripts/cea-autofill.user.js
 // @downloadURL  https://raw.githubusercontent.com/gaelc08/jccattenom-app/main/scripts/cea-autofill.user.js
 // @grant        none
@@ -12,6 +12,9 @@
 
 (function () {
   'use strict';
+
+  // Activer uniquement sur la page de création de prestation
+  if (!location.pathname.includes('creerPrestation')) return;
 
   const STORAGE_KEY = 'jcc_cea_payload';
 
@@ -115,7 +118,6 @@
     return fillInput(el, String(value).replace('.', ','));
   }
 
-  // Convertit des heures décimales (ex: 42.5) en format hhh:mn
   function toHHMN(heures) {
     const total = parseFloat(String(heures).replace(',', '.'));
     if (isNaN(total)) return String(heures);
@@ -124,7 +126,6 @@
     return `${h}:${String(mn).padStart(2, '0')}`;
   }
 
-  // 1er jour du mois suivant au format dd/mm/yyyy
   function datePaiement(mois) {
     const [year, month] = mois.split('-').map(Number);
     const next = new Date(year, month, 1);
@@ -188,7 +189,6 @@
     return filled;
   }
 
-  // Étape 2 : tout laisser par défaut, juste cliquer Suivant
   function fillStep2() {
     const btn = document.getElementById('btnSuivant');
     if (btn) { setTimeout(() => btn.click(), 300); return true; }
@@ -204,28 +204,24 @@
   function fillStep3(data) {
     let filled = 0;
 
-    // --- Date de paiement : 1er du mois suivant dans inPayeSalaire ---
     const inPaye = document.getElementById('inPayeSalaire');
     if (inPaye && data.mois) {
       fillInput(inPaye, datePaiement(data.mois));
       filled++;
     }
 
-    // --- Radio : sélectionner NET (remunerationBrut2) ---
     const radioNet = document.getElementById('prestation.remunerationBrut2');
     if (radioNet && !radioNet.checked) {
       radioNet.checked = true;
       radioNet.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
-    // --- Base forfaitaire calculée : sélectionner OUI (true) ---
     const radioForfait = document.getElementById('prestation.baseForfaitaireCalculee1');
     if (radioForfait && !radioForfait.checked) {
       radioForfait.checked = true;
       radioForfait.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
-    // --- Rémunération : euros + centimes séparés ---
     const inEuro = document.getElementById('inRemunerationEuro');
     const inCent = document.getElementById('inRemunerationCent');
     if ((inEuro || inCent) && data.salaireBrut != null) {
@@ -234,14 +230,12 @@
       if (inCent) { fillInput(inCent, cents); filled++; }
     }
 
-    // --- Nombre d'heures au format hhh:mn ---
     const inHeures = document.getElementById('inNombreHeures');
     if (inHeures && data.heures != null) {
       fillInput(inHeures, toHHMN(data.heures));
       filled++;
     }
 
-    // --- Manifestations (compétitions) ---
     const inNbManif = document.getElementById('inNombreManifestation');
     const inMtManif = document.getElementById('inMontantManifestation');
     if (inNbManif && data.joursComp  != null) { fillNumeric(inNbManif, data.joursComp);   filled++; }
