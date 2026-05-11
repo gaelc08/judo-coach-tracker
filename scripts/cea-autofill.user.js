@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JC Cattenom → CEA URSSAF Autofill
 // @namespace    https://github.com/gaelc08/jccattenom-app
-// @version      2.10.1
+// @version      2026.05.11-01
 // @description  Lit la synthèse du mois depuis l'app JC Cattenom et pré-remplit le portail CEA URSSAF
 // @author       Gaël CANTARERO
 // @match        *://*/*
@@ -19,7 +19,11 @@
 
   let _memStore = null;
   function storageGet() {
-    try { return localStorage.getItem(STORAGE_KEY); } catch(e) { return _memStore; }
+    try {
+      const v = localStorage.getItem(STORAGE_KEY);
+      if (v !== null) return v;
+    } catch(e) {}
+    return _memStore;
   }
   function storageSet(val) {
     try { localStorage.setItem(STORAGE_KEY, val); } catch(e) {}
@@ -41,7 +45,7 @@
     #jcc-panel-header span { font-weight: 600; font-size: 14px; color: #ffffff; }
     #jcc-panel-body { padding: 12px 14px; }
     #jcc-panel table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
-    #jcc-panel tr { border-bottom: 1px solid rgba(255,255,255,0.06); }
+    #jcc-panel tr { border-bottom: 1px solid rgba(255,255,255,0.07); }
     #jcc-panel tr:last-child { border-bottom: none; }
     #jcc-panel td { padding: 5px 2px; }
     #jcc-panel td:first-child { color: #a8c8e8; width: 55%; font-size: 12px; }
@@ -93,7 +97,7 @@
     const hasSelectOrDate = !!(
       document.querySelector('select') ||
       Array.from(document.querySelectorAll('input[type="text"]'))
-        .some(i => /date|du|au|période|periode|debut|fin/i.test(i.name + i.id + i.placeholder))
+        .some(i => /date|du|au|p\u00e9riode|periode|debut|fin/i.test(i.name + i.id + i.placeholder))
     );
     if (hasSelectOrDate) return 'step1';
 
@@ -113,6 +117,7 @@
     return fillInput(el, String(value).replace('.', ','));
   }
 
+  // Convertit des heures décimales (ex: 42.5) en format hhh:mn
   function toHHMN(heures) {
     const total = parseFloat(String(heures).replace(',', '.'));
     if (isNaN(total)) return String(heures);
@@ -121,6 +126,7 @@
     return `${h}:${String(mn).padStart(2, '0')}`;
   }
 
+  // 1er jour du mois suivant au format dd/mm/yyyy
   function datePaiement(mois) {
     const [year, month] = mois.split('-').map(Number);
     const next = new Date(year, month, 1);
@@ -154,7 +160,7 @@
 
     if (filled === 0 && data.nomCoach) {
       for (const inp of document.querySelectorAll('input[type="text"]')) {
-        if (/salar|nom|prénom|prenom/i.test(inp.name + inp.id + inp.placeholder)) {
+        if (/salar|nom|pr\u00e9nom|prenom/i.test(inp.name + inp.id + inp.placeholder)) {
           fillInput(inp, data.nomCoach); filled++; break;
         }
       }
@@ -168,7 +174,7 @@
       const dateFin   = `${pad(lastDay)}/${pad(month)}/${year}`;
 
       const dateInputs = Array.from(document.querySelectorAll('input[type="text"]'))
-        .filter(i => /date|du|au|période|debut|fin/i.test(
+        .filter(i => /date|du|au|p\u00e9riode|debut|fin/i.test(
           i.name + i.id + i.placeholder +
           (i.closest('td')?.previousElementSibling?.textContent || '')));
 
@@ -184,6 +190,7 @@
     return filled;
   }
 
+  // Étape 2 : tout laisser par défaut, juste cliquer Suivant
   function fillStep2() {
     const btn = document.getElementById('btnSuivant');
     if (btn) { setTimeout(() => btn.click(), 300); return true; }
@@ -199,18 +206,28 @@
   function fillStep3(data) {
     let filled = 0;
 
+    // --- Date de paiement : 1er du mois suivant dans inPayeSalaire ---
     const inPaye = document.getElementById('inPayeSalaire');
     if (inPaye && data.mois) {
       fillInput(inPaye, datePaiement(data.mois));
       filled++;
     }
 
+    // --- Radio : sélectionner NET (remunerationBrut2) ---
     const radioNet = document.getElementById('prestation.remunerationBrut2');
     if (radioNet && !radioNet.checked) {
       radioNet.checked = true;
       radioNet.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
+    // --- Base forfaitaire : sélectionner OUI ---
+    const radioForfaitOui = document.getElementById('prestation.baseForfaitaire1');
+    if (radioForfaitOui && !radioForfaitOui.checked) {
+      radioForfaitOui.checked = true;
+      radioForfaitOui.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    // --- Rémunération : euros + centimes séparés ---
     const inEuro = document.getElementById('inRemunerationEuro');
     const inCent = document.getElementById('inRemunerationCent');
     if ((inEuro || inCent) && data.salaireBrut != null) {
@@ -219,12 +236,14 @@
       if (inCent) { fillInput(inCent, cents); filled++; }
     }
 
+    // --- Nombre d'heures au format hhh:mn ---
     const inHeures = document.getElementById('inNombreHeures');
     if (inHeures && data.heures != null) {
       fillInput(inHeures, toHHMN(data.heures));
       filled++;
     }
 
+    // --- Manifestations (compétitions) ---
     const inNbManif = document.getElementById('inNombreManifestation');
     const inMtManif = document.getElementById('inMontantManifestation');
     if (inNbManif && data.joursComp  != null) { fillNumeric(inNbManif, data.joursComp);   filled++; }
@@ -242,35 +261,35 @@
 
     if (step === 'step1') {
       zone.innerHTML = `
-        <div class="jcc-step-label">📍 Étape 1 — Salarié &amp; Période</div>
-        <button class="jcc-btn" id="jcc-step-btn">▶ Remplir salarié + période</button>
+        <div class="jcc-step-label">\uD83D\uDCCD \u00C9tape 1 \u2014 Salari\u00E9 &amp; P\u00E9riode</div>
+        <button class="jcc-btn" id="jcc-step-btn">\u25B6 Remplir salari\u00E9 + p\u00E9riode</button>
       `;
       zone.querySelector('#jcc-step-btn').addEventListener('click', () => {
-        if (!payload) { setStatus('⚠ Importez d\'abord les données.', true); return; }
+        if (!payload) { setStatus('\u26A0 Importez d\'abord les donn\u00E9es.', true); return; }
         const n = fillStep1(payload);
-        setStatus(n > 0 ? `✅ ${n} champ(s) rempli(s) — vérifiez puis Suivant` : '⚠ Aucun champ trouvé.');
+        setStatus(n > 0 ? `\u2705 ${n} champ(s) rempli(s) \u2014 v\u00E9rifiez puis Suivant` : '\u26A0 Aucun champ trouv\u00E9.');
       });
     } else if (step === 'step2') {
       zone.innerHTML = `
-        <div class="jcc-step-label">📍 Étape 2 — Options (défaut)</div>
-        <button class="jcc-btn" id="jcc-step-btn">▶ Passer à l'étape suivante</button>
+        <div class="jcc-step-label">\uD83D\uDCCD \u00C9tape 2 \u2014 Options (d\u00E9faut)</div>
+        <button class="jcc-btn" id="jcc-step-btn">\u25B6 Passer \u00E0 l\u2019\u00E9tape suivante</button>
       `;
       zone.querySelector('#jcc-step-btn').addEventListener('click', () => {
         const ok = fillStep2();
-        setStatus(ok ? '⏩ Passage à l'étape 3…' : '⚠ Bouton Suivant introuvable.', !ok);
+        setStatus(ok ? '\u23E9 Passage \u00E0 l\u2019\u00E9tape 3\u2026' : '\u26A0 Bouton Suivant introuvable.', !ok);
       });
     } else if (step === 'step3') {
       zone.innerHTML = `
-        <div class="jcc-step-label">📍 Étape 3 — Rémunération</div>
-        <button class="jcc-btn" id="jcc-step-btn">▶ Remplir salaire &amp; heures</button>
+        <div class="jcc-step-label">\uD83D\uDCCD \u00C9tape 3 \u2014 R\u00E9mun\u00E9ration</div>
+        <button class="jcc-btn" id="jcc-step-btn">\u25B6 Remplir salaire &amp; heures</button>
       `;
       zone.querySelector('#jcc-step-btn').addEventListener('click', () => {
-        if (!payload) { setStatus('⚠ Importez d\'abord les données.', true); return; }
+        if (!payload) { setStatus('\u26A0 Importez d\'abord les donn\u00E9es.', true); return; }
         const n = fillStep3(payload);
-        setStatus(n > 0 ? `✅ ${n} champ(s) rempli(s)` : '⚠ Aucun champ trouvé.');
+        setStatus(n > 0 ? `\u2705 ${n} champ(s) rempli(s)` : '\u26A0 Aucun champ trouv\u00E9.');
       });
     } else {
-      zone.innerHTML = `<div class="jcc-step-label" style="color:#e67e22">Étape non reconnue</div>`;
+      zone.innerHTML = `<div class="jcc-step-label" style="color:#e67e22">\u00C9tape non reconnue</div>`;
     }
   }
 
@@ -282,11 +301,11 @@
     panel.id = 'jcc-panel';
     panel.innerHTML = `
       <div id="jcc-panel-header">
-        <span>🥋 JC Cattenom → CEA</span>
+        <span>\uD83E\uDD4B JC Cattenom \u2192 CEA</span>
         <span class="jcc-badge">AUTO</span>
       </div>
       <div id="jcc-panel-body">
-        <button class="jcc-btn" id="jcc-import-btn">📋 Coller les données depuis l'app</button>
+        <button class="jcc-btn" id="jcc-import-btn">\uD83D\uDCCB Coller les donn\u00E9es depuis l\u2019app</button>
         <table id="jcc-data-table"></table>
         <hr class="jcc-divider">
         <div id="jcc-step-zone"></div>
@@ -307,9 +326,9 @@
         if (data.salaireBrut == null && data.heures == null) throw new Error('invalide');
         savePayload(data);
         renderTable();
-        setStatus('✅ Données importées !');
+        setStatus('\u2705 Donn\u00E9es import\u00E9es !');
       } catch(e) {
-        setStatus('❌ Clipboard invalide — utilisez "Copier pour CEA" dans l\'app.', true);
+        setStatus('\u274C Clipboard invalide \u2014 utilisez "Copier pour CEA" dans l\u2019app.', true);
       }
     });
 
@@ -328,22 +347,22 @@
     const t = document.getElementById('jcc-data-table');
     if (!t) return;
     if (!payload) {
-      t.innerHTML = '<tr><td colspan="2" style="color:#a8c8e8;font-style:italic;text-align:center;padding:8px">Aucune donnée chargée</td></tr>';
+      t.innerHTML = '<tr><td colspan="2" style="color:#a8c8e8;font-style:italic;text-align:center;padding:8px">Aucune donn\u00E9e charg\u00E9e</td></tr>';
       return;
     }
     const rows = [
       ['Coach',             payload.nomCoach,            false],
       ['Mois',              payload.mois,                false],
-      ['Date paiement',     payload.mois ? datePaiement(payload.mois) : '—', false],
-      ['Heures',            payload.heures != null ? toHHMN(payload.heures) : '—', false],
-      ['Taux horaire',      payload.tauxHoraire != null ? payload.tauxHoraire + ' €' : '—', false],
-      ['Salaire formation', payload.salaireFormation != null ? payload.salaireFormation + ' €' : '—', false],
-      ['Jours compét.',     payload.joursComp != null ? payload.joursComp + ' j' : '—', false],
-      ['Salaire compét.',   payload.salaireComp != null ? payload.salaireComp + ' €' : '—', false],
-      ['Total net',         payload.salaireBrut != null ? payload.salaireBrut + ' €' : '—', true],
+      ['Date paiement',     payload.mois ? datePaiement(payload.mois) : '\u2014', false],
+      ['Heures',            payload.heures != null ? toHHMN(payload.heures) : '\u2014', false],
+      ['Taux horaire',      payload.tauxHoraire != null ? payload.tauxHoraire + ' \u20AC' : '\u2014', false],
+      ['Salaire formation', payload.salaireFormation != null ? payload.salaireFormation + ' \u20AC' : '\u2014', false],
+      ['Jours comp\u00E9t.',payload.joursComp != null ? payload.joursComp + ' j' : '\u2014', false],
+      ['Salaire comp\u00E9t.',payload.salaireComp != null ? payload.salaireComp + ' \u20AC' : '\u2014', false],
+      ['Total net',         payload.salaireBrut != null ? payload.salaireBrut + ' \u20AC' : '\u2014', true],
     ];
     t.innerHTML = rows.map(([l, v, highlight]) =>
-      `<tr${highlight ? ' class="jcc-total"' : ''}><td>${l}</td><td>${v ?? '—'}</td></tr>`
+      `<tr${highlight ? ' class="jcc-total"' : ''}><td>${l}</td><td>${v ?? '\u2014'}</td></tr>`
     ).join('');
   }
 
