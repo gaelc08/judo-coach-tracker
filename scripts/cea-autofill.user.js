@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JC Cattenom → CEA URSSAF Autofill
 // @namespace    https://github.com/gaelc08/jccattenom-app
-// @version      2026.05.11-01
+// @version      2026.05.11-02
 // @description  Lit la synthèse du mois depuis l'app JC Cattenom et pré-remplit le portail CEA URSSAF
 // @author       Gaël CANTARERO
 // @match        *://*/*
@@ -220,11 +220,11 @@
       radioNet.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
-    // --- Base forfaitaire : sélectionner OUI ---
-    const radioForfaitOui = document.getElementById('prestation.baseForfaitaire1');
-    if (radioForfaitOui && !radioForfaitOui.checked) {
-      radioForfaitOui.checked = true;
-      radioForfaitOui.dispatchEvent(new Event('change', { bubbles: true }));
+    // --- Base forfaitaire calculée : sélectionner OUI (true) ---
+    const radioForfait = document.getElementById('prestation.baseForfaitaireCalculee1');
+    if (radioForfait && !radioForfait.checked) {
+      radioForfait.checked = true;
+      radioForfait.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
     // --- Rémunération : euros + centimes séparés ---
