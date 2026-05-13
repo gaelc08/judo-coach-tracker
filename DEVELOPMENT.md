@@ -7,8 +7,8 @@
 
 ## URLs
 
-- **Production**: https://jccattenom.cantarero.fr/
-- **Development**: https://jccattenom.cantarero.fr/?env=dev
+- **Production**: https://gestion.judo-cattenom.fr/
+- **Development**: https://gestion.judo-cattenom.fr/?env=dev
 
 ## Workflow
 
@@ -30,7 +30,7 @@ git push origin feature/my-feature
 ### 2. Testing on Dev
 
 - Push to `dev` branch → deploys to dev Supabase project
-- Test at: https://jccattenom.cantarero.fr/?env=dev
+- Test at: https://gestion.judo-cattenom.fr/?env=dev
 - Database changes are isolated to dev project
 
 ### 3. Merge to Production

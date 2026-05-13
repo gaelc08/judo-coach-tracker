@@ -144,7 +144,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return jsonResponse({ error: 'Missing or invalid email', requestId }, 400)
     }
 
-    const siteUrl = redirectTo || Deno.env.get('SITE_URL') || 'https://jccattenom.cantarero.fr/'
+    const siteUrl = redirectTo || Deno.env.get('SITE_URL') || 'https://gestion.judo-cattenom.fr/'
 
     let targetUser = null
     let inviteSent = false

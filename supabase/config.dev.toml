@@ -3,7 +3,7 @@ project_id = "nkzsjyzhpvivfgslzltn"
 [auth]
 # Dev environment URL used in auth e-mails when no redirectTo is provided.
 # Using the main app URL with ?env=dev so auth links work after the cantarero-dev host was retired.
-site_url = "https://jccattenom.cantarero.fr/?env=dev"
+site_url = "https://gestion.judo-cattenom.fr/?env=dev"
 
 # Allowed post-auth redirect URLs for dev project.
 additional_redirect_urls = [
@@ -13,8 +13,8 @@ additional_redirect_urls = [
   "http://127.0.0.1:8000/",
   "https://gaelc08.github.io/judo-coach-tracker/?env=dev",
   "https://gaelc08.github.io/judo-coach-tracker/?env=prod",
-  "https://jccattenom.cantarero.fr",
-  "https://jccattenom.cantarero.fr/",
+  "https://gestion.judo-cattenom.fr",
+  "https://gestion.judo-cattenom.fr/",
   "https://gaelc08.github.io/judo-coach-tracker",
   "https://gaelc08.github.io/judo-coach-tracker/"
 ]

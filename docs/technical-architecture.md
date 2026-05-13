@@ -95,7 +95,7 @@ Current hostname rules:
 Additional notes:
 - `?env=auto` clears the persisted override
 - local dev credentials can be overridden with `jct.dev.supabase.url` and `jct.dev.supabase.key`
-- the production frontend host is `jccattenom.cantarero.fr`
+- the production frontend host is `gestion.judo-cattenom.fr`
 
 ## Backend Architecture
 

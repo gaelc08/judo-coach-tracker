@@ -2,7 +2,7 @@ project_id = "ajbpzueanpeukozjhkiv"
 
 [auth]
 # Production environment URL used in auth e-mails when no redirectTo is provided.
-site_url = "https://jccattenom.cantarero.fr/"
+site_url = "https://gestion.judo-cattenom.fr/"
 
 # Allowed post-auth redirect URLs for prod project.
 additional_redirect_urls = [
@@ -12,8 +12,8 @@ additional_redirect_urls = [
   "http://127.0.0.1:8000/",
   "https://gaelc08.github.io/judo-coach-tracker/?env=dev",
   "https://gaelc08.github.io/judo-coach-tracker/?env=prod",
-  "https://jccattenom.cantarero.fr",
-  "https://jccattenom.cantarero.fr/",
+  "https://gestion.judo-cattenom.fr",
+  "https://gestion.judo-cattenom.fr/",
   "https://gaelc08.github.io/judo-coach-tracker",
   "https://gaelc08.github.io/judo-coach-tracker/"
 ]

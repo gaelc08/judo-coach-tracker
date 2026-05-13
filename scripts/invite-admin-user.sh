@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_REF="ajbpzueanpeukozjhkiv"
-REDIRECT_TO="https://jccattenom.cantarero.fr/"
+REDIRECT_TO="https://gestion.judo-cattenom.fr/"
 EMAIL=""
 
 usage() {

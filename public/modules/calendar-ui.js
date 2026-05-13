@@ -241,6 +241,10 @@ export function openDayModal(dateStr) {
   const title = document.getElementById('dayTitle');
   if (title) title.textContent = `Modifier le ${dateStr}`;
 
+  // Masquer les heures pour les bénévoles et admins
+  const isVolunteerOrAdmin = __isVolunteerProfile(currentCoach) || (currentCoach?.profile_type === 'admin' || currentCoach?.role === 'admin');
+  const hoursGroup = document.getElementById('trainingHoursGroup');
+  if (hoursGroup) hoursGroup.style.display = isVolunteerOrAdmin ? 'none' : '';
   // Populate modal fields (IDs matching index.html)
   _setField('trainingHours', data.hours || '');
   _setField('kilometers', data.km || '');

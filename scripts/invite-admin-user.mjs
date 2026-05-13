@@ -1,4 +1,4 @@
-const DEFAULT_REDIRECT_TO = 'https://jccattenom.cantarero.fr/'
+const DEFAULT_REDIRECT_TO = 'https://gestion.judo-cattenom.fr/'
 
 function parseArgs(argv) {
   const options = {

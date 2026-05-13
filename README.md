@@ -80,11 +80,11 @@ You can clear a persisted override with:
 ```
 
 Production frontend host:
-- `https://jccattenom.cantarero.fr/`
+- `https://gestion.judo-cattenom.fr/`
 
 Useful URLs:
-- `https://jccattenom.cantarero.fr/` for prod
-- `https://jccattenom.cantarero.fr/?env=dev` for dev backend from the same frontend host
+- `https://gestion.judo-cattenom.fr/` for prod
+- `https://gestion.judo-cattenom.fr/?env=dev` for dev backend from the same frontend host
 
 ## Supabase Commands
 
@@ -114,7 +114,7 @@ These wrappers are preferred over ad hoc CLI commands because they keep dev and 
 
 Frontend deployment:
 - `.github/workflows/deploy-pages.yml` deploys the static app to GitHub Pages
-- `public/CNAME` configures the custom domain `jccattenom.cantarero.fr`
+- `public/CNAME` configures the custom domain `gestion.judo-cattenom.fr`
 
 Supabase deployment:
 - `.github/workflows/deploy-supabase.yml` deploys Edge Functions

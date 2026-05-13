@@ -4,7 +4,7 @@ param(
 
   [string]$ProjectRef = 'ajbpzueanpeukozjhkiv',
 
-  [string]$RedirectTo = 'https://jccattenom.cantarero.fr/'
+  [string]$RedirectTo = 'https://gestion.judo-cattenom.fr/'
 )
 
 $ErrorActionPreference = 'Stop'
