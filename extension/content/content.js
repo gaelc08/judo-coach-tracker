@@ -1,7 +1,6 @@
 // Content script — injecté sur moncompte.ffjudo.com
 // Étape 1 : nom, prenom, sexe, naissance
 // Étape 2 : formulaire complet
-// CP et Adresse sont des Select2 : on injecte l'option et on la sélectionne via jQuery.
 
 // --- Helpers ---
 
@@ -30,41 +29,60 @@ function setRadio(name, value) {
   return true;
 }
 
-function setCheckbox(name, checked) {
-  const el = document.querySelector(`input[name="${name}"]`);
+function setCheckbox(id, checked) {
+  const el = document.getElementById(id) || document.querySelector(`input[name="${id}"]`);
   if (!el) return false;
   el.checked = checked;
   el.dispatchEvent(new Event('change', { bubbles: true }));
   return true;
 }
 
-// Helper générique Select2 : injecte une option et la sélectionne.
-// La valeur est toujours en MAJUSCULES (format FFJDA).
-function setSelect2(selectName, value) {
-  if (typeof jQuery === 'undefined') return false;
-  const $select = jQuery(`[name="${selectName}"]`);
-  if (!$select.length || !$select.data('select2')) return false;
+// Select2 : ouvre le dropdown, tape la recherche, attend les résultats, clique l'option.
+// Retourne une Promise.
+function fillSelect2(selectName, searchText, targetText) {
+  return new Promise((resolve) => {
+    if (typeof jQuery === 'undefined') { resolve(false); return; }
+    const $select = jQuery(`[name="${selectName}"]`);
+    if (!$select.length || !$select.data('select2')) { resolve(false); return; }
 
-  const label = value.toUpperCase();
+    // 1. Ouvrir le dropdown
+    $select.select2('open');
 
-  if (!$select.find(`option[value="${label}"]`).length) {
-    $select.append(new Option(label, label, true, true));
-  }
-  $select.val(label).trigger('change');
-  return true;
-}
+    setTimeout(() => {
+      // 2. Trouver l'input de recherche actif
+      const searchInput = document.querySelector('.select2-search__field');
+      if (!searchInput) { $select.select2('close'); resolve(false); return; }
 
-// CP : format "57970 BASSE-HAM" → la page remplit CP et Ville automatiquement
-function setSelect2CP(codePostal, ville) {
-  const label = ville
-    ? `${codePostal} ${ville.toUpperCase()}`
-    : codePostal;
-  return setSelect2('cp', label);
-}
+      // 3. Taper le texte de recherche
+      searchInput.value = searchText;
+      searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+      searchInput.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
 
-// Adresse : format "3 IMPASSE DU MOULIN"
-function setSelect2Adresse(adresse) {
-  return setSelect2('adresse', adresse);
+      // 4. Attendre le chargement des options
+      setTimeout(() => {
+        const options = document.querySelectorAll('.select2-results__option:not(.select2-results__option--disabled)');
+        const match = targetText
+          ? [...options].find(o => o.textContent.toUpperCase().includes(targetText.toUpperCase()))
+          : options[0];
+
+        if (match) {
+          match.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+          match.click();
+          resolve(true);
+        } else {
+          // Fallback : prendre la première option disponible
+          if (options[0]) {
+            options[0].dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+            options[0].click();
+            resolve(true);
+          } else {
+            $select.select2('close');
+            resolve(false);
+          }
+        }
+      }, 1000); // attente chargement résultats
+    }, 400);  // attente ouverture
+  });
 }
 
 // --- Étape 1 : nom / prenom / sexe / naissance ---
@@ -80,10 +98,10 @@ function fillStep1(a) {
 
 // --- Étape 2 : formulaire complet ---
 
-function fillStep2(a) {
+async function fillStep2(a) {
   let filled = 0;
 
-  // Champs texte
+  // Champs texte simples
   if (setInput('nom', a.nom)) filled++;
   if (setInput('prenom', a.prenom)) filled++;
   if (setInput('date_naissance', a.date_naissance)) filled++;
@@ -94,12 +112,19 @@ function fillStep2(a) {
   // Sexe
   if (a.sexe && setSelect('sexe', a.sexe === 'F' ? 'F' : 'M')) filled++;
 
-  // Code postal Select2 : "57970 BASSE-HAM" → remplit CP + Ville
-  if (a.code_postal && setSelect2CP(a.code_postal, a.ville)) filled++;
+  // Code postal Select2 : recherche par CP, cible "CP VILLE"
+  if (a.code_postal) {
+    const cpTarget = a.ville ? `${a.code_postal} ${a.ville.toUpperCase()}` : a.code_postal;
+    const cpOk = await fillSelect2('cp', a.code_postal, cpTarget);
+    if (cpOk) filled++;
 
-  // Adresse Select2 : "3 IMPASSE DU MOULIN"
-  // Stocker adresse comme un champ unique dans les données adhérent
-  if (a.adresse && setSelect2Adresse(a.adresse)) filled++;
+    // Adresse Select2 : après le CP (attendre que le select adresse soit actif)
+    if (a.adresse) {
+      await new Promise(r => setTimeout(r, 600));
+      const adresseOk = await fillSelect2('adresse', a.adresse, a.adresse);
+      if (adresseOk) filled++;
+    }
+  }
 
   // Pratique : Judo = 1, Jujitsu = 2, Taïso = 3, Non pratiquant = 4
   if (setSelect('pratiques_1', a.pratique || '1')) filled++;
@@ -107,11 +132,26 @@ function fillStep2(a) {
   // Type pratique : L = Loisir, C = Compétition
   if (setRadio('type_pratique_1', a.type_pratique || 'L')) filled++;
 
-  // Pas de handicap par défaut
+  // Handicap : Non par défaut
   setRadio('handicap', '0');
 
-  // Certificat : QU = Questionnaire, SP = Sportif, SC = Sportif en compétition, NP = Non pratiquant
+  // Certificat médical
   if (a.certificat) setSelect('certificat', a.certificat);
+
+  // Questionnaire santé : cocher si certificat = QU
+  if (a.certificat === 'QU') {
+    if (setCheckbox('chk_questionnaire', true)) filled++;
+  }
+
+  // Fonction : 1 = dirigeant/entraîneur, 4 = adhérent simple (Non)
+  const fonctionVal = a.fonction || '4';
+  if (setRadio('fonction', fonctionVal)) filled++;
+
+  // Assurance : cocher
+  if (setCheckbox('assurance', true)) filled++;
+
+  // RGPD : cocher
+  setCheckbox('rgpd', true);
 
   return { success: filled > 0, filled };
 }
@@ -134,7 +174,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (step === 1) {
       sendResponse({ ...fillStep1(message.adherent), step: 1 });
     } else if (step === 2) {
-      sendResponse({ ...fillStep2(message.adherent), step: 2 });
+      fillStep2(message.adherent).then(result => {
+        sendResponse({ ...result, step: 2 });
+      });
+      return true; // async
     } else {
       sendResponse({ success: false, step: 0, error: 'Page non reconnue' });
     }
