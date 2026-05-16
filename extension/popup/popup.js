@@ -1,5 +1,6 @@
 // popup.js
 let adherents = [];
+let pendingAdherent = null; // adhérent en attente pour l'étape 2
 
 const select   = document.getElementById('adherent-select');
 const fiche    = document.getElementById('fiche');
@@ -59,7 +60,27 @@ select.addEventListener('change', () => {
 });
 
 // -----------------------------------------------------------------------
-// Fonction exécutée dans world: MAIN — accès au jQuery natif de FFJDA
+// Observer : détecte le passage étape 1 → 2 dans la page FFJDA
+// -----------------------------------------------------------------------
+function observerScript() {
+  // Nettoyage d'un éventuel observer précédent
+  if (window.__jccObserver) { window.__jccObserver.disconnect(); window.__jccObserver = null; }
+
+  const obs = new MutationObserver(() => {
+    if (document.querySelector('[name="date_naissance"]')) {
+      obs.disconnect();
+      window.__jccObserver = null;
+      // Signale à la popup que l'étape 2 est prête
+      window.dispatchEvent(new CustomEvent('jcc_step2_ready'));
+    }
+  });
+
+  obs.observe(document.body, { childList: true, subtree: true });
+  window.__jccObserver = obs;
+}
+
+// -----------------------------------------------------------------------
+// pageScript : remplissage dans world MAIN
 // -----------------------------------------------------------------------
 function pageScript(adherent) {
   function norm(s) { return (s || '').toUpperCase().replace(/-/g, ' '); }
@@ -73,7 +94,6 @@ function pageScript(adherent) {
     el.dispatchEvent(new Event('change', { bubbles: true }));
     return true;
   }
-
   function setSelect(name, value) {
     const el = document.querySelector(`[name="${name}"]`);
     if (!el || value == null) return false;
@@ -81,7 +101,6 @@ function pageScript(adherent) {
     el.dispatchEvent(new Event('change', { bubbles: true }));
     return true;
   }
-
   function setRadio(name, value) {
     const el = document.querySelector(`input[name="${name}"][value="${value}"]`);
     if (!el) return false;
@@ -89,7 +108,6 @@ function pageScript(adherent) {
     el.dispatchEvent(new Event('change', { bubbles: true }));
     return true;
   }
-
   function setCheckbox(id, checked) {
     const el = document.getElementById(id) || document.querySelector(`input[name="${id}"]`);
     if (!el) return false;
@@ -97,8 +115,6 @@ function pageScript(adherent) {
     el.dispatchEvent(new Event('change', { bubbles: true }));
     return true;
   }
-
-  // Clic complet sur une option Select2
   function clickOption(el) {
     el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
     el.dispatchEvent(new MouseEvent('mouseover',  { bubbles: true }));
@@ -106,29 +122,22 @@ function pageScript(adherent) {
     el.dispatchEvent(new MouseEvent('mouseup',    { bubbles: true, button: 0 }));
     el.dispatchEvent(new MouseEvent('click',      { bubbles: true, button: 0 }));
   }
-
   function fillSelect2(selectName, searchText, targetText) {
     return new Promise((resolve) => {
-      // Fermer tout dropdown ouvert
       jQuery('.select2-container--open [name]').each(function() {
         try { jQuery(this).select2('close'); } catch(e) {}
       });
-
       const $sel = jQuery(`[name="${selectName}"]`);
       if (!$sel.length || !$sel.data('select2')) { resolve(false); return; }
-
       setTimeout(() => {
         $sel.select2('open');
-
         setTimeout(() => {
           const input = document.querySelector('.select2-container--open .select2-search__field');
           if (!input) { $sel.select2('close'); resolve(false); return; }
-
           input.focus();
           input.value = searchText;
           input.dispatchEvent(new Event('input',         { bubbles: true }));
           input.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
-
           setTimeout(() => {
             const opts = document.querySelectorAll(
               '.select2-container--open .select2-results__option:not(.select2-results__option--disabled):not(.select2-results__option--loading)'
@@ -136,26 +145,18 @@ function pageScript(adherent) {
             const normTarget = norm(targetText);
             let match = Array.from(opts).find(o => norm(o.textContent).includes(normTarget));
             if (!match && opts[0]) match = opts[0];
-
-            if (match) {
-              clickOption(match);
-              setTimeout(() => resolve(true), 400);
-            } else {
-              $sel.select2('close');
-              resolve(false);
-            }
+            if (match) { clickOption(match); setTimeout(() => resolve(true), 400); }
+            else { $sel.select2('close'); resolve(false); }
           }, 1500);
         }, 500);
       }, 200);
     });
   }
 
-  // --- Détection étape ---
   const hasNaissance     = !!document.querySelector('[name="naissance"]');
   const hasDateNaissance = !!document.querySelector('[name="date_naissance"]');
   const step = (hasNaissance && !hasDateNaissance) ? 1 : hasDateNaissance ? 2 : 0;
 
-  // --- Étape 1 ---
   if (step === 1) {
     let f = 0;
     if (setInput('nom',       adherent.nom))                       f++;
@@ -165,7 +166,6 @@ function pageScript(adherent) {
     return Promise.resolve({ step: 1, success: f > 0, filled: f });
   }
 
-  // --- Étape 2 ---
   if (step === 2) {
     let f = 0;
     if (setInput('nom',            adherent.nom))           f++;
@@ -175,16 +175,11 @@ function pageScript(adherent) {
     if (setInput('mail',           adherent.email))          f++;
     if (setInput('mail-confirm',   adherent.email))          f++;
     if (setSelect('sexe',          adherent.sexe === 'F' ? 'F' : 'M')) f++;
-
     const cpTarget = adherent.ville
       ? `${adherent.code_postal} ${adherent.ville}`
       : adherent.code_postal;
-
     return fillSelect2('cp', adherent.code_postal, cpTarget)
-      .then(cpOk => {
-        if (cpOk) f++;
-        return wait(1200); // attendre que FFJDA active le select Adresse
-      })
+      .then(cpOk => { if (cpOk) f++; return wait(1200); })
       .then(() => {
         if (!adherent.adresse) return;
         return fillSelect2('adresse', adherent.adresse, adherent.adresse)
@@ -209,6 +204,19 @@ function pageScript(adherent) {
 }
 
 // -----------------------------------------------------------------------
+// Exécution du remplissage sur l'onglet actif
+// -----------------------------------------------------------------------
+async function runFill(tab, adherent) {
+  const results = await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    world: 'MAIN',
+    func: pageScript,
+    args: [adherent]
+  });
+  return results[0].result;
+}
+
+// -----------------------------------------------------------------------
 // Bouton Remplir
 // -----------------------------------------------------------------------
 btnFill.addEventListener('click', async () => {
@@ -222,25 +230,69 @@ btnFill.addEventListener('click', async () => {
     return;
   }
 
-  showStatus('Remplissage en cours... (~5s)', 'info');
+  showStatus('Remplissage en cours...', 'info');
 
   try {
-    const results = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      world: 'MAIN',
-      func: pageScript,
-      args: [adherent]
-    });
-
-    const r = results[0].result;
+    const r = await runFill(tab, adherent);
     if (!r) { showStatus('Pas de réponse.', 'error'); return; }
-    const stepLabel = r.step === 1 ? 'Étape 1' : r.step === 2 ? 'Étape 2' : 'Page non reconnue';
-    showStatus(
-      r.success
-        ? `${stepLabel} : ${r.filled} champ(s) rempli(s) ✅`
-        : `${stepLabel} : ${r.error || 'aucun champ rempli.'}`,
-      r.success ? 'success' : 'error'
-    );
+
+    if (r.step === 1 && r.success) {
+      showStatus(`Étape 1 : ${r.filled} champ(s) ✅ — En attente de l'étape 2...`, 'info');
+      pendingAdherent = adherent;
+
+      // Installer l'observer dans la page
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        world: 'MAIN',
+        func: observerScript
+      });
+
+      // Écouter l'événement jcc_step2_ready via le content script
+      // On utilise un polling léger côté popup (toutes les 500ms, max 60s)
+      const pollStart = Date.now();
+      const poll = setInterval(async () => {
+        if (!pendingAdherent) { clearInterval(poll); return; }
+        if (Date.now() - pollStart > 60000) {
+          clearInterval(poll);
+          showStatus('Timeout : étape 2 non détectée.', 'error');
+          pendingAdherent = null;
+          return;
+        }
+        // Vérifier si l'étape 2 est prête
+        const check = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          world: 'MAIN',
+          func: () => !!document.querySelector('[name="date_naissance"]')
+        });
+        if (check[0].result) {
+          clearInterval(poll);
+          const a = pendingAdherent;
+          pendingAdherent = null;
+          showStatus('Étape 2 détectée — remplissage...', 'info');
+          // Petit délai pour laisser la page se stabiliser
+          await new Promise(res => setTimeout(res, 800));
+          try {
+            const r2 = await runFill(tab, a);
+            if (!r2) { showStatus('Pas de réponse étape 2.', 'error'); return; }
+            showStatus(
+              r2.success
+                ? `Étape 2 : ${r2.filled} champ(s) rempli(s) ✅`
+                : `Étape 2 : ${r2.error || 'aucun champ rempli.'}`,
+              r2.success ? 'success' : 'error'
+            );
+          } catch(e) { showStatus('Erreur étape 2 : ' + e.message, 'error'); }
+        }
+      }, 500);
+
+    } else {
+      const stepLabel = r.step === 2 ? 'Étape 2' : 'Page';
+      showStatus(
+        r.success
+          ? `${stepLabel} : ${r.filled} champ(s) rempli(s) ✅`
+          : `${stepLabel} : ${r.error || 'aucun champ rempli.'}`,
+        r.success ? 'success' : 'error'
+      );
+    }
   } catch (err) {
     showStatus('Erreur : ' + err.message, 'error');
   }
