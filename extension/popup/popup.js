@@ -98,13 +98,20 @@ function pageScript(adherent) {
     return true;
   }
 
-  // Remplit un Select2 de façon séquentielle et sûre
+  // Clic complet sur une option Select2
+  function clickOption(el) {
+    el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+    el.dispatchEvent(new MouseEvent('mouseover',  { bubbles: true }));
+    el.dispatchEvent(new MouseEvent('mousedown',  { bubbles: true, button: 0 }));
+    el.dispatchEvent(new MouseEvent('mouseup',    { bubbles: true, button: 0 }));
+    el.dispatchEvent(new MouseEvent('click',      { bubbles: true, button: 0 }));
+  }
+
   function fillSelect2(selectName, searchText, targetText) {
     return new Promise((resolve) => {
-      // Fermer tout dropdown ouvert avant de commencer
-      jQuery('.select2-container--open').each(function() {
-        var sel = jQuery(this).data('select2');
-        if (sel) sel.$element.select2('close');
+      // Fermer tout dropdown ouvert
+      jQuery('.select2-container--open [name]').each(function() {
+        try { jQuery(this).select2('close'); } catch(e) {}
       });
 
       const $sel = jQuery(`[name="${selectName}"]`);
@@ -114,7 +121,6 @@ function pageScript(adherent) {
         $sel.select2('open');
 
         setTimeout(() => {
-          // S'assurer qu'on trouve le bon input (celui du select ouvert)
           const input = document.querySelector('.select2-container--open .select2-search__field');
           if (!input) { $sel.select2('close'); resolve(false); return; }
 
@@ -129,20 +135,18 @@ function pageScript(adherent) {
             );
             const normTarget = norm(targetText);
             let match = Array.from(opts).find(o => norm(o.textContent).includes(normTarget));
-            if (!match && opts[0]) match = opts[0]; // fallback première option
+            if (!match && opts[0]) match = opts[0];
 
             if (match) {
-              match.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-              match.click();
-              // Attendre la fermeture du dropdown
-              setTimeout(() => resolve(true), 300);
+              clickOption(match);
+              setTimeout(() => resolve(true), 400);
             } else {
               $sel.select2('close');
               resolve(false);
             }
-          }, 1500); // attente résultats AJAX
-        }, 500);   // attente ouverture
-      }, 200);     // délai avant ouverture (laisse le temps de fermer)
+          }, 1500);
+        }, 500);
+      }, 200);
     });
   }
 
@@ -154,25 +158,24 @@ function pageScript(adherent) {
   // --- Étape 1 ---
   if (step === 1) {
     let f = 0;
-    if (setInput('nom',       adherent.nom))          f++;
-    if (setInput('prenom',    adherent.prenom))        f++;
+    if (setInput('nom',       adherent.nom))                       f++;
+    if (setInput('prenom',    adherent.prenom))                     f++;
     if (setSelect('sexe',     adherent.sexe === 'F' ? 'F' : 'M')) f++;
-    if (setInput('naissance', adherent.date_naissance || '')) f++;
+    if (setInput('naissance', adherent.date_naissance || ''))      f++;
     return Promise.resolve({ step: 1, success: f > 0, filled: f });
   }
 
   // --- Étape 2 ---
   if (step === 2) {
     let f = 0;
-    if (setInput('nom',           adherent.nom))          f++;
-    if (setInput('prenom',        adherent.prenom))        f++;
-    if (setInput('date_naissance',adherent.date_naissance)) f++;
-    if (setInput('portable',      adherent.telephone))     f++;
-    if (setInput('mail',          adherent.email))         f++;
-    if (setInput('mail-confirm',  adherent.email))         f++;
-    if (setSelect('sexe',         adherent.sexe === 'F' ? 'F' : 'M')) f++;
+    if (setInput('nom',            adherent.nom))           f++;
+    if (setInput('prenom',         adherent.prenom))         f++;
+    if (setInput('date_naissance', adherent.date_naissance)) f++;
+    if (setInput('portable',       adherent.telephone))      f++;
+    if (setInput('mail',           adherent.email))          f++;
+    if (setInput('mail-confirm',   adherent.email))          f++;
+    if (setSelect('sexe',          adherent.sexe === 'F' ? 'F' : 'M')) f++;
 
-    // 1. CP Select2
     const cpTarget = adherent.ville
       ? `${adherent.code_postal} ${adherent.ville}`
       : adherent.code_postal;
@@ -180,9 +183,7 @@ function pageScript(adherent) {
     return fillSelect2('cp', adherent.code_postal, cpTarget)
       .then(cpOk => {
         if (cpOk) f++;
-        // 2. Attendre que FFJDA charge le select Adresse suite à la sélection CP
-        // + s'assurer que le dropdown CP est bien fermé
-        return wait(1200);
+        return wait(1200); // attendre que FFJDA active le select Adresse
       })
       .then(() => {
         if (!adherent.adresse) return;
@@ -190,12 +191,12 @@ function pageScript(adherent) {
           .then(adOk => { if (adOk) f++; });
       })
       .then(() => {
-        if (setSelect('pratiques_1',    adherent.pratique || '1'))     f++;
+        if (setSelect('pratiques_1',    adherent.pratique || '1'))      f++;
         if (setRadio('type_pratique_1', adherent.type_pratique || 'L')) f++;
         setRadio('handicap', '0');
         if (adherent.certificat) setSelect('certificat', adherent.certificat);
         if (adherent.certificat === 'QU' && setCheckbox('chk_questionnaire', true)) f++;
-        if (setRadio('fonction',       adherent.fonction || '4'))      f++;
+        if (setRadio('fonction',        adherent.fonction || '4'))      f++;
         setRadio('souscription', '1');
         setRadio('newsletter',   '0');
         if (setCheckbox('assurance', true)) f++;
