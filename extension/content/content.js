@@ -1,8 +1,7 @@
 // Content script — injecté sur moncompte.ffjudo.com
 // Étape 1 : nom, prenom, sexe, naissance
 // Étape 2 : formulaire complet
-// Le champ CP est un Select2 : on crée l'option "57970 BASSE-HAM" et on la sélectionne
-// directement via jQuery, ce qui remplit CP et Ville automatiquement.
+// CP et Adresse sont des Select2 : on injecte l'option et on la sélectionne via jQuery.
 
 // --- Helpers ---
 
@@ -39,28 +38,33 @@ function setCheckbox(name, checked) {
   return true;
 }
 
-// Select2 CP : on injecte directement l'option "CP VILLE" (ex: "57970 BASSE-HAM")
-// puis on la sélectionne via l'API jQuery Select2.
-// Cela déclenche les handlers FFJDA qui remplissent CP et Ville automatiquement.
-function setSelect2CP(codePostal, ville) {
+// Helper générique Select2 : injecte une option et la sélectionne.
+// La valeur est toujours en MAJUSCULES (format FFJDA).
+function setSelect2(selectName, value) {
   if (typeof jQuery === 'undefined') return false;
-  const $select = jQuery('[name="cp"]');
+  const $select = jQuery(`[name="${selectName}"]`);
   if (!$select.length || !$select.data('select2')) return false;
 
-  // Construire la valeur au format attendu par FFJDA : "57970 BASSE-HAM"
+  const label = value.toUpperCase();
+
+  if (!$select.find(`option[value="${label}"]`).length) {
+    $select.append(new Option(label, label, true, true));
+  }
+  $select.val(label).trigger('change');
+  return true;
+}
+
+// CP : format "57970 BASSE-HAM" → la page remplit CP et Ville automatiquement
+function setSelect2CP(codePostal, ville) {
   const label = ville
     ? `${codePostal} ${ville.toUpperCase()}`
     : codePostal;
+  return setSelect2('cp', label);
+}
 
-  // Créer l'option si elle n'existe pas encore
-  if (!$select.find(`option[value="${label}"]`).length) {
-    const newOption = new Option(label, label, true, true);
-    $select.append(newOption);
-  }
-
-  // Sélectionner via l'API Select2 et déclencher le trigger
-  $select.val(label).trigger('change');
-  return true;
+// Adresse : format "3 IMPASSE DU MOULIN"
+function setSelect2Adresse(adresse) {
+  return setSelect2('adresse', adresse);
 }
 
 // --- Étape 1 : nom / prenom / sexe / naissance ---
@@ -70,7 +74,6 @@ function fillStep1(a) {
   if (setInput('nom', a.nom)) filled++;
   if (setInput('prenom', a.prenom)) filled++;
   if (a.sexe && setSelect('sexe', a.sexe === 'F' ? 'F' : 'M')) filled++;
-  // Étape 1 utilise "naissance", étape 2 utilise "date_naissance"
   if (setInput('naissance', a.date_naissance || '')) filled++;
   return { success: filled > 0, filled };
 }
@@ -91,11 +94,12 @@ function fillStep2(a) {
   // Sexe
   if (a.sexe && setSelect('sexe', a.sexe === 'F' ? 'F' : 'M')) filled++;
 
-  // Code postal via Select2 : format "57970 BASSE-HAM"
-  // La page FFJDA remplit CP et Ville automatiquement après le trigger
-  if (a.code_postal) {
-    if (setSelect2CP(a.code_postal, a.ville)) filled++;
-  }
+  // Code postal Select2 : "57970 BASSE-HAM" → remplit CP + Ville
+  if (a.code_postal && setSelect2CP(a.code_postal, a.ville)) filled++;
+
+  // Adresse Select2 : "3 IMPASSE DU MOULIN"
+  // Stocker adresse comme un champ unique dans les données adhérent
+  if (a.adresse && setSelect2Adresse(a.adresse)) filled++;
 
   // Pratique : Judo = 1, Jujitsu = 2, Taïso = 3, Non pratiquant = 4
   if (setSelect('pratiques_1', a.pratique || '1')) filled++;
