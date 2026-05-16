@@ -1,6 +1,5 @@
-// background.js — v2026.05.16-17
+// background.js — v2026.05.16-18
 // Utilise chrome.tabs.onUpdated au lieu de setInterval
-// Le service worker se réveille sur chaque navigation, pas de polling
 
 let flowState = null; // { tabId, adherent }
 
@@ -158,7 +157,17 @@ function fillEtape2(adherent) {
       sr('newsletter',   '0');
       if (sc('assurance', true)) f++;
       sc('rgpd', true);
-      return { step: 2, success: f > 0, filled: f };
+
+      // Clic sur "Suivant"
+      return wait(400).then(() => {
+        const suivant = Array.from(document.querySelectorAll('button.big-btn[type="submit"]'))
+          .find(b => b.textContent.trim().toLowerCase().includes('suivant'));
+        if (suivant) {
+          suivant.click();
+          f++;
+        }
+        return { step: 2, success: f > 0, filled: f, submitted: !!suivant };
+      });
     });
 }
 
@@ -173,7 +182,6 @@ async function handleNavigation(tabId, url) {
 
   if (step === 'etape1') {
     setStatus('\u00c9tape 1 : remplissage...', 'info');
-    // Attendre que la page soit stable
     await new Promise(r => setTimeout(r, 800));
     try {
       const r = await runInTab(tabId, fillEtape1, [adherent]);
@@ -200,17 +208,18 @@ async function handleNavigation(tabId, url) {
     try {
       const r = await runInTab(tabId, fillEtape2, [adherent]);
       if (!r) { setStatus('\u00c9tape 2 : pas de r\u00e9ponse.', 'error'); return; }
+      const sub = r.submitted ? ' \u2192 "Suivant" cliqu\u00e9 \u2705' : '';
       setStatus(
-        r.success ? `\u00c9tape 2 : ${r.filled} champ(s) \u2705` : `\u00c9tape 2 : ${r.error || 'aucun champ.'}`,
+        r.success ? `\u00c9tape 2 : ${r.filled} champ(s) \u2705${sub}` : `\u00c9tape 2 : ${r.error || 'aucun champ.'}`,
         r.success ? 'success' : 'error'
       );
-      flowState = null; // Flux terminé
+      flowState = null;
     } catch(e) { setStatus('Erreur \u00e9tape 2 : ' + e.message, 'error'); }
     return;
   }
 }
 
-// ---- Listener principal : se déclenche à chaque navigation ----
+// ---- Listener principal ----
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status !== 'complete') return;
@@ -224,27 +233,18 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.action === 'startFlow') {
     const { tabId, tabUrl, adherent } = msg;
     const step = detectStep(tabUrl);
-
     if (!step) {
       setStatus('Page FFJDA non reconnue.', 'error');
       sendResponse({ ok: false });
       return true;
     }
-
     flowState = { tabId, adherent };
-
-    // Si déjà sur la bonne page, traiter immédiatement
     if (step === 'depart') {
       setStatus('Navigation vers "Saisir une licence"...', 'info');
-      chrome.tabs.update(tabId, {
-        url: 'https://moncompte.ffjudo.com/espace-club/prise-licence/saisir-licence'
-      });
+      chrome.tabs.update(tabId, { url: 'https://moncompte.ffjudo.com/espace-club/prise-licence/saisir-licence' });
     } else {
-      // La page est déjà chargée, handleNavigation ne se redéclenchera pas
-      // On le force manuellement
       handleNavigation(tabId, tabUrl);
     }
-
     sendResponse({ ok: true, step });
     return true;
   }
