@@ -1,6 +1,8 @@
 // Content script — injecté sur moncompte.ffjudo.com
 // Étape 1 : nom, prenom, sexe, naissance
-// Étape 2 : formulaire complet avec Select2 pour CP/adresse
+// Étape 2 : formulaire complet
+// Le champ CP est un Select2 : on crée l'option "57970 BASSE-HAM" et on la sélectionne
+// directement via jQuery, ce qui remplit CP et Ville automatiquement.
 
 // --- Helpers ---
 
@@ -37,49 +39,28 @@ function setCheckbox(name, checked) {
   return true;
 }
 
-// Select2 : saisie du code postal dans le champ de recherche
-// puis sélection de l'option correspondant à "CP VILLE"
-function setSelect2CP(cpValue, villeValue) {
-  return new Promise((resolve) => {
-    // Ouvrir le dropdown Select2
-    const container = document.querySelector('.cp-selector + .select2-container');
-    if (!container) { resolve(false); return; }
+// Select2 CP : on injecte directement l'option "CP VILLE" (ex: "57970 BASSE-HAM")
+// puis on la sélectionne via l'API jQuery Select2.
+// Cela déclenche les handlers FFJDA qui remplissent CP et Ville automatiquement.
+function setSelect2CP(codePostal, ville) {
+  if (typeof jQuery === 'undefined') return false;
+  const $select = jQuery('[name="cp"]');
+  if (!$select.length || !$select.data('select2')) return false;
 
-    // Déclencher le clic via jQuery/Select2
-    if (typeof jQuery !== 'undefined' && jQuery('[name="cp"]').data('select2')) {
-      jQuery('[name="cp"]').select2('open');
-    } else {
-      container.querySelector('.select2-selection')?.click();
-    }
+  // Construire la valeur au format attendu par FFJDA : "57970 BASSE-HAM"
+  const label = ville
+    ? `${codePostal} ${ville.toUpperCase()}`
+    : codePostal;
 
-    // Attendre que l'input de recherche apparaisse
-    setTimeout(() => {
-      const searchInput = document.querySelector('.select2-search__field');
-      if (!searchInput) { resolve(false); return; }
+  // Créer l'option si elle n'existe pas encore
+  if (!$select.find(`option[value="${label}"]`).length) {
+    const newOption = new Option(label, label, true, true);
+    $select.append(newOption);
+  }
 
-      // Taper le code postal
-      searchInput.value = cpValue;
-      searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-
-      // Attendre le chargement des résultats
-      setTimeout(() => {
-        // Chercher l'option qui contient CP + ville
-        const options = document.querySelectorAll('.select2-results__option');
-        const target = [...options].find(o =>
-          o.textContent.includes(cpValue) &&
-          (!villeValue || o.textContent.toUpperCase().includes(villeValue.toUpperCase()))
-        );
-
-        if (target) {
-          target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-          target.click();
-          resolve(true);
-        } else {
-          resolve(false);
-        }
-      }, 800); // attente chargement options
-    }, 300); // attente ouverture dropdown
-  });
+  // Sélectionner via l'API Select2 et déclencher le trigger
+  $select.val(label).trigger('change');
+  return true;
 }
 
 // --- Étape 1 : nom / prenom / sexe / naissance ---
@@ -90,14 +71,13 @@ function fillStep1(a) {
   if (setInput('prenom', a.prenom)) filled++;
   if (a.sexe && setSelect('sexe', a.sexe === 'F' ? 'F' : 'M')) filled++;
   // Étape 1 utilise "naissance", étape 2 utilise "date_naissance"
-  const ddn = a.date_naissance || '';
-  if (setInput('naissance', ddn)) filled++;
+  if (setInput('naissance', a.date_naissance || '')) filled++;
   return { success: filled > 0, filled };
 }
 
 // --- Étape 2 : formulaire complet ---
 
-async function fillStep2(a) {
+function fillStep2(a) {
   let filled = 0;
 
   // Champs texte
@@ -107,30 +87,27 @@ async function fillStep2(a) {
   if (setInput('portable', a.telephone)) filled++;
   if (setInput('mail', a.email)) filled++;
   if (setInput('mail-confirm', a.email)) filled++;
-  if (setInput('ville-all', a.ville)) filled++;
 
   // Sexe
   if (a.sexe && setSelect('sexe', a.sexe === 'F' ? 'F' : 'M')) filled++;
 
+  // Code postal via Select2 : format "57970 BASSE-HAM"
+  // La page FFJDA remplit CP et Ville automatiquement après le trigger
+  if (a.code_postal) {
+    if (setSelect2CP(a.code_postal, a.ville)) filled++;
+  }
+
   // Pratique : Judo = 1, Jujitsu = 2, Taïso = 3, Non pratiquant = 4
-  const pratique = a.pratique || '1';
-  if (setSelect('pratiques_1', pratique)) filled++;
+  if (setSelect('pratiques_1', a.pratique || '1')) filled++;
 
   // Type pratique : L = Loisir, C = Compétition
-  const typePratique = a.type_pratique || 'L';
-  if (setRadio('type_pratique_1', typePratique)) filled++;
+  if (setRadio('type_pratique_1', a.type_pratique || 'L')) filled++;
 
   // Pas de handicap par défaut
   setRadio('handicap', '0');
 
   // Certificat : QU = Questionnaire, SP = Sportif, SC = Sportif en compétition, NP = Non pratiquant
-  if (a.certificat && setSelect('certificat', a.certificat)) filled++;
-
-  // Code postal via Select2
-  if (a.code_postal) {
-    const cpOk = await setSelect2CP(a.code_postal, a.ville);
-    if (cpOk) filled++;
-  }
+  if (a.certificat) setSelect('certificat', a.certificat);
 
   return { success: filled > 0, filled };
 }
@@ -138,7 +115,6 @@ async function fillStep2(a) {
 // --- Détection de l'étape courante ---
 
 function detectStep() {
-  // Étape 1 : présence du champ "naissance" sans "date_naissance"
   const hasNaissance = !!document.querySelector('[name="naissance"]');
   const hasDateNaissance = !!document.querySelector('[name="date_naissance"]');
   if (hasNaissance && !hasDateNaissance) return 1;
@@ -152,13 +128,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'fill_form') {
     const step = detectStep();
     if (step === 1) {
-      const result = fillStep1(message.adherent);
-      sendResponse({ ...result, step: 1 });
+      sendResponse({ ...fillStep1(message.adherent), step: 1 });
     } else if (step === 2) {
-      fillStep2(message.adherent).then(result => {
-        sendResponse({ ...result, step: 2 });
-      });
-      return true; // async
+      sendResponse({ ...fillStep2(message.adherent), step: 2 });
     } else {
       sendResponse({ success: false, step: 0, error: 'Page non reconnue' });
     }
