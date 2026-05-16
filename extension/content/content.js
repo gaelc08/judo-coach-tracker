@@ -53,14 +53,19 @@ function fillSelect2(selectName, searchText, targetText) {
       const searchInput = document.querySelector('.select2-search__field');
       if (!searchInput) { $select.select2('close'); resolve(false); return; }
 
-      // 3. Taper le texte de recherche
-      searchInput.value = searchText;
-      searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-      searchInput.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
+      // 3. Taper le texte de recherche caractère par caractère pour déclencher l'AJAX
+      searchInput.focus();
+      searchInput.value = '';
+      for (const char of searchText) {
+        searchInput.value += char;
+        searchInput.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: char }));
+        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+        searchInput.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: char }));
+      }
 
-      // 4. Attendre le chargement des options
+      // 4. Attendre le chargement des options AJAX
       setTimeout(() => {
-        const options = document.querySelectorAll('.select2-results__option:not(.select2-results__option--disabled)');
+        const options = document.querySelectorAll('.select2-results__option:not(.select2-results__option--disabled):not(.select2-results__option--loading)');
         const match = targetText
           ? [...options].find(o => o.textContent.toUpperCase().includes(targetText.toUpperCase()))
           : options[0];
@@ -69,19 +74,16 @@ function fillSelect2(selectName, searchText, targetText) {
           match.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
           match.click();
           resolve(true);
+        } else if (options[0]) {
+          options[0].dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+          options[0].click();
+          resolve(true);
         } else {
-          // Fallback : prendre la première option disponible
-          if (options[0]) {
-            options[0].dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-            options[0].click();
-            resolve(true);
-          } else {
-            $select.select2('close');
-            resolve(false);
-          }
+          $select.select2('close');
+          resolve(false);
         }
-      }, 1000); // attente chargement résultats
-    }, 400);  // attente ouverture
+      }, 1500); // attente chargement résultats AJAX
+    }, 500);  // attente ouverture dropdown
   });
 }
 
@@ -120,7 +122,7 @@ async function fillStep2(a) {
 
     // Adresse Select2 : après le CP (attendre que le select adresse soit actif)
     if (a.adresse) {
-      await new Promise(r => setTimeout(r, 600));
+      await new Promise(r => setTimeout(r, 800));
       const adresseOk = await fillSelect2('adresse', a.adresse, a.adresse);
       if (adresseOk) filled++;
     }
@@ -144,8 +146,13 @@ async function fillStep2(a) {
   }
 
   // Fonction : 1 = dirigeant/entraîneur, 4 = adhérent simple (Non)
-  const fonctionVal = a.fonction || '4';
-  if (setRadio('fonction', fonctionVal)) filled++;
+  if (setRadio('fonction', a.fonction || '4')) filled++;
+
+  // Souscription commerciale FFJDA : Non = valeur 1
+  setRadio('souscription', '1');
+
+  // Newsletter : Non = valeur 0
+  setRadio('newsletter', '0');
 
   // Assurance : cocher
   if (setCheckbox('assurance', true)) filled++;
