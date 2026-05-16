@@ -1,9 +1,14 @@
-// background.js — v2026.05.16-19
+// background.js — v2026.05.16-20
+// Support saisie multiple via queue
 
 let flowState = null;
+// flowState = { tabId, queue: [...], current: 0, results: [] }
 
 function setStatus(msg, type = 'info') {
   chrome.storage.session.set({ flowStatus: { msg, type, ts: Date.now() } });
+}
+function setProgress(current, total) {
+  chrome.storage.session.set({ queueProgress: { current, total } });
 }
 
 function detectStep(url) {
@@ -43,26 +48,22 @@ function fillEtape1(adherent) {
     el.dispatchEvent(new Event('change', { bubbles: true }));
     return true;
   }
-
   let f = 0;
   if (si('nom',       adherent.nom))                      f++;
   if (si('prenom',    adherent.prenom))                    f++;
   if (ss('sexe',      adherent.sexe === 'F' ? 'F' : 'M')) f++;
   if (si('naissance', adherent.date_naissance || ''))     f++;
-
-  // Clic sur "Valider"
   setTimeout(() => {
-    const valider = Array.from(document.querySelectorAll('button[type="submit"]'))
+    const btn = Array.from(document.querySelectorAll('button[type="submit"]'))
       .find(b => b.textContent.trim().toLowerCase().includes('valider'));
-    if (valider) valider.click();
+    if (btn) btn.click();
   }, 400);
-
   return { step: 1, success: f > 0, filled: f };
 }
 
 function clickCreerLicence() {
   const btn = Array.from(document.querySelectorAll('a.big-btn'))
-    .find(a => a.textContent.trim().toLowerCase().includes('cr\u00e9er une licence'));
+    .find(a => a.textContent.trim().toLowerCase().includes('créer une licence'));
   if (btn) { btn.click(); return true; }
   return false;
 }
@@ -174,49 +175,72 @@ function fillEtape2(adherent) {
     });
 }
 
+// ---- Queue : passer à l'adhérent suivant ----
+
+function nextInQueue() {
+  if (!flowState) return;
+  flowState.current++;
+  const { current, queue, tabId } = flowState;
+  setProgress(current, queue.length);
+
+  if (current >= queue.length) {
+    setStatus(`✅ ${queue.length} licence(s) saisie(s) avec succès !`, 'success');
+    flowState = null;
+    return;
+  }
+
+  const adherent = queue[current];
+  setStatus(`[${current + 1}/${queue.length}] ${adherent.nom} ${adherent.prenom}...`, 'info');
+  chrome.tabs.update(tabId, {
+    url: 'https://moncompte.ffjudo.com/espace-club/prise-licence/saisir-licence'
+  });
+}
+
 // ---- Gestionnaire central ----
 
 async function handleNavigation(tabId, url) {
   if (!flowState || flowState.tabId !== tabId) return;
   const step = detectStep(url);
   if (!step) return;
-  const adherent = flowState.adherent;
+  const adherent = flowState.queue[flowState.current];
+  const idx      = flowState.current;
+  const total    = flowState.queue.length;
 
   if (step === 'etape1') {
-    setStatus('\u00c9tape 1 : remplissage + clic Valider...', 'info');
+    setStatus(`[${idx + 1}/${total}] ${adherent.nom} — étape 1...`, 'info');
     await new Promise(r => setTimeout(r, 800));
     try {
       const r = await runInTab(tabId, fillEtape1, [adherent]);
-      if (!r || !r.success) { setStatus('\u00c9tape 1 : aucun champ rempli.', 'error'); return; }
-      setStatus(`\u00c9tape 1 : ${r.filled} champ(s) \u2705 \u2192 Valider cliqu\u00e9...`, 'info');
-    } catch(e) { setStatus('Erreur \u00e9tape 1 : ' + e.message, 'error'); }
+      if (!r || !r.success) { setStatus(`[${idx + 1}/${total}] Étape 1 : aucun champ.`, 'error'); return; }
+      setStatus(`[${idx + 1}/${total}] ${adherent.nom} — étape 1 ✅ → Valider...`, 'info');
+    } catch(e) { setStatus('Erreur étape 1 : ' + e.message, 'error'); }
     return;
   }
 
   if (step === 'intermediaire') {
-    setStatus('Clic auto sur "Je souhaite cr\u00e9er une licence"...', 'info');
+    setStatus(`[${idx + 1}/${total}] ${adherent.nom} — création licence...`, 'info');
     await new Promise(r => setTimeout(r, 1000));
     try {
       const ok = await runInTab(tabId, clickCreerLicence);
-      if (!ok) { setStatus('Bouton "cr\u00e9er une licence" introuvable.', 'error'); return; }
-      setStatus('Navigation vers \u00e9tape 2...', 'info');
-    } catch(e) { setStatus('Erreur interm\u00e9diaire : ' + e.message, 'error'); }
+      if (!ok) { setStatus('Bouton "créer une licence" introuvable.', 'error'); return; }
+    } catch(e) { setStatus('Erreur intermédiaire : ' + e.message, 'error'); }
     return;
   }
 
   if (step === 'etape2') {
-    setStatus('\u00c9tape 2 : remplissage...', 'info');
+    setStatus(`[${idx + 1}/${total}] ${adherent.nom} — étape 2...`, 'info');
     await new Promise(r => setTimeout(r, 1000));
     try {
       const r = await runInTab(tabId, fillEtape2, [adherent]);
-      if (!r) { setStatus('\u00c9tape 2 : pas de r\u00e9ponse.', 'error'); return; }
-      const sub = r.submitted ? ' \u2192 "Suivant" cliqu\u00e9 \u2705' : '';
-      setStatus(
-        r.success ? `\u00c9tape 2 : ${r.filled} champ(s) \u2705${sub}` : `\u00c9tape 2 : ${r.error || 'aucun champ.'}`,
-        r.success ? 'success' : 'error'
-      );
-      flowState = null;
-    } catch(e) { setStatus('Erreur \u00e9tape 2 : ' + e.message, 'error'); }
+      if (!r) { setStatus(`Étape 2 [${idx + 1}] : pas de réponse.`, 'error'); return; }
+      if (r.success) {
+        setStatus(`[${idx + 1}/${total}] ${adherent.nom} ✅`, 'success');
+        // Attendre que la FFJDA traite le submit avant de passer au suivant
+        setTimeout(() => nextInQueue(), 2500);
+      } else {
+        setStatus(`Étape 2 [${idx + 1}] : ${r.error || 'erreur inconnue'}`, 'error');
+      }
+    } catch(e) { setStatus('Erreur étape 2 : ' + e.message, 'error'); }
     return;
   }
 }
@@ -232,27 +256,32 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 // ---- Messages depuis la popup ----
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg.action === 'startFlow') {
-    const { tabId, tabUrl, adherent } = msg;
-    const step = detectStep(tabUrl);
-    if (!step) {
-      setStatus('Page FFJDA non reconnue.', 'error');
+  if (msg.action === 'startQueue') {
+    const { tabId, tabUrl, queue } = msg;
+    if (!queue || queue.length === 0) {
+      setStatus('Aucun adhérent sélectionné.', 'error');
       sendResponse({ ok: false });
       return true;
     }
-    flowState = { tabId, adherent };
-    if (step === 'depart') {
-      setStatus('Navigation vers "Saisir une licence"...', 'info');
-      chrome.tabs.update(tabId, { url: 'https://moncompte.ffjudo.com/espace-club/prise-licence/saisir-licence' });
-    } else {
+    flowState = { tabId, queue, current: 0, results: [] };
+    setProgress(0, queue.length);
+    const adherent = queue[0];
+    setStatus(`[1/${queue.length}] ${adherent.nom} ${adherent.prenom}...`, 'info');
+    const step = detectStep(tabUrl);
+    if (step && step !== 'depart') {
       handleNavigation(tabId, tabUrl);
+    } else {
+      chrome.tabs.update(tabId, {
+        url: 'https://moncompte.ffjudo.com/espace-club/prise-licence/saisir-licence'
+      });
     }
-    sendResponse({ ok: true, step });
+    sendResponse({ ok: true, total: queue.length });
     return true;
   }
+
   if (msg.action === 'cancelFlow') {
     flowState = null;
-    setStatus('Flux annul\u00e9.', 'info');
+    setStatus('Flux annulé.', 'info');
     sendResponse({ ok: true });
     return true;
   }

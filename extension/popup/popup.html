@@ -13,60 +13,30 @@
   </div>
 
   <div class="section">
-    <label for="adherent-select">Adhérent à saisir</label>
-    <select id="adherent-select">
-      <option value="">-- Sélectionner un adhérent --</option>
-    </select>
+    <div class="select-header">
+      <label>Adhérents à saisir</label>
+      <div class="select-actions">
+        <button id="btn-all" class="btn-link">Tout</button>
+        <button id="btn-none" class="btn-link">Aucun</button>
+        <span id="counter" class="counter">0 sélectionné(s)</span>
+      </div>
+    </div>
+    <div id="adherent-list" class="adherent-list"></div>
   </div>
 
-  <div id="fiche" class="fiche hidden">
-    <div class="field-row">
-      <span class="label">Nom</span>
-      <span id="f-nom" class="value"></span>
+  <div class="progress-wrap">
+    <div class="progress-label">
+      <span>Progression</span>
+      <span class="progress-current">0/0</span>
     </div>
-    <div class="field-row">
-      <span class="label">Prénom</span>
-      <span id="f-prenom" class="value"></span>
-    </div>
-    <div class="field-row">
-      <span class="label">Date de naissance</span>
-      <span id="f-ddn" class="value"></span>
-    </div>
-    <div class="field-row">
-      <span class="label">Email</span>
-      <span id="f-email" class="value"></span>
-    </div>
-    <div class="field-row">
-      <span class="label">Téléphone</span>
-      <span id="f-tel" class="value"></span>
-    </div>
-    <div class="field-row">
-      <span class="label">Adresse</span>
-      <span id="f-adresse" class="value"></span>
-    </div>
-    <div class="field-row">
-      <span class="label">Code postal</span>
-      <span id="f-cp" class="value"></span>
-    </div>
-    <div class="field-row">
-      <span class="label">Ville</span>
-      <span id="f-ville" class="value"></span>
-    </div>
-    <div class="field-row">
-      <span class="label">Sexe</span>
-      <span id="f-sexe" class="value"></span>
-    </div>
-    <div class="field-row">
-      <span class="label">Discipline</span>
-      <span id="f-discipline" class="value"></span>
-    </div>
+    <div class="progress-bar"><div class="progress-fill"></div></div>
   </div>
 
   <div id="status" class="status hidden"></div>
 
   <div class="actions">
     <button id="btn-fill" class="btn-primary" disabled>
-      Préremplir le formulaire FFJDA
+      ▶ Lancer la saisie
     </button>
     <button id="btn-load" class="btn-secondary">
       Charger les données
