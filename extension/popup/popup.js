@@ -1,5 +1,4 @@
-// Données adhérents — à terme chargées depuis l'API club ou un export
-// Format attendu: tableau d'objets avec les champs du modèle
+// Données adhérents — chargées depuis chrome.storage.local
 let adherents = [];
 
 const select = document.getElementById('adherent-select');
@@ -11,6 +10,7 @@ const status = document.getElementById('status');
 function showStatus(msg, type = 'info') {
   status.textContent = msg;
   status.className = `status ${type}`;
+  status.classList.remove('hidden');
 }
 
 function hideFiche() {
@@ -43,7 +43,7 @@ function populateSelect(data) {
   });
 }
 
-// Chargement des données (storage local pour l'instant)
+// Chargement des données depuis storage
 btnLoad.addEventListener('click', () => {
   chrome.storage.local.get(['adherents'], (result) => {
     if (result.adherents && result.adherents.length > 0) {
@@ -59,10 +59,7 @@ btnLoad.addEventListener('click', () => {
 // Sélection d'un adhérent
 select.addEventListener('change', () => {
   const idx = select.value;
-  if (idx === '') {
-    hideFiche();
-    return;
-  }
+  if (idx === '') { hideFiche(); return; }
   showFiche(adherents[parseInt(idx)]);
 });
 
@@ -79,15 +76,22 @@ btnFill.addEventListener('click', async () => {
     return;
   }
 
+  showStatus('Remplissage en cours...', 'info');
+
   chrome.tabs.sendMessage(tab.id, { action: 'fill_form', adherent }, (response) => {
     if (chrome.runtime.lastError) {
       showStatus('Erreur : rechargez la page FFJDA.', 'error');
       return;
     }
-    if (response && response.success) {
-      showStatus('Formulaire prérempli !', 'success');
+    if (!response) {
+      showStatus('Pas de réponse de la page.', 'error');
+      return;
+    }
+    const stepLabel = response.step === 1 ? 'Étape 1' : response.step === 2 ? 'Étape 2' : 'Page non reconnue';
+    if (response.success) {
+      showStatus(`${stepLabel} : ${response.filled} champ(s) rempli(s) ✅`, 'success');
     } else {
-      showStatus('Certains champs n\'ont pas pu être remplis.', 'info');
+      showStatus(`${stepLabel} : aucun champ rempli.`, 'error');
     }
   });
 });
