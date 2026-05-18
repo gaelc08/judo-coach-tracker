@@ -1,7 +1,7 @@
-// popup.js — v2026.05.18-01
+// popup.js — v2026.05.18-02
 let adherents = [];
 let selected  = new Set();
-let currentMode = 'nouvelle'; // 'nouvelle' | 'renouvellement'
+let currentMode = 'nouvelle';
 
 const list    = document.getElementById('adherent-list');
 const btnFill = document.getElementById('btn-fill');
@@ -22,12 +22,16 @@ document.querySelectorAll('.tab').forEach(tab => {
     currentMode = tab.dataset.tab;
     selected.clear();
     renderList();
-    // Mettre à jour le label du bouton
     btnFill.textContent = currentMode === 'renouvellement'
       ? '▶ Lancer le renouvellement'
       : '▶ Lancer la saisie';
     status.className = 'status hidden';
   });
+});
+
+// --- Import HelloAsso ---
+document.getElementById('btn-import-helloasso').addEventListener('click', () => {
+  window.location.href = 'import.html';
 });
 
 function showStatus(msg, type = 'info') {
@@ -45,15 +49,16 @@ function updateCounter() {
 function renderList() {
   list.innerHTML = '';
   if (adherents.length === 0) {
-    list.innerHTML = '<div style="padding:10px;text-align:center;color:#999;font-size:12px">Aucun adhérent chargé</div>';
+    list.innerHTML = '<div style="padding:10px;text-align:center;color:#999;font-size:12px">Aucun adhérent — cliquer 📥 HelloAsso</div>';
     return;
   }
   adherents.forEach((a, i) => {
     const item = document.createElement('label');
     item.className = 'adherent-item' + (selected.has(i) ? ' checked' : '');
+    const sexeWarn = !a.sexe ? ' ⚠' : '';
     item.innerHTML = `
       <input type="checkbox" value="${i}" ${selected.has(i) ? 'checked' : ''}>
-      <span class="name">${a.nom} ${a.prenom}</span>
+      <span class="name">${a.nom} ${a.prenom}${sexeWarn}</span>
       <span class="ddn">${a.date_naissance || ''}</span>
     `;
     item.querySelector('input').addEventListener('change', e => {
@@ -112,14 +117,14 @@ btnLoad.addEventListener('click', () => {
     if (result.adherents?.length > 0) {
       adherents = result.adherents;
       renderList();
-      showStatus(`${adherents.length} adhérent(s) chargé(s).`, 'success');
+      showStatus(`${adherents.length} adhérent(s) rechargé(s).`, 'success');
     } else {
-      showStatus("Aucune donnée. Importez d'abord les adhérents.", 'error');
+      showStatus("Aucune donnée. Utilisez 📥 HelloAsso.", 'error');
     }
   });
 });
 
-// Chargement auto au démarrage
+// Chargement auto
 chrome.storage.local.get(['adherents'], result => {
   if (result.adherents?.length > 0) {
     adherents = result.adherents;

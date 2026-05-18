@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Import HelloAsso</title>
+  <link rel="stylesheet" href="import.css">
+</head>
+<body>
+  <div class="header">
+    <button id="btn-back" class="btn-back">← Retour</button>
+    <h1>Import HelloAsso</h1>
+  </div>
+
+  <div class="section">
+    <div class="club-select">
+      <label for="sel-club">Club</label>
+      <select id="sel-club">
+        <option value="judo">JCC Cattenom — Judo</option>
+        <option value="iaido">JCC Cattenom — Iaïdo</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="section drop-zone" id="drop-zone">
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+      <polyline points="17 8 12 3 7 8"/>
+      <line x1="12" y1="3" x2="12" y2="15"/>
+    </svg>
+    <p>Glisser le fichier HelloAsso (.xlsx)</p>
+    <p class="hint">ou</p>
+    <label class="btn-secondary" for="file-input">Choisir un fichier</label>
+    <input type="file" id="file-input" accept=".xlsx,.xls,.csv" hidden>
+    <p id="file-name" class="file-name"></p>
+  </div>
+
+  <div id="preview" class="preview hidden">
+    <div class="preview-header">
+      <span id="preview-count"></span>
+      <span id="warning-sexe" class="badge-warn hidden">⚠ Sexe manquant</span>
+    </div>
+    <div id="preview-list" class="preview-list"></div>
+  </div>
+
+  <div id="status" class="status hidden"></div>
+
+  <div class="actions">
+    <button id="btn-import" class="btn-primary" disabled>Importer dans l'extension</button>
+  </div>
+
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script src="import.js"></script>
+</body>
+</html>
