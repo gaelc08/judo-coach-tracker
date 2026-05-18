@@ -1,8 +1,8 @@
-// background.js — v2026.05.16-20
-// Support saisie multiple via queue
+// background.js — v2026.05.18-01
+// Saisie nouvelle licence + renouvellement
 
 let flowState = null;
-// flowState = { tabId, queue: [...], current: 0, results: [] }
+// flowState = { mode: 'nouvelle'|'renouvellement', tabId, queue, current, results }
 
 function setStatus(msg, type = 'info') {
   chrome.storage.session.set({ flowStatus: { msg, type, ts: Date.now() } });
@@ -13,10 +13,14 @@ function setProgress(current, total) {
 
 function detectStep(url) {
   if (!url) return null;
-  if (url.includes('/achat-licence/creation-licence-club/etape_1')) return 'etape2';
-  if (url.includes('/saisir-licence/etape-2'))                       return 'intermediaire';
-  if (url.includes('/saisir-licence'))                               return 'etape1';
-  if (url.includes('/prise-licence'))                                return 'depart';
+  // Renouvellement
+  if (url.includes('/achat-licence/renouvellement-licence-club/etape_1')) return 'renew_form';
+  if (url.includes('/renouvellement-licencie-club'))                       return 'renew_search';
+  // Nouvelle licence
+  if (url.includes('/achat-licence/creation-licence-club/etape_1'))        return 'etape2';
+  if (url.includes('/saisir-licence/etape-2'))                             return 'intermediaire';
+  if (url.includes('/saisir-licence'))                                     return 'etape1';
+  if (url.includes('/prise-licence'))                                      return 'depart';
   return null;
 }
 
@@ -136,43 +140,84 @@ function fillEtape2(adherent) {
   }
 
   let f = 0;
-  if (si('nom',            adherent.nom))           f++;
-  if (si('prenom',         adherent.prenom))         f++;
-  if (si('date_naissance', adherent.date_naissance)) f++;
-  if (si('portable',       adherent.telephone))      f++;
-  if (si('mail',           adherent.email))          f++;
-  if (si('mail-confirm',   adherent.email))          f++;
-  if (ss('sexe', adherent.sexe === 'F' ? 'F' : 'M')) f++;
+  // Remplir uniquement les champs vides ou à mettre à jour
+  if (adherent.telephone) si('portable', adherent.telephone) && f++;
+  if (adherent.email) {
+    si('mail',         adherent.email) && f++;
+    si('mail-confirm', adherent.email) && f++;
+  }
+  // Toujours remplir les champs obligatoires de pratique/fonction
+  if (ss('pratiques_1',     adherent.pratique || '1'))      f++;
+  if (sr('type_pratique_1', adherent.type_pratique || 'L')) f++;
+  sr('handicap', '0');
+  if (adherent.certificat) ss('certificat', adherent.certificat);
+  if (adherent.certificat === 'QU') sc('chk_questionnaire', true);
+  if (sr('fonction',    adherent.fonction || '4')) f++;
+  sr('souscription', '1');
+  sr('newsletter',   '0');
+  if (sc('assurance', true)) f++;
+  sc('rgpd', true);
 
-  const cpTarget = adherent.ville
-    ? `${adherent.code_postal} ${adherent.ville}`
-    : adherent.code_postal;
+  // CP/adresse uniquement si pas déjà remplis
+  const cpEl = document.querySelector('[name="cp"]');
+  const hasCP = cpEl && cpEl.value && cpEl.value.trim().length > 0;
 
-  return fillSelect2('cp', adherent.code_postal, cpTarget)
-    .then(ok => { if (ok) f++; return wait(1200); })
-    .then(() => {
-      if (!adherent.adresse) return;
-      return fillSelect2('adresse', adherent.adresse, adherent.adresse)
-        .then(ok => { if (ok) f++; });
-    })
-    .then(() => {
-      if (ss('pratiques_1',     adherent.pratique || '1'))      f++;
-      if (sr('type_pratique_1', adherent.type_pratique || 'L')) f++;
-      sr('handicap', '0');
-      if (adherent.certificat) ss('certificat', adherent.certificat);
-      if (adherent.certificat === 'QU') sc('chk_questionnaire', true);
-      if (sr('fonction',    adherent.fonction || '4')) f++;
-      sr('souscription', '1');
-      sr('newsletter',   '0');
-      if (sc('assurance', true)) f++;
-      sc('rgpd', true);
-      return wait(400).then(() => {
-        const suivant = Array.from(document.querySelectorAll('button.big-btn[type="submit"]'))
-          .find(b => b.textContent.trim().toLowerCase().includes('suivant'));
-        if (suivant) { suivant.click(); f++; }
-        return { step: 2, success: f > 0, filled: f, submitted: !!suivant };
+  const doAddr = () => {
+    if (hasCP || !adherent.code_postal) return Promise.resolve();
+    const cpTarget = adherent.ville ? `${adherent.code_postal} ${adherent.ville}` : adherent.code_postal;
+    return fillSelect2('cp', adherent.code_postal, cpTarget)
+      .then(ok => { if (ok) f++; return wait(1200); })
+      .then(() => {
+        if (!adherent.adresse) return;
+        return fillSelect2('adresse', adherent.adresse, adherent.adresse)
+          .then(ok => { if (ok) f++; });
       });
+  };
+
+  return doAddr().then(() => wait(400)).then(() => {
+    const suivant = Array.from(document.querySelectorAll('button.big-btn[type="submit"]'))
+      .find(b => b.textContent.trim().toLowerCase().includes('suivant'));
+    if (suivant) { suivant.click(); f++; }
+    return { step: 2, success: f > 0, filled: f, submitted: !!suivant };
+  });
+}
+
+// ---- Script renouvellement : recherche + clic sur le lien NOM Prénom ----
+
+function searchAndClickRenew(adherent) {
+  function norm(s) { return (s || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim(); }
+
+  // Remplir le formulaire de recherche
+  function setField(name, val) {
+    const el = document.querySelector(`[name="${name}"]`);
+    if (!el) return;
+    el.value = val;
+    el.dispatchEvent(new Event('input',  { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  // S'il y a déjà des résultats affichés (retour de recherche), chercher le lien
+  const links = Array.from(document.querySelectorAll('a.bluelink'));
+  if (links.length > 0) {
+    const nomA = norm(adherent.nom);
+    const prenomA = norm(adherent.prenom);
+    const match = links.find(a => {
+      const t = norm(a.textContent);
+      return t.includes(nomA) && t.includes(prenomA);
     });
+    if (match) { match.click(); return { found: true, clicked: true }; }
+    return { found: false, clicked: false, msg: 'Licencié non trouvé dans les résultats' };
+  }
+
+  // Sinon, remplir et soumettre la recherche
+  setField('nom',    adherent.nom);
+  setField('prenom', adherent.prenom);
+  setTimeout(() => {
+    const btn = Array.from(document.querySelectorAll('button'))
+      .find(b => b.textContent.trim().toUpperCase().includes('RECHERCHER'));
+    if (btn) btn.click();
+  }, 300);
+  return { found: false, clicked: false, searching: true };
 }
 
 // ---- Queue : passer à l'adhérent suivant ----
@@ -184,16 +229,24 @@ function nextInQueue() {
   setProgress(current, queue.length);
 
   if (current >= queue.length) {
-    setStatus(`✅ ${queue.length} licence(s) saisie(s) avec succès !`, 'success');
+    const label = flowState.mode === 'renouvellement' ? 'renouvellement(s)' : 'licence(s) saisie(s)';
+    setStatus(`✅ ${queue.length} ${label} avec succès !`, 'success');
     flowState = null;
     return;
   }
 
   const adherent = queue[current];
   setStatus(`[${current + 1}/${queue.length}] ${adherent.nom} ${adherent.prenom}...`, 'info');
-  chrome.tabs.update(tabId, {
-    url: 'https://moncompte.ffjudo.com/espace-club/prise-licence/saisir-licence'
-  });
+
+  if (flowState.mode === 'renouvellement') {
+    chrome.tabs.update(tabId, {
+      url: 'https://moncompte.ffjudo.com/espace-club/prise-licence/renouvellement-licencie-club'
+    });
+  } else {
+    chrome.tabs.update(tabId, {
+      url: 'https://moncompte.ffjudo.com/espace-club/prise-licence/saisir-licence'
+    });
+  }
 }
 
 // ---- Gestionnaire central ----
@@ -205,6 +258,66 @@ async function handleNavigation(tabId, url) {
   const adherent = flowState.queue[flowState.current];
   const idx      = flowState.current;
   const total    = flowState.queue.length;
+
+  // === RENOUVELLEMENT ===
+
+  if (step === 'renew_search') {
+    setStatus(`[${idx + 1}/${total}] ${adherent.nom} — recherche...`, 'info');
+    await new Promise(r => setTimeout(r, 1000));
+    try {
+      const r = await runInTab(tabId, searchAndClickRenew, [adherent]);
+      if (r && r.searching) {
+        // La recherche a été lancée, attendre le rechargement avec résultats
+        flowState._renewSearching = true;
+      } else if (r && r.clicked) {
+        setStatus(`[${idx + 1}/${total}] ${adherent.nom} — trouvé, chargement fiche...`, 'info');
+      } else {
+        setStatus(`[${idx + 1}/${total}] ${adherent.nom} — ${r?.msg || 'introuvable'}`, 'error');
+        // Passer au suivant après 3s
+        setTimeout(() => nextInQueue(), 3000);
+      }
+    } catch(e) { setStatus('Erreur recherche : ' + e.message, 'error'); }
+    return;
+  }
+
+  if (step === 'renew_form') {
+    // Résultats de recherche chargés OU formulaire de renouvellement
+    if (flowState._renewSearching) {
+      // On est sur la page résultats — chercher et cliquer le lien
+      flowState._renewSearching = false;
+      setStatus(`[${idx + 1}/${total}] ${adherent.nom} — sélection dans les résultats...`, 'info');
+      await new Promise(r => setTimeout(r, 800));
+      // Note: l'URL contient encore /renouvellement-licencie-club après la recherche
+      // On va détecter si c'est la liste ou le formulaire
+      try {
+        const r = await runInTab(tabId, searchAndClickRenew, [adherent]);
+        if (r && r.clicked) {
+          setStatus(`[${idx + 1}/${total}] ${adherent.nom} — trouvé, chargement...`, 'info');
+        } else {
+          setStatus(`[${idx + 1}/${total}] ${adherent.nom} — ${r?.msg || 'introuvable dans les résultats'}`, 'error');
+          setTimeout(() => nextInQueue(), 3000);
+        }
+      } catch(e) { setStatus('Erreur sélection : ' + e.message, 'error'); }
+      return;
+    }
+
+    // Formulaire de renouvellement (etape_1) — même que fillEtape2
+    setStatus(`[${idx + 1}/${total}] ${adherent.nom} — formulaire renouvellement...`, 'info');
+    await new Promise(r => setTimeout(r, 1000));
+    try {
+      const r = await runInTab(tabId, fillEtape2, [adherent]);
+      if (!r) { setStatus(`Renouvellement [${idx + 1}] : pas de réponse.`, 'error'); return; }
+      if (r.success) {
+        setStatus(`[${idx + 1}/${total}] ${adherent.nom} ✅`, 'success');
+        setTimeout(() => nextInQueue(), 2500);
+      } else {
+        setStatus(`Renouvellement [${idx + 1}] : ${r.error || 'erreur inconnue'}`, 'error');
+      }
+    } catch(e) { setStatus('Erreur formulaire renouvellement : ' + e.message, 'error'); }
+    return;
+  }
+
+  // === NOUVELLE LICENCE ===
 
   if (step === 'etape1') {
     setStatus(`[${idx + 1}/${total}] ${adherent.nom} — étape 1...`, 'info');
@@ -235,7 +348,6 @@ async function handleNavigation(tabId, url) {
       if (!r) { setStatus(`Étape 2 [${idx + 1}] : pas de réponse.`, 'error'); return; }
       if (r.success) {
         setStatus(`[${idx + 1}/${total}] ${adherent.nom} ✅`, 'success');
-        // Attendre que la FFJDA traite le submit avant de passer au suivant
         setTimeout(() => nextInQueue(), 2500);
       } else {
         setStatus(`Étape 2 [${idx + 1}] : ${r.error || 'erreur inconnue'}`, 'error');
@@ -256,24 +368,33 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 // ---- Messages depuis la popup ----
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg.action === 'startQueue') {
+
+  if (msg.action === 'startQueue' || msg.action === 'startRenewalQueue') {
     const { tabId, tabUrl, queue } = msg;
+    const mode = msg.action === 'startRenewalQueue' ? 'renouvellement' : 'nouvelle';
     if (!queue || queue.length === 0) {
       setStatus('Aucun adhérent sélectionné.', 'error');
       sendResponse({ ok: false });
       return true;
     }
-    flowState = { tabId, queue, current: 0, results: [] };
+    flowState = { mode, tabId, queue, current: 0, results: [], _renewSearching: false };
     setProgress(0, queue.length);
     const adherent = queue[0];
     setStatus(`[1/${queue.length}] ${adherent.nom} ${adherent.prenom}...`, 'info');
-    const step = detectStep(tabUrl);
-    if (step && step !== 'depart') {
-      handleNavigation(tabId, tabUrl);
-    } else {
+
+    if (mode === 'renouvellement') {
       chrome.tabs.update(tabId, {
-        url: 'https://moncompte.ffjudo.com/espace-club/prise-licence/saisir-licence'
+        url: 'https://moncompte.ffjudo.com/espace-club/prise-licence/renouvellement-licencie-club'
       });
+    } else {
+      const step = detectStep(tabUrl);
+      if (step && step !== 'depart') {
+        handleNavigation(tabId, tabUrl);
+      } else {
+        chrome.tabs.update(tabId, {
+          url: 'https://moncompte.ffjudo.com/espace-club/prise-licence/saisir-licence'
+        });
+      }
     }
     sendResponse({ ok: true, total: queue.length });
     return true;

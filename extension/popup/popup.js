@@ -1,6 +1,7 @@
-// popup.js — v2026.05.16-20
+// popup.js — v2026.05.18-01
 let adherents = [];
 let selected  = new Set();
+let currentMode = 'nouvelle'; // 'nouvelle' | 'renouvellement'
 
 const list    = document.getElementById('adherent-list');
 const btnFill = document.getElementById('btn-fill');
@@ -12,6 +13,22 @@ const status  = document.getElementById('status');
 const progressWrap = document.querySelector('.progress-wrap');
 const progressFill = document.querySelector('.progress-fill');
 const progressCurrent = document.querySelector('.progress-current');
+
+// --- Onglets ---
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentMode = tab.dataset.tab;
+    selected.clear();
+    renderList();
+    // Mettre à jour le label du bouton
+    btnFill.textContent = currentMode === 'renouvellement'
+      ? '▶ Lancer le renouvellement'
+      : '▶ Lancer la saisie';
+    status.className = 'status hidden';
+  });
+});
 
 function showStatus(msg, type = 'info') {
   status.textContent = msg;
@@ -78,11 +95,16 @@ btnFill.addEventListener('click', async () => {
     return;
   }
   const queue = [...selected].sort((a, b) => a - b).map(i => adherents[i]);
-  showStatus(`Lancement de ${queue.length} saisie(s)...`, 'info');
+  showStatus(`Lancement de ${queue.length} ${currentMode === 'renouvellement' ? 'renouvellement(s)' : 'saisie(s)'}...`, 'info');
   progressWrap.classList.add('visible');
   progressFill.style.width = '0%';
   progressCurrent.textContent = `0/${queue.length}`;
-  chrome.runtime.sendMessage({ action: 'startQueue', tabId: tab.id, tabUrl: tab.url, queue });
+  chrome.runtime.sendMessage({
+    action: currentMode === 'renouvellement' ? 'startRenewalQueue' : 'startQueue',
+    tabId: tab.id,
+    tabUrl: tab.url,
+    queue
+  });
 });
 
 btnLoad.addEventListener('click', () => {

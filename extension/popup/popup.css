@@ -17,6 +17,31 @@ body {
 .header h1 { font-size: 15px; font-weight: 700; letter-spacing: .3px; }
 .header .subtitle { font-size: 11px; opacity: .75; margin-top: 2px; }
 
+/* Onglets */
+.tabs {
+  display: flex;
+  border-bottom: 2px solid #e0e0e0;
+  background: #fff;
+}
+.tab {
+  flex: 1;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #777;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  cursor: pointer;
+  transition: color .15s, border-color .15s;
+}
+.tab.active {
+  color: #1a237e;
+  border-bottom-color: #1a237e;
+}
+.tab:hover:not(.active) { color: #444; }
+
 .section {
   padding: 10px 14px 8px;
   background: #fff;
